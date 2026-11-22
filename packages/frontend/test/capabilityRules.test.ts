@@ -2,24 +2,32 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { Capability } from '../src/api.ts';
-import { groupState, lockedFor, orderedCaps, requires, toggleCap, toggleForRole, toggleMany } from '../src/capabilityRules.ts';
+import { groupState, lockedFor, orderedCaps, requires, rightsRows, toggleCap, toggleForRole, toggleMany } from '../src/capabilityRules.ts';
 
 const set = (...caps: Capability[]) => new Set<Capability>(caps);
 
 test('eigene Daten und Verwalten setzen die Mitgliedschaft voraus, Sehen nicht', () => {
   assert.equal(requires('view_own_points'), 'member');
   assert.equal(requires('manage_events'), 'member');
-  assert.equal(requires('create_users'), 'member');
+  assert.equal(requires('view_accounts'), 'member');
+  assert.equal(requires('manage_former'), 'member');
   assert.equal(requires('view_ranks'), null);
   assert.equal(requires('calendar'), null);
   assert.equal(requires('member'), null);
 });
 
+test('zu- und absagen setzt den internen Kalender voraus, nicht die Mitgliedschaft', () => {
+  assert.equal(requires('respond_calendar'), 'calendar');
+  assert.deepEqual(orderedCaps(toggleCap(set(), 'respond_calendar', true)), ['calendar', 'respond_calendar']);
+  assert.deepEqual(orderedCaps(toggleCap(set('calendar', 'respond_calendar', 'view_ranks'), 'calendar', false)), ['view_ranks']);
+  assert.equal(lockedFor('guest', true, 'respond_calendar'), false, 'auch für Gast');
+});
+
 test('Anhaken bringt die Voraussetzung mit, Abhaken nimmt was sie voraussetzt', () => {
-  assert.deepEqual(orderedCaps(toggleCap(set(), 'manage_points', true)), ['member', 'manage_points']);
-  const before = set('member', 'view_own_points', 'manage_points', 'view_ranks');
+  assert.deepEqual(orderedCaps(toggleCap(set(), 'manage_events', true)), ['member', 'manage_events']);
+  const before = set('member', 'view_own_points', 'manage_events', 'view_ranks');
   assert.deepEqual(orderedCaps(toggleCap(before, 'member', false)), ['view_ranks'], 'Sehen bleibt');
-  assert.deepEqual(orderedCaps(before), ['member', 'view_own_points', 'view_ranks', 'manage_points'], 'unverändert');
+  assert.deepEqual(orderedCaps(before), ['member', 'view_own_points', 'view_ranks', 'manage_events'], 'unverändert');
 });
 
 test('persönliche Angaben: pflegen setzt sehen voraus, über mehrere Stufen', () => {
@@ -29,6 +37,32 @@ test('persönliche Angaben: pflegen setzt sehen voraus, über mehrere Stufen', (
   const all = set('member', 'view_personal', 'manage_personal', 'view_ranks');
   assert.deepEqual(orderedCaps(toggleCap(all, 'view_personal', false)), ['member', 'view_ranks']);
   assert.deepEqual(orderedCaps(toggleCap(all, 'member', false)), ['view_ranks'], 'ohne Mitgliedschaft fällt beides weg');
+});
+
+test('Schreiben setzt das passende Lesen voraus, Lesen die Mitgliedschaft (wie Capability::READ_OF)', () => {
+  const pairs: [Capability, Capability][] = [
+    ['manage_points', 'view_points'],
+    ['manage_penalties', 'view_penalties'],
+    ['manage_ranks', 'view_promotions'],
+    ['manage_titles', 'view_titles'],
+    ['manage_attendance', 'view_attendance'],
+    ['create_users', 'view_accounts'],
+    ['promote_users', 'view_accounts'],
+  ];
+  for (const [write, read] of pairs) {
+    assert.equal(requires(write), read, write);
+    assert.equal(requires(read), 'member', read);
+  }
+  assert.deepEqual(orderedCaps(toggleCap(set(), 'manage_points', true)), ['member', 'view_points', 'manage_points']);
+  assert.deepEqual(
+    orderedCaps(toggleCap(set('member', 'view_points', 'manage_points'), 'view_points', false)),
+    ['member'],
+    'ohne Lesen kein Schreiben',
+  );
+  assert.deepEqual(orderedCaps(toggleCap(set('member', 'view_points', 'manage_points'), 'manage_points', false)), [
+    'member',
+    'view_points',
+  ]);
 });
 
 test('Haken einer Gruppe: alle, einige, keine', () => {
@@ -85,4 +119,28 @@ test('Kompanien und Sponsoren: Rechte zum Sehen, auch für Gast, und beim Speich
     'view_sponsors',
     'member',
   ]);
+});
+
+test('Rechtebaum: Leserecht mit Bereich und folgendem Schreibrecht in einer Zeile, sonst einzeln', () => {
+  const rows = rightsRows<{ key: Capability; area?: string }>([
+    { key: 'view_points', area: 'Punkte' },
+    { key: 'manage_points' },
+    { key: 'view_accounts', area: 'Konten' },
+    { key: 'create_users' },
+    { key: 'manage_former' },
+    { key: 'promote_users' },
+    { key: 'view_lists', area: 'Listen' },
+    { key: 'manage_events' },
+  ]);
+  assert.deepEqual(
+    rows.map((r) => (r.kind === 'pair' ? `${r.area}: ${r.read.key}/${r.write.key}` : r.item.key)),
+    [
+      'Punkte: view_points/manage_points',
+      'Konten: view_accounts/create_users',
+      'manage_former',
+      'promote_users',
+      'view_lists',
+      'manage_events',
+    ],
+  );
 });

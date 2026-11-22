@@ -5,19 +5,24 @@ import {
   buildNav,
   draftError,
   draftOf,
+  guestDraftOf,
   internOrderOf,
+  isGuestView,
+  navigationFor,
   isPageTarget,
   mergeOrder,
   menuOf,
   moveTo,
   NAV_TARGETS,
   orderBy,
+  pageAllowedForGuests,
   pageTarget,
   placeOf,
   removeMenu,
   startChoices,
   startOf,
   tabbarClass,
+  targetAllowed,
   unplaced,
   viewPath,
   type NavContext,
@@ -212,4 +217,101 @@ test('Nur „Intern“ umgeordnet: es bleibt bei der Standardnavigation', () => 
   assert.equal(internOrderOf(initial, moved), null, 'anderer Platz: eigene Navigation');
   const renamed = { ...initial, items: [...initial.items.slice(0, -1), { ...menu, label: 'Mehr' }] };
   assert.equal(internOrderOf(initial, renamed), null, 'anderer Name: eigene Navigation');
+});
+
+test('Leiste für Gäste: ohne Anmeldung und mit der Grundrolle Gast, sonst die der Angemeldeten', () => {
+  assert.equal(isGuestView(null), true);
+  assert.equal(isGuestView(undefined), true);
+  assert.equal(isGuestView({ level: 'guest' }), true, 'auch angemeldet, z. B. ehemalige Mitglieder und die Vorschau als Gast');
+  assert.equal(isGuestView({ level: 'member' }), false);
+  assert.equal(isGuestView({ level: 'admin' }), false);
+
+  const member = { items: ['termine', { label: 'Intern', icon: 'ordner', items: ['mitglieder'] }], hidden: [] };
+  const guest = { items: ['mitglieder', 'termine'], hidden: [] };
+  assert.equal(navigationFor({ navigation: member, navigation_guest: guest }, true), guest);
+  assert.equal(navigationFor({ navigation: member, navigation_guest: guest }, false), member);
+  assert.equal(navigationFor({ navigation: member, navigation_guest: null }, true), member, 'ohne eigene: wie Angemeldete');
+  assert.equal(navigationFor({ navigation: null, navigation_guest: guest }, false), null, 'Angemeldete mit Standardnavigation');
+  assert.equal(navigationFor({ navigation: null }, true), null);
+  assert.equal(navigationFor(null, true), null);
+});
+
+test('Erster Entwurf für Gäste: Mitglieder und Dokumente aus Untermenüs nach unten, leere Untermenüs fallen weg', () => {
+  const member = {
+    items: [
+      'termine',
+      { label: 'Intern', icon: 'ordner', items: ['mitglieder', 'dokumente'] },
+      { label: 'Mehr', icon: 'stern', items: ['brett'] },
+    ],
+    hidden: ['punktekatalog'],
+  };
+  assert.deepEqual(guestDraftOf(member), {
+    items: ['termine', { label: 'Mehr', icon: 'stern', items: ['brett'] }, 'mitglieder', 'dokumente'],
+    hidden: ['punktekatalog'],
+  });
+  assert.deepEqual(member.items[1], { label: 'Intern', icon: 'ordner', items: ['mitglieder', 'dokumente'] }, 'Vorlage unverändert');
+  // Ausgeblendetes bleibt ausgeblendet, unten Stehendes bleibt, wo es ist.
+  assert.deepEqual(guestDraftOf({ items: ['mitglieder', 'termine'], hidden: ['dokumente'] }), {
+    items: ['mitglieder', 'termine'],
+    hidden: ['dokumente'],
+  });
+  // Aus der Standardnavigation
+  assert.deepEqual(guestDraftOf(draftOf(null)), {
+    items: [
+      'termine',
+      'news',
+      'galerie',
+      'kompanien',
+      { label: 'Intern', icon: 'ordner', items: ['sponsoren', 'brett', 'dienstgrade', 'punktekatalog'] },
+      'mitglieder',
+      'dokumente',
+    ],
+    hidden: [],
+  });
+});
+
+test('targetAllowed: Bereich an und Recht, wie die Tab-Leiste und Einstellungen → Navigation es prüfen', () => {
+  const caps =
+    (...c: string[]) =>
+    (cap: string) =>
+      c.includes(cap);
+  const on =
+    (...f: string[]) =>
+    (feature: string) =>
+      f.includes(feature);
+  const all = () => true;
+  // Mit allen Rechten zählt nur, ob ein Bereich an ist.
+  assert.equal(targetAllowed('kompanien', all, on()), false);
+  assert.equal(targetAllowed('kompanien', all, on('companies')), true);
+  assert.equal(targetAllowed('mitglieder', all, on('offices')), true);
+  assert.equal(targetAllowed('termine', all, on('birthdays')), true);
+  // Rechte der Rolle Gast: Dokumente und Punktekatalog nur mit ihrem Recht, das Brett nur mit view_board.
+  const gast = caps('view_events', 'view_news', 'view_gallery', 'view_directory');
+  const allOn = () => true;
+  assert.deepEqual(
+    NAV_TARGETS.filter((t) => targetAllowed(t, gast, allOn)),
+    ['termine', 'news', 'galerie', 'mitglieder'],
+  );
+  assert.equal(targetAllowed('dokumente', caps('view_restricted_documents'), allOn), true);
+  assert.equal(targetAllowed('brett', caps('post_board'), allOn), false);
+  assert.equal(targetAllowed('galerie', caps('view_gallery_internal'), allOn), true);
+  assert.equal(targetAllowed('termine', caps('calendar'), on('events')), false);
+});
+
+test('pageAllowedForGuests: öffentliche Seiten alle, Seiten für Mitglieder nur mit view_board oder manage_pages', () => {
+  const none = () => false;
+  assert.equal(pageAllowedForGuests('public', none), true);
+  assert.equal(pageAllowedForGuests('members', none), false);
+  assert.equal(
+    pageAllowedForGuests('members', (c) => c === 'view_board'),
+    true,
+  );
+  assert.equal(pageAllowedForGuests(undefined, none), false);
+});
+
+test('mergeOrder: auch mit Untermenüs (Objekten) ordnet es nur die gezeigten Punkte, die übrigen bleiben an ihrem Platz', () => {
+  const menu = { label: 'Verein', icon: 'ordner', items: ['brett'] };
+  const full = ['termine', 'kompanien', menu, 'news'];
+  // kompanien ist aus und wird nicht gezeigt; der Admin zieht news nach vorn.
+  assert.deepEqual(mergeOrder(full, ['news', 'termine', menu]), ['news', 'kompanien', 'termine', menu]);
 });

@@ -2,6 +2,7 @@ import { useRef, useState, type FormEvent } from 'react';
 import { api, type Sponsor } from '../api';
 import { useDragSort, useSaveQueue } from '../dragSort';
 import brand from '../generated/brand';
+import { t } from '../i18n';
 import { Empty, ErrorBox, LinkField, Loading, useAsync } from '../ui';
 import { normalizeLink } from '../link';
 import { sources } from '../viewData';
@@ -33,10 +34,10 @@ function SponsorFields({
   return (
     <>
       <label className="field">
-        <span>Name</span>
+        <span>{t('Name')}</span>
         <input type="text" maxLength={NAME_MAX} value={name} onChange={(e) => onName(e.target.value)} required autoFocus={autoFocus} />
       </label>
-      <LinkField label="Link (optional)" value={url} onChange={onUrl} />
+      <LinkField label={t('Link (optional)')} value={url} onChange={onUrl} />
     </>
   );
 }
@@ -75,7 +76,7 @@ export function SponsorAdmin({ onToast }: { onToast: (msg: string) => void }) {
 
   async function add(e: FormEvent) {
     e.preventDefault();
-    if (await run(() => api.createSponsor({ name: name.trim(), url: normalizeLink(url) }), 'Sponsor angelegt')) {
+    if (await run(() => api.createSponsor({ name: name.trim(), url: normalizeLink(url) }), t('Sponsor angelegt'))) {
       setName('');
       setUrl('');
     }
@@ -93,14 +94,14 @@ export function SponsorAdmin({ onToast }: { onToast: (msg: string) => void }) {
     if (!file || id === null) return;
     const ext = file.name.toLowerCase().split('.').pop() ?? '';
     if (!['png', 'jpg', 'jpeg', 'webp', 'svg'].includes(ext)) {
-      setFormError('Erlaubt sind PNG, JPG, WebP und SVG.');
+      setFormError(t('Erlaubt sind PNG, JPG, WebP und SVG.'));
       return;
     }
     if (file.size > LOGO_MAX_BYTES) {
-      setFormError('Das Logo darf höchstens 2 MB groß sein.');
+      setFormError(t('Das Logo darf höchstens 2 MB groß sein.'));
       return;
     }
-    await run(() => api.uploadSponsorLogo(id, file), 'Logo gespeichert');
+    await run(() => api.uploadSponsorLogo(id, file), t('Logo gespeichert'));
   }
 
   const saveOrder = useSaveQueue();
@@ -121,7 +122,7 @@ export function SponsorAdmin({ onToast }: { onToast: (msg: string) => void }) {
   const sort = useDragSort(data ?? [], reorder, editing !== null);
 
   if (loading && !data) return <Loading />;
-  if (error || !data) return <ErrorBox message={error ?? 'Die Einträge konnten nicht geladen werden.'} onRetry={reload} />;
+  if (error || !data) return <ErrorBox message={error ?? t('Die Einträge konnten nicht geladen werden.')} onRetry={reload} />;
   const list = data;
 
   return (
@@ -132,7 +133,7 @@ export function SponsorAdmin({ onToast }: { onToast: (msg: string) => void }) {
         </p>
       )}
       {list.length === 0 ? (
-        <Empty>Noch keine {sec.sponsors}.</Empty>
+        <Empty>{t('Noch keine {section}.', { section: sec.sponsors })}</Empty>
       ) : (
         <ul className="card-list sponsor-admin-list">
           {list.map((s, i) =>
@@ -142,17 +143,17 @@ export function SponsorAdmin({ onToast }: { onToast: (msg: string) => void }) {
                   className="form"
                   onSubmit={async (e) => {
                     e.preventDefault();
-                    if (await run(() => api.updateSponsor(s.id, { name: editName.trim(), url: normalizeLink(editUrl) }), 'Gespeichert'))
+                    if (await run(() => api.updateSponsor(s.id, { name: editName.trim(), url: normalizeLink(editUrl) }), t('Gespeichert')))
                       setEditing(null);
                   }}
                 >
                   <SponsorFields name={editName} url={editUrl} onName={setEditName} onUrl={setEditUrl} autoFocus />
                   <div className="button-row">
                     <button className="btn" type="submit" disabled={busy}>
-                      Speichern
+                      {t('Speichern')}
                     </button>
                     <button className="btn btn-secondary" type="button" onClick={() => setEditing(null)}>
-                      Abbrechen
+                      {t('Abbrechen')}
                     </button>
                   </div>
                 </form>
@@ -165,11 +166,11 @@ export function SponsorAdmin({ onToast }: { onToast: (msg: string) => void }) {
                 </div>
                 <div className="row-main">
                   <div className="row-title">{s.name}</div>
-                  <div className="row-sub">{s.url || 'ohne Link'}</div>
+                  <div className="row-sub">{s.url || t('ohne Link')}</div>
                   <div className="row-actions">
                     <IconButton
                       icon="edit"
-                      label="Bearbeiten"
+                      label={t('Bearbeiten')}
                       disabled={busy}
                       onClick={() => {
                         setEditName(s.name);
@@ -178,25 +179,28 @@ export function SponsorAdmin({ onToast }: { onToast: (msg: string) => void }) {
                       }}
                     />
                     <button className="btn btn-small btn-secondary" disabled={busy} onClick={() => chooseLogo(s.id)}>
-                      {s.logo_url ? 'Logo ersetzen' : 'Logo hochladen'}
+                      {s.logo_url ? t('Logo ersetzen') : t('Logo hochladen')}
                     </button>
                     {s.logo_url && (
                       <button
                         className="btn btn-small btn-secondary"
                         disabled={busy}
                         onClick={async () =>
-                          (await confirmAsk(`Logo von „${s.name}“ entfernen?`)) && run(() => api.removeSponsorLogo(s.id), 'Logo entfernt')
+                          (await confirmAsk(t('Logo von „{name}“ entfernen?', { name: s.name }))) &&
+                          run(() => api.removeSponsorLogo(s.id), t('Logo entfernt'))
                         }
                       >
-                        Logo entfernen
+                        {t('Logo entfernen')}
                       </button>
                     )}
                     <IconButton
                       icon="delete"
-                      label="Löschen"
+                      label={t('Löschen')}
                       variant="danger"
                       disabled={busy}
-                      onClick={async () => (await confirmAsk(`„${s.name}“ löschen?`)) && run(() => api.deleteSponsor(s.id), 'Gelöscht')}
+                      onClick={async () =>
+                        (await confirmAsk(t('„{name}“ löschen?', { name: s.name }))) && run(() => api.deleteSponsor(s.id), t('Gelöscht'))
+                      }
                     />
                   </div>
                 </div>
@@ -211,15 +215,15 @@ export function SponsorAdmin({ onToast }: { onToast: (msg: string) => void }) {
         type="file"
         accept={LOGO_ACCEPT}
         hidden
-        aria-label="Logo-Datei"
+        aria-label={t('Logo-Datei')}
         onChange={(e) => uploadLogo(e.target.files?.[0] ?? null)}
       />
 
       <form className="form card" onSubmit={add}>
-        <h3>Neuer Sponsor</h3>
+        <h3>{t('Neuer Sponsor')}</h3>
         <SponsorFields name={name} url={url} onName={setName} onUrl={setUrl} />
         <button className="btn btn-block" type="submit" disabled={busy}>
-          Anlegen
+          {t('Anlegen')}
         </button>
       </form>
     </div>

@@ -53,6 +53,12 @@ const gruppe: Gruppe = async (f) => {
   await expect(page.locator('.sheet')).toBeVisible();
   await f.foto('mitglied-uebersicht-eintritt');
 
+  // Anwesenheit (Beispieldaten: tests/standalone/handbuch-daten/50-organisation.php)
+  await f.oeffnen(`verwaltung/mitglied/${id}`);
+  await expect(page.locator('.member-attendance-tile')).toBeVisible();
+  await oben('.member-attendance');
+  await f.foto('mitglied-uebersicht-anwesenheit');
+
   // Geburtstag
   await f.oeffnen(`verwaltung/mitglied/${id}/geburtstag`);
   await expect(page.locator('.sheet')).toBeVisible();

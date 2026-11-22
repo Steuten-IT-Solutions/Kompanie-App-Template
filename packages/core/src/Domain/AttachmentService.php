@@ -7,6 +7,7 @@ namespace KompanieApp\Core\Domain;
 use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 
 /**
  * Dateianhänge am Schwarzen Brett und an E-Mails aus der Verwaltung, allgemeiner Baustein wie RichImageService.
@@ -73,21 +74,21 @@ final class AttachmentService
         $bytes = $data === '' ? '' : base64_decode($data, true);
         unset($data);
         if ($bytes === false || $bytes === '') {
-            throw ApiError::invalid(sprintf(
-                'Es ist keine Datei angekommen (leer oder größer als das, was der Server annimmt: %s).',
-                DocumentService::formatBytes(self::maxBytes()),
+            throw ApiError::invalid(I18n::t(
+                'Es ist keine Datei angekommen (leer oder größer als das, was der Server annimmt: {max}).',
+                ['max' => DocumentService::formatBytes(self::maxBytes())],
             ));
         }
         $max = DocumentService::requestLimit();
         if (strlen($bytes) > $max) {
-            throw ApiError::invalid(sprintf('„%s“ ist zu groß: Anhänge dürfen höchstens %s groß sein.', $name, DocumentService::formatBytes($max)));
+            throw ApiError::invalid(I18n::t('„{name}“ ist zu groß: Anhänge dürfen höchstens {max} groß sein.', ['name' => $name, 'max' => DocumentService::formatBytes($max)]));
         }
         $uid = bin2hex(random_bytes(16));
         $file = 'anh-' . $uid . '.bin';
         $path = $this->app->files->path(self::DIR . $file, false);
         if (@file_put_contents($path, $bytes) !== strlen($bytes)) {
             @unlink($path);
-            throw new ApiError(500, 'storage_failed', 'Der Anhang konnte nicht gespeichert werden (Speicherplatz, Schreibrechte?).');
+            throw new ApiError(500, 'storage_failed', I18n::t('Der Anhang konnte nicht gespeichert werden (Speicherplatz, Schreibrechte?).'));
         }
         $row = [
             'uid' => $uid, 'owner_type' => self::OWNER_DRAFT, 'owner_id' => $actor->id, 'user_id' => $actor->id, 'name' => $name,
@@ -108,7 +109,7 @@ final class AttachmentService
             return [];
         }
         if (!is_array($uids)) {
-            throw ApiError::invalid('attachments: Liste von Kennungen erwartet.');
+            throw ApiError::invalid(I18n::t('attachments: Liste von Kennungen erwartet.'));
         }
         $out = [];
         foreach (array_values(array_unique(array_map(static fn (mixed $u): string => is_string($u) ? strtolower($u) : '', $uids))) as $uid) {
@@ -116,7 +117,7 @@ final class AttachmentService
             $own = $row !== null && (($row['owner_type'] === self::OWNER_DRAFT && $row['owner_id'] === $actor->id)
                 || ($ownerId !== null && $row['owner_type'] === $ownerType && $row['owner_id'] === $ownerId));
             if (!$own) {
-                throw ApiError::invalid('Ein Anhang ist nicht mehr vorhanden. Bitte die Datei erneut anhängen.');
+                throw ApiError::invalid(I18n::t('Ein Anhang ist nicht mehr vorhanden. Bitte die Datei erneut anhängen.'));
             }
             $out[] = $row;
         }

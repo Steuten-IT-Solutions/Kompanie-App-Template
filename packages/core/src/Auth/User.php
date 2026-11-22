@@ -20,6 +20,11 @@ final class User
         public readonly string $lastName = '',
         /** Vorschau „App als Rolle ansehen“ (Issue #63, Auth\Preview): ein Admin mit genau dieser Rolle, ohne Zusatzrollen */
         public readonly bool $preview = false,
+        /**
+         * Vorschau „App als Person ansehen“: ID, Name und Benutzername sind die der gewählten Person (ihre eigenen Daten
+         * unter „Meins“), angemeldet bleibt der Admin; nur lesen.
+         */
+        public readonly bool $previewPerson = false,
     ) {
     }
 

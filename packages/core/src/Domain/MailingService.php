@@ -9,6 +9,7 @@ use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Mail\Mail;
 use KompanieApp\Core\Mail\MailResult;
 use KompanieApp\Core\Port\Mailer;
@@ -84,7 +85,7 @@ final class MailingService
         }
         return [
             'available' => $available,
-            'reason' => $available ? null : ($this->app->mail()->unavailable() ?? 'Der Mailversand ist noch nicht eingerichtet (Einstellungen → E-Mail).'),
+            'reason' => $available ? null : ($this->app->mail()->unavailable() ?? I18n::t('Der Mailversand ist noch nicht eingerichtet (Einstellungen → E-Mail).')),
             'from' => $config['from'],
             'from_name' => $config['from_name'],
             'groups' => $this->groups(),
@@ -118,21 +119,21 @@ final class MailingService
     public function send(User $author, array $in): array
     {
         if (!$this->available()) {
-            throw ApiError::invalid($this->options()['reason'] ?? 'Der Mailversand ist nicht eingerichtet.');
+            throw ApiError::invalid($this->options()['reason'] ?? I18n::t('Der Mailversand ist nicht eingerichtet.'));
         }
         $subject = is_string($in['subject'] ?? null) ? Text::line($in['subject'], self::SUBJECT_MAX) : '';
         if ($subject === '') {
-            throw ApiError::invalid('Bitte einen Betreff eingeben.');
+            throw ApiError::invalid(I18n::t('Bitte einen Betreff eingeben.'));
         }
         $text = $in['text'] ?? null;
         $body = is_string($text) ? RichText::sanitize($text) : '';
         if (RichText::isEmpty($body)) {
-            throw ApiError::invalid('Bitte einen Text eingeben.');
+            throw ApiError::invalid(I18n::t('Bitte einen Text eingeben.'));
         }
         $selection = $this->validSelection(['to' => $in['to'] ?? null, 'cc' => $in['cc'] ?? null, 'bcc' => $in['bcc'] ?? null]);
         ['recipients' => $recipients] = $this->resolve($selection);
         if ($recipients === []) {
-            throw ApiError::invalid('Keiner der gewählten Empfänger hat eine Mailadresse. Bitte Empfänger auswählen.');
+            throw ApiError::invalid(I18n::t('Keiner der gewählten Empfänger hat eine Mailadresse. Bitte Empfänger auswählen.'));
         }
         $files = $this->app->attachments()->resolve($author, $in['attachments'] ?? null, AttachmentService::OWNER_MAIL);
         $this->checkSize($subject, $body, $recipients, $files);
@@ -186,7 +187,7 @@ final class MailingService
      */
     public function detail(int $id): array
     {
-        $row = $this->find($id) ?? throw ApiError::notFound('Diese E-Mail gibt es nicht (mehr).');
+        $row = $this->find($id) ?? throw ApiError::notFound(I18n::t('Diese E-Mail gibt es nicht (mehr).'));
         $names = new UserNames($this->app->users);
         $selection = json_decode((string) $row['selection'], true);
         $selection = is_array($selection) ? $selection : [];
@@ -197,7 +198,7 @@ final class MailingService
             $userIds = array_values(array_filter((array) ($s['users'] ?? []), 'is_int'));
             $names->prime($userIds);
             $described[$field] = [
-                'groups' => array_map(fn (string $k): array => ['key' => $k, 'label' => $this->app->mailGroups()->find($k)['label'] ?? 'Gelöschte Gruppe'], array_values(array_filter((array) ($s['groups'] ?? []), 'is_string'))),
+                'groups' => array_map(fn (string $k): array => ['key' => $k, 'label' => $this->app->mailGroups()->find($k)['label'] ?? I18n::t('Gelöschte Gruppe')], array_values(array_filter((array) ($s['groups'] ?? []), 'is_string'))),
                 'roles' => array_map(static fn (string $k): array => ['key' => $k, 'label' => $roles[$k]['label'] ?? $k], array_values(array_filter((array) ($s['roles'] ?? []), 'is_string'))),
                 'users' => array_map(static fn (int $u): array => ['id' => $u, 'name' => $names->name($u)], $userIds),
                 'emails' => array_values(array_filter((array) ($s['emails'] ?? []), 'is_string')),
@@ -225,10 +226,10 @@ final class MailingService
         ];
     }
 
-    /** Bild einer Mail ansehen (RichImageService::canView): wer Mails versendet und den Verlauf sieht. */
+    /** Bild einer Mail ansehen (RichImageService::canView): wer den Verlauf der Mails sieht (view_mail). */
     public function canSeeImage(User $viewer, int $mailingId): bool
     {
-        return $this->app->features()->enabled(self::FEATURE) && $viewer->can(Capability::SendMail) && $this->find($mailingId) !== null;
+        return $this->app->features()->enabled(self::FEATURE) && $viewer->can(Capability::ViewMail) && $this->find($mailingId) !== null;
     }
 
     /**
@@ -308,7 +309,7 @@ final class MailingService
             return '<img src="cid:' . $m[1] . '"' . $m[2] . '>';
         }, $body);
         $esc = static fn (string $s): string => htmlspecialchars($s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-        $document = '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>' . $esc($subject) . '</title></head>'
+        $document = '<!DOCTYPE html><html lang="' . I18n::base() . '"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>' . $esc($subject) . '</title></head>'
             . '<body style="margin: 0; padding: 16px; font-family: Arial, Helvetica, sans-serif; font-size: 15px; line-height: 1.5; color: #222222; background-color: #ffffff">'
             . $html
             . '</body></html>';
@@ -346,7 +347,7 @@ final class MailingService
     public function validSelection(mixed $in): array
     {
         if (!is_array($in)) {
-            throw ApiError::invalid('Bitte Empfänger angeben (to, cc, bcc).');
+            throw ApiError::invalid(I18n::t('Bitte Empfänger angeben (to, cc, bcc).'));
         }
         $out = [];
         foreach (self::FIELDS as $field) {
@@ -366,7 +367,7 @@ final class MailingService
             $f = [];
         }
         if (!is_array($f)) {
-            throw ApiError::invalid($field . ': Rollen, Mitglieder und Adressen erwartet.');
+            throw ApiError::invalid(I18n::t('{field}: Rollen, Mitglieder und Adressen erwartet.', ['field' => $field]));
         }
         $roles = $this->app->roles()->all();
         $sel = ['roles' => [], 'users' => [], 'emails' => []];
@@ -374,7 +375,7 @@ final class MailingService
             $groups = [];
             foreach ((array) ($f['groups'] ?? []) as $key) {
                 if (!is_string($key) || $this->app->mailGroups()->find($key) === null) {
-                    throw ApiError::invalid('Unbekannte Mailgruppe: ' . (is_scalar($key) ? (string) $key : '?') . '.');
+                    throw ApiError::invalid(I18n::t('Unbekannte Mailgruppe: {group}.', ['group' => is_scalar($key) ? (string) $key : '?']));
                 }
                 $groups[] = $key;
             }
@@ -382,25 +383,25 @@ final class MailingService
         }
         foreach ((array) ($f['roles'] ?? []) as $key) {
             if (!is_string($key) || !isset($roles[$key]) || $key === Roles::GUEST) {
-                throw ApiError::invalid('Unbekannte Rolle: ' . (is_scalar($key) ? (string) $key : '?') . '.');
+                throw ApiError::invalid(I18n::t('Unbekannte Rolle: {role}.', ['role' => is_scalar($key) ? (string) $key : '?']));
             }
             $sel['roles'][] = $key;
         }
         foreach ((array) ($f['users'] ?? []) as $id) {
             $id = Input::integer($id);
             if ($id === null || $id < 1) {
-                throw ApiError::invalid('Ungültiges Mitglied in ' . $field . '.');
+                throw ApiError::invalid(I18n::t('Ungültiges Mitglied in {field}.', ['field' => $field]));
             }
             $sel['users'][] = $id;
         }
         $emails = (array) ($f['emails'] ?? []);
         if (count($emails) > self::EMAILS_MAX) {
-            throw ApiError::invalid(sprintf('Höchstens %d Adressen je Feld.', self::EMAILS_MAX));
+            throw ApiError::invalid(I18n::t('Höchstens {max} Adressen je Feld.', ['max' => self::EMAILS_MAX]));
         }
         foreach ($emails as $email) {
             $email = is_string($email) ? trim($email) : '';
             if ($email === '' || strlen($email) > 191 || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
-                throw ApiError::invalid('Ungültige Adresse: „' . $email . '“.');
+                throw ApiError::invalid(I18n::t('Ungültige Adresse: „{email}“.', ['email' => $email]));
             }
             $sel['emails'][] = $email;
         }
@@ -410,7 +411,7 @@ final class MailingService
         $found = $this->app->users->findMany($sel['users']);
         foreach ($sel['users'] as $id) {
             if (!isset($found[$id]) || $found[$id]->role === Roles::GUEST) {
-                throw ApiError::invalid('Dieses Mitglied gibt es nicht (mehr).');
+                throw ApiError::invalid(I18n::t('Dieses Mitglied gibt es nicht (mehr).'));
             }
         }
         return $sel;
@@ -527,10 +528,9 @@ final class MailingService
         $mail = $this->compose($subject, $body, ['email' => $recipients[0]['email'], 'name' => $recipients[0]['name']], $header, $this->app->attachments()->forMail($files));
         $size = $this->app->mailer()->measure($mail);
         if ($size > $max) {
-            throw ApiError::invalid(sprintf(
-                'Die Mail ist mit Bildern und Anhängen %s groß, der Mailserver nimmt höchstens %s an. Bitte Bilder oder Anhänge verkleinern.',
-                ServerLimits::format($size),
-                ServerLimits::format($max),
+            throw ApiError::invalid(I18n::t(
+                'Die Mail ist mit Bildern und Anhängen {size} groß, der Mailserver nimmt höchstens {max} an. Bitte Bilder oder Anhänge verkleinern.',
+                ['size' => ServerLimits::format($size), 'max' => ServerLimits::format($max)],
             ));
         }
     }

@@ -64,7 +64,8 @@ final class FeaturesTest extends TestCase
 
         $users->current = $users->add('admin', Roles::ADMIN);
         $list = $h('GET')->data;
-        $this->assertSame(Features::keys(), array_column($list, 'key'));
+        // Ohne Ort für die Webseite (wie unter WordPress) fehlt der Bereich Webseite.
+        $this->assertSame(array_values(array_diff(Features::keys(), ['website'])), array_column($list, 'key'));
         $byKey = array_column($list, null, 'key');
         $this->assertTrue($byKey['points']['enabled']);
         $this->assertFalse($byKey['news']['enabled']);

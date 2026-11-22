@@ -8,6 +8,7 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Storage\CompanyRepository;
 
 /**
@@ -47,15 +48,15 @@ final class CompanyService
 
     /**
      * Alle Kompanien in ihrer Reihenfolge, für $viewer (null: ohne Anmeldung). Mitglieder (members, member_count) nur
-     * mit dem Bereich directory und view_directory; wer Kompanien verwaltet, bekommt dazu die IDs aller
-     * Zugeordneten.
+     * mit dem Bereich directory und view_directory; wer die Zuordnung sieht (view_company_members), bekommt dazu die IDs
+     * aller Zugeordneten.
      *
      * @return list<array<string, mixed>>
      */
     public function list(?User $viewer): array
     {
         $who = $viewer ?? $this->app->anonymous();
-        $manager = $viewer !== null && $viewer->can(Capability::ManageCompanies);
+        $manager = $viewer !== null && $viewer->can(Capability::ViewCompanyMembers);
         // Mitgliederliste: zentral der Bereich directory, wer sie sieht, das Recht view_directory (wie GET /directory).
         $directory = $this->app->features()->enabled('directory') && $who->can(Capability::ViewDirectory);
         $assignments = $this->repository()->assignments();
@@ -100,7 +101,7 @@ final class CompanyService
     public function create(array $in, User $actor): array
     {
         if (!array_key_exists('name', $in)) {
-            throw ApiError::invalid('Bitte den Namen der Kompanie angeben.');
+            throw ApiError::invalid(I18n::t('Bitte den Namen der Kompanie angeben.'));
         }
         $data = $this->validate($in);
         $description = $data['description'] ?? '';
@@ -160,7 +161,7 @@ final class CompanyService
         $known = array_keys($companies);
         sort($known);
         if ($given !== $known) {
-            throw ApiError::invalid('Bitte die Reihenfolge aller Einträge angeben.');
+            throw ApiError::invalid(I18n::t('Bitte die Reihenfolge aller Einträge angeben.'));
         }
         $now = $this->app->time()->nowUtc();
         foreach ($order as $i => $id) {
@@ -221,17 +222,17 @@ final class CompanyService
      */
     public function assignToUser(int $userId, mixed $companyIds): array
     {
-        $user = $this->app->users->find($userId) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
+        $user = $this->app->users->find($userId) ?? throw ApiError::notFound(I18n::t('Mitglied nicht gefunden.'));
         $known = array_column($this->repository()->all(), 'id');
-        $ids = self::ids($companyIds, 'Bitte die Kompanien als Liste angeben.');
+        $ids = self::ids($companyIds, I18n::t('Bitte die Kompanien als Liste angeben.'));
         foreach ($ids as $id) {
             if (!in_array($id, $known, true)) {
-                throw ApiError::invalid('Unbekannte Kompanie.');
+                throw ApiError::invalid(I18n::t('Unbekannte Kompanie.'));
             }
         }
         $current = $this->repository()->companyIdsOf($userId);
         if (!$user->isMember() && array_diff($ids, $current) !== []) {
-            throw ApiError::invalid('Kompanien zuordnen lassen sich nur Mitglieder.');
+            throw ApiError::invalid(I18n::t('Kompanien zuordnen lassen sich nur Mitglieder.'));
         }
         $this->repository()->replaceOfUser($userId, $ids, $this->app->time()->nowUtc());
         return $this->of($userId);
@@ -245,16 +246,16 @@ final class CompanyService
     public function assignMembers(int $id, mixed $userIds, User $actor): array
     {
         $this->find($id);
-        $ids = self::ids($userIds, 'Bitte die Personen als Liste angeben.');
+        $ids = self::ids($userIds, I18n::t('Bitte die Personen als Liste angeben.'));
         $current = $this->repository()->memberIdsOf($id);
         $users = $this->app->users->findMany($ids);
         foreach ($ids as $userId) {
             $user = $users[$userId] ?? null;
             if ($user === null) {
-                throw ApiError::invalid('Unbekannte Person.');
+                throw ApiError::invalid(I18n::t('Unbekannte Person.'));
             }
             if (!$user->isMember() && !in_array($userId, $current, true)) {
-                throw ApiError::invalid(sprintf('%s ist kein Mitglied und lässt sich nicht zuordnen.', $user->name));
+                throw ApiError::invalid(I18n::t('{name} ist kein Mitglied und lässt sich nicht zuordnen.', ['name' => $user->name]));
             }
         }
         $this->repository()->replaceOfCompany($id, $ids, $this->app->time()->nowUtc());
@@ -289,7 +290,7 @@ final class CompanyService
     /** @return Company */
     private function find(int $id): array
     {
-        return $this->repository()->find($id) ?? throw ApiError::notFound('Kompanie nicht gefunden.');
+        return $this->repository()->find($id) ?? throw ApiError::notFound(I18n::t('Kompanie nicht gefunden.'));
     }
 
     /** @return array<string, mixed> eine Kompanie wie in list() */
@@ -300,7 +301,7 @@ final class CompanyService
                 return $c;
             }
         }
-        throw ApiError::notFound('Kompanie nicht gefunden.');
+        throw ApiError::notFound(I18n::t('Kompanie nicht gefunden.'));
     }
 
     /**
@@ -332,35 +333,35 @@ final class CompanyService
     {
         $data = [];
         if (array_key_exists('name', $in)) {
-            $data['name'] = self::line($in['name'], self::NAME_MAX, 'Name', true);
+            $data['name'] = self::line($in['name'], self::NAME_MAX, I18n::t('Der Name darf höchstens {max} Zeichen lang sein.', ['max' => self::NAME_MAX]), true);
         }
         if (array_key_exists('short_name', $in)) {
-            $data['short_name'] = self::line($in['short_name'], self::SHORT_MAX, 'Kurzname', false);
+            $data['short_name'] = self::line($in['short_name'], self::SHORT_MAX, I18n::t('Der Kurzname darf höchstens {max} Zeichen lang sein.', ['max' => self::SHORT_MAX]), false);
         }
         if (array_key_exists('founded_year', $in)) {
             $data['founded_year'] = $this->year($in['founded_year']);
         }
         if (array_key_exists('description', $in)) {
             if ($in['description'] !== null && !is_string($in['description'])) {
-                throw ApiError::invalid('Ungültige Beschreibung.');
+                throw ApiError::invalid(I18n::t('Ungültige Beschreibung.'));
             }
             // Bilder übernimmt create()/update() (claim); öffentlich ausgeliefert mit view_companies (Issue #281).
             $html = RichText::sanitize((string) $in['description']);
             $html = RichText::isEmpty($html) ? '' : $html;
             if (strlen($html) > self::DESCRIPTION_MAX) {
-                throw ApiError::invalid('Die Beschreibung ist zu lang.');
+                throw ApiError::invalid(I18n::t('Die Beschreibung ist zu lang.'));
             }
             $data['description'] = $html;
         }
         if (array_key_exists('website_url', $in)) {
-            $data['website_url'] = Input::httpsUrl($in['website_url'], 'Webseite');
+            $data['website_url'] = Input::httpsUrl($in['website_url'], I18n::t('Webseite'));
         }
         if (array_key_exists('app_url', $in)) {
-            $data['app_url'] = Input::httpsUrl($in['app_url'], 'App der Kompanie');
+            $data['app_url'] = Input::httpsUrl($in['app_url'], I18n::t('App der Kompanie'));
         }
         if (array_key_exists('active', $in)) {
             if (!is_bool($in['active'])) {
-                throw ApiError::invalid('Ungültiger Wert für „aktiv“.');
+                throw ApiError::invalid(I18n::t('Ungültiger Wert für „aktiv“.'));
             }
             $data['active'] = $in['active'];
         }
@@ -374,20 +375,22 @@ final class CompanyService
         }
         $year = Input::integer($raw);
         $max = (int) $this->app->time()->format($this->app->time()->timestamp(), 'Y');
-        if ($year === null || $year < OfficeService::YEAR_MIN || $year > $max) {
-            throw ApiError::invalid(sprintf('Bitte ein Gründungsjahr zwischen %d und %d angeben oder das Feld leer lassen.', OfficeService::YEAR_MIN, $max));
+        // Keine Untergrenze außer > 0: Manche Kompanien sind älter als jede feste Grenze.
+        if ($year === null || $year < 1 || $year > $max) {
+            throw ApiError::invalid(I18n::t('Bitte ein Gründungsjahr bis {max} angeben oder das Feld leer lassen.', ['max' => $max]));
         }
         return $year;
     }
 
-    private static function line(mixed $raw, int $max, string $label, bool $required): string
+    /** @param string $tooLong Meldung, wenn der Text länger als $max Zeichen ist */
+    private static function line(mixed $raw, int $max, string $tooLong, bool $required): string
     {
         $text = Text::line($raw ?? '');
         if ($required && $text === '') {
-            throw ApiError::invalid('Bitte den Namen der Kompanie angeben.');
+            throw ApiError::invalid(I18n::t('Bitte den Namen der Kompanie angeben.'));
         }
         if (mb_strlen($text) > $max) {
-            throw ApiError::invalid(sprintf('Der %s darf höchstens %d Zeichen lang sein.', $label, $max));
+            throw ApiError::invalid($tooLong);
         }
         return $text;
     }

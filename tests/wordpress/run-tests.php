@@ -51,12 +51,12 @@ $legacyCaps = static fn (array $l): array => array_values(array_filter(
 $c->ok($caps($member) === $legacyCaps(['member']), 'Mitglied: Mitgliedschaft und Rechte zum Sehen');
 $c->ok($caps($organizer) === $legacyCaps(['member', 'manage_events']), 'Termine verwalten: Termine und Mitglied, keine Punkte/Strafen');
 $c->ok($app->users->find($organizer)?->role === 'events' && get_user_meta($organizer, KompanieApp\WordPress\WpUsers::metaKey(), true) === 'events', 'Rolle steht in der Benutzer-Option der Website');
-$c->ok($caps($manager) === $legacyCaps(['member', 'manage_points']), 'Punkte verwalten: Punkte und Mitglied');
+$c->ok($caps($manager) === $legacyCaps(['member', 'view_points', 'manage_points']), 'Punkte verwalten: Punkte und Mitglied');
 $c->ok(in_array(Roles::ROLE_MEMBER, get_userdata($member)->roles, true), 'Mitglied behält die frühere WP-Rolle (Zurückrollen)');
 $c->ok(count($caps($admin)) === count(KompanieApp\Core\Auth\Capability::cases()) && $app->users->find($admin)?->role === 'admin', 'Administrator: alle App-Rechte');
 
 // Eigene Rolle aus der App wirkt auch in WordPress.
-$app->roles()->create(['label' => 'Kpwp Kasse', 'capabilities' => $legacyCaps(['member', 'manage_penalties'])]);
+$app->roles()->create(['label' => 'Kpwp Kasse', 'capabilities' => $legacyCaps(['member', 'view_penalties', 'manage_penalties'])]);
 $kasseKey = (string) array_search('Kpwp Kasse', array_column($app->roles()->all(), 'label', 'key'), true);
 $app->users->setRole($member, $kasseKey);
 clean_user_cache($member);
@@ -69,7 +69,7 @@ $app->roles()->delete($kasseKey, null);
 $c->section('Anwärter');
 $candKey = (string) (array_search('Kpwp Anwärter', array_column($app->roles()->all(), 'label', 'key'), true)
     ?: $app->roles()->create(['label' => 'Kpwp Anwärter', 'capabilities' => $legacyCaps(['calendar']), 'new_accounts' => true, 'promotable' => true])['key']);
-$app->roles()->create(['label' => 'Kpwp Aufnahme', 'capabilities' => $legacyCaps(['member', 'create_users'])]);
+$app->roles()->create(['label' => 'Kpwp Aufnahme', 'capabilities' => $legacyCaps(['member', 'view_accounts', 'create_users'])]);
 $aufnahmeKey = (string) array_search('Kpwp Aufnahme', array_column($app->roles()->all(), 'label', 'key'), true);
 $holder = $d->createUser('kpwp_aufnahme', $aufnahmeKey);
 $existingCand = get_user_by('login', 'kpwp.anwaerter');
@@ -136,7 +136,7 @@ remove_role('kpwp_vorstand');
 
 // Wer in der App Konten anlegen darf, setzt keine Passwörter von Benutzerverwaltern der Webseite zurück.
 add_role('kpwp_userpflege', 'Benutzerpflege', ['read' => true, 'list_users' => true, 'edit_users' => true]);
-$pflegeRole = $app->roles()->create(['label' => 'Kpwp Kontenpflege', 'capabilities' => $legacyCaps(['member', 'create_users'])]);
+$pflegeRole = $app->roles()->create(['label' => 'Kpwp Kontenpflege', 'capabilities' => $legacyCaps(['member', 'view_accounts', 'create_users'])]);
 $pflegeKey = $pflegeRole['key'];
 $pfleger = $d->createUser('kpwp_pfleger', 'member');
 $app->users->setRole($pfleger, $pflegeKey);
@@ -197,7 +197,7 @@ wp_delete_user($manual);
 wp_set_current_user($pfleger);
 // Konto der Webseite (z. B. Kunde, Forum), das erst über die App zum Mitglied gemacht wird: nicht übernehmbar.
 wp_set_current_user(0);
-$app->roles()->update($pflegeKey, ['capabilities' => $legacyCaps(['member', 'create_users', 'promote_users'])]);
+$app->roles()->update($pflegeKey, ['capabilities' => $legacyCaps(['member', 'view_accounts', 'create_users', 'promote_users'])]);
 $fremd = wp_insert_user(['user_login' => 'kpwp_fremd', 'user_pass' => wp_generate_password(), 'role' => 'subscriber']);
 wp_set_current_user($pfleger);
 $app->users->setRole($fremd, 'member');
@@ -275,7 +275,7 @@ $d->request('PATCH', "/members/$rid/account", ['username' => 'kpwp.dritter']);
 clean_user_cache($rid);
 $c->ok(get_userdata($rid)->user_login === 'kpwp.dritter' && get_userdata($rid)->user_nicename === 'kpwp-eigen', 'Eigener Name in Adressen bleibt');
 // Benutzer der Webseite (z. B. Redakteur): nur mit dem Recht aus WordPress, nicht über „Mitglieder anlegen“ der App.
-$umbenenner = $app->roles()->create(['label' => 'Kpwp Umbenenner', 'capabilities' => $legacyCaps(['member', 'create_users'])]);
+$umbenenner = $app->roles()->create(['label' => 'Kpwp Umbenenner', 'capabilities' => $legacyCaps(['member', 'view_accounts', 'create_users'])]);
 $kontenpfleger = $d->createUser('kpwp_kontenpfleger', 'member');
 $app->users->setRole($kontenpfleger, $umbenenner['key']);
 $redakteur = wp_insert_user(['user_login' => 'kpwp_red', 'user_pass' => wp_generate_password(), 'role' => 'editor']);
@@ -308,6 +308,88 @@ $c->ok($d->request('GET', '/news/' . $draft)[0] === 404, 'Entwurf → 404');
 $c->ok($d->request('GET', '/news/' . $pw)[0] === 404, 'Kennwortgeschützter Beitrag → 404');
 foreach ([$pub, $draft, $pw] as $pid) {
     wp_delete_post($pid, true);
+}
+
+$c->section('Neuigkeiten aus Beiträgen je Sprache (Polylang)');
+require_once __DIR__ . '/polylang-stub.php';
+$languagesBefore = $app->settings->get('languages', '');
+$app->settings->set('languages', 'de,en');
+$deMit = wp_insert_post(['post_title' => 'Kpwp Schützenfest', 'post_content' => '<p>Deutsch</p>', 'post_status' => 'publish']);
+$enMit = wp_insert_post(['post_title' => 'Kpwp Shooting fair', 'post_content' => '<p>English</p>', 'post_status' => 'publish']);
+$deOhne = wp_insert_post(['post_title' => 'Kpwp Nur deutsch', 'post_content' => '<p>Nur deutsch</p>', 'post_status' => 'publish']);
+$enEntwurf = wp_insert_post(['post_title' => 'Kpwp Draft', 'post_content' => 'x', 'post_status' => 'draft']);
+$ohneSprache = wp_insert_post(['post_title' => 'Kpwp Ohne Sprache', 'post_content' => '<p>alt</p>', 'post_status' => 'publish']);
+$GLOBALS['kpwp_pll'] = [
+    'lang' => [$deMit => 'de', $enMit => 'en', $deOhne => 'de', $enEntwurf => 'en'],
+    'groups' => [['de' => $deMit, 'en' => $enMit], ['de' => $deOhne, 'en' => $enEntwurf]],
+];
+$byId = static fn (array $list): array => array_column(array_filter($list, static fn (array $n): bool => str_starts_with($n['title'], 'Kpwp')), null, 'id');
+$d->actAs(null);
+$d->lang('en');
+[$s, $news] = $d->request('GET', '/news');
+$en = $byId($news);
+$c->ok($s === 200 && count($en) === 3 && isset($en[(string) $deMit], $en[(string) $deOhne], $en[(string) $ohneSprache]), 'Polylang: Liste aus den deutschen Beiträgen und denen ohne Sprache, Kennung des deutschen');
+$c->ok(($en[(string) $deMit]['title'] ?? '') === 'Kpwp Shooting fair' && !isset($en[(string) $deMit]['untranslated']) && ($en[(string) $deMit]['link'] ?? '') === get_permalink($enMit), 'Auf Englisch die Übersetzung');
+$c->ok(($en[(string) $deOhne]['title'] ?? '') === 'Kpwp Nur deutsch' && ($en[(string) $deOhne]['untranslated'] ?? '') === 'all', 'Ohne veröffentlichte Übersetzung deutsch mit Hinweis');
+[$s, $item] = $d->request('GET', '/news/' . $deMit);
+$c->ok($s === 200 && $item['id'] === (string) $deMit && str_contains($item['content'], 'English') && !isset($item['untranslated']), 'Beitrag auf Englisch');
+[, $item] = $d->request('GET', '/news/' . $deOhne);
+$c->ok(str_contains($item['content'], 'Nur deutsch') && ($item['untranslated'] ?? '') === 'all', 'Beitrag ohne Übersetzung mit Hinweis');
+$d->lang(null);
+[, $news] = $d->request('GET', '/news');
+$de = $byId($news);
+$c->ok(($de[(string) $deMit]['title'] ?? '') === 'Kpwp Schützenfest' && !isset($de[(string) $deMit]['untranslated'], $de[(string) $deOhne]['untranslated']), 'Auf Deutsch die deutschen ohne Hinweis');
+[, $item] = $d->request('GET', '/news/' . $enMit);
+$c->ok(str_contains($item['content'], 'Deutsch') && $item['id'] === (string) $enMit, 'Übersetzter Beitrag auf Deutsch aufgerufen: die deutsche Fassung');
+$GLOBALS['kpwp_pll'] = null;
+$d->lang('en');
+[, $news] = $d->request('GET', '/news');
+$en = $byId($news);
+$c->ok(count($en) === 4 && ($en[(string) $enMit]['untranslated'] ?? '') === 'all', 'Ohne Polylang: alle Beiträge, auf Englisch mit Hinweis');
+$d->lang(null);
+\KompanieApp\Core\I18n\I18n::setLocale('de');
+$app->settings->set('languages', $languagesBefore);
+foreach ([$deMit, $enMit, $deOhne, $enEntwurf, $ohneSprache] as $pid) {
+    wp_delete_post($pid, true);
+}
+
+$c->section('News im Editor von WordPress schreiben');
+$newsWasOn = $app->features()->enabled('news');
+$app->features()->update(['news' => true]);
+$app->settings->delete(KompanieApp\Core\Domain\NewsService::SOURCE_SETTING);
+KompanieApp\WordPress\WpNewsSource::forget();
+$roles = $app->roles()->all();
+$c->ok(isset($roles['news']) && in_array('manage_news', $roles['news']['capabilities'], true), 'Standardrolle „News verwalten“ auch mit den Beiträgen der Seite');
+$autor = $d->createUser('kpwp_newsautor', 'news');
+$leser = $d->createUser('kpwp_newsleser', 'member');
+KompanieApp\WordPress\WpNewsSource::forget();
+$fremd = wp_insert_post(['post_title' => 'Kpwp Fremder Beitrag', 'post_content' => 'x', 'post_status' => 'publish', 'post_author' => $admin]);
+$seite = wp_insert_post(['post_title' => 'Kpwp Seite', 'post_type' => 'page', 'post_status' => 'publish', 'post_author' => $admin]);
+$c->ok(user_can($autor, 'edit_posts') && user_can($autor, 'publish_posts') && user_can($autor, 'upload_files') && user_can($autor, 'edit_post', $fremd) && user_can($autor, 'delete_post', $fremd), 'News schreiben gibt in WordPress die Rechte für alle Beiträge');
+$c->ok(!user_can($autor, 'edit_pages') && !user_can($autor, 'edit_post', $seite) && !user_can($autor, 'unfiltered_html') && !user_can($autor, 'manage_options'), 'Keine Seiten, kein ungefiltertes HTML, keine Einstellungen');
+$c->ok(!user_can($leser, 'edit_posts') && !user_can($leser, 'upload_files'), 'Mitglied ohne das Recht bekommt nichts');
+$d->actAs($autor);
+[, $cfg] = $d->request('GET', '/config');
+$c->ok(($cfg['newsEditorUrl'] ?? '') === admin_url('post-new.php') && ($cfg['newsInApp'] ?? null) === false, '/config newsEditorUrl für News schreiben');
+[$s, $item] = $d->request('GET', '/news/' . $fremd);
+$c->ok($s === 200 && ($item['edit_url'] ?? '') === admin_url('post.php?post=' . $fremd . '&action=edit'), 'Beitrag mit edit_url');
+$d->actAs($leser);
+[, $cfg] = $d->request('GET', '/config');
+[, $item] = $d->request('GET', '/news/' . $fremd);
+$c->ok(($cfg['newsEditorUrl'] ?? null) === null && !isset($item['edit_url']), 'Ohne das Recht keine Adressen');
+$d->actAs(null);
+$app->settings->set(KompanieApp\Core\Domain\NewsService::SOURCE_SETTING, 'app');
+KompanieApp\WordPress\WpNewsSource::forget();
+$c->ok(!user_can($autor, 'edit_posts'), 'Mit der Quelle „In der App“ keine Rechte in WordPress');
+$app->settings->delete(KompanieApp\Core\Domain\NewsService::SOURCE_SETTING);
+KompanieApp\WordPress\WpNewsSource::forget();
+foreach ([$autor, $leser] as $uid) {
+    $d->deleteUser($uid);
+}
+wp_delete_post($fremd, true);
+wp_delete_post($seite, true);
+if (!$newsWasOn) {
+    $app->features()->update(['news' => false]);
 }
 
 $c->section('Shortcodes');
@@ -454,6 +536,14 @@ Plugin::upgrade();
 $c->ok($wpSettings->get('kp_alt') === 'aus der Vorversion', 'Einstellung ohne Autoload aus einer Vorversion nach dem Update lesbar');
 $c->ok(get_option(KompanieApp\WordPress\WpSettings::PREFIX . 'roles_version') === $rolesVersion, 'Update-Schritt einmal je Version');
 delete_option(KompanieApp\WordPress\WpSettings::PREFIX . 'kp_alt');
+// false bei einer noch nicht gespeicherten Einstellung (update_option() allein speicherte nichts, die Vorgabe „an“ blieb).
+delete_option(KompanieApp\WordPress\WpSettings::PREFIX . 'kp_schalter');
+$wpSettings->set('kp_schalter', false);
+wp_cache_delete('alloptions', 'options');
+$c->ok((bool) (new KompanieApp\WordPress\WpSettings())->get('kp_schalter', true) === false, 'Schalter mit Vorgabe an lässt sich beim ersten Mal ausschalten (false gespeichert)');
+$wpSettings->set('kp_schalter', true);
+$c->ok((bool) $wpSettings->get('kp_schalter', false) === true, 'Und wieder einschalten');
+delete_option(KompanieApp\WordPress\WpSettings::PREFIX . 'kp_schalter');
 
 $c->section('Aufgaben');
 $task = [\KompanieApp\Core\Domain\GalleryService::TASK];
@@ -638,6 +728,15 @@ $c->ok(str_contains($page, 'Alternative: Dienstkonto') && strpos($page, 'id="dri
 $d->actAs($admin);
 [$s, $set] = $d->request('GET', '/admin/settings');
 $c->ok($s === 200 && ($set['google']['redirect_uri'] ?? '') === $redirect, 'Weiterleitungs-URI: wp-admin/admin-post.php');
+// Erinnerung an Zu- und Absagen ausschalten (Vorgabe an): bleibt nach dem Neuladen aus.
+delete_option(KompanieApp\WordPress\WpSettings::PREFIX . KompanieApp\Core\Domain\EventResponseService::REMINDER_SETTING);
+$responsesBefore = $app->settings->get(KompanieApp\Core\Domain\EventResponseService::ENABLED_SETTING);
+[$s, $set] = $d->request('PATCH', '/admin/settings', ['calendar_responses' => '1', 'calendar_response_reminder' => '0']);
+wp_cache_delete('alloptions', 'options');
+$c->ok($s === 200 && $set['calendar']['response_reminder'] === false && $d->request('GET', '/admin/settings')[1]['calendar']['response_reminder'] === false && get_option(KompanieApp\WordPress\WpSettings::PREFIX . KompanieApp\Core\Domain\EventResponseService::REMINDER_SETTING, null) !== null, 'Erinnerung an Zu- und Absagen bleibt ausgeschaltet');
+[$s, $set] = $d->request('PATCH', '/admin/settings', ['calendar_response_reminder' => '1']);
+$c->ok($s === 200 && $set['calendar']['response_reminder'] === true, 'Erinnerung wieder einschalten');
+$responsesBefore === null ? $app->settings->delete(KompanieApp\Core\Domain\EventResponseService::ENABLED_SETTING) : $app->settings->set(KompanieApp\Core\Domain\EventResponseService::ENABLED_SETTING, $responsesBefore);
 [$s, $start] = $d->request('POST', '/admin/google/connect', ['client_id' => '1-wp.apps.googleusercontent.com', 'client_secret' => 'GOCSPX-wp']);
 parse_str((string) parse_url((string) ($start['url'] ?? ''), PHP_URL_QUERY), $q);
 $c->ok($s === 200 && ($q['redirect_uri'] ?? '') === $redirect && str_starts_with((string) ($q['state'] ?? ''), 'kompanie_app_app_'), 'REST: Admin beginnt die Verbindung (Rückkehr in die App)');

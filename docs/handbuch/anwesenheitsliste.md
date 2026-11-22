@@ -1,7 +1,8 @@
 ---
 titel: "Anwesenheitsliste „…“"
 reihenfolge: 60
-rechte: [manage_attendance]
+rechte: []
+einrecht: [view_attendance, manage_attendance]
 bereiche: [attendance]
 ---
 In einer Anwesenheitsliste trägst du für einen Termin ein, wer **anwesend** war, wer **entschuldigt** war und wer **fehlt**. Darfst du auch {bereich.points} oder {bereich.penalties} vergeben, buchst du sie von hier aus für alle Anwesenden bzw. Fehlenden.
@@ -14,11 +15,15 @@ Tippe unten auf **Verwaltung**, dann auf **{bereich.attendance}**. Tippe dort au
 ## Was du hier siehst
 - **‹ {bereich.attendance}**: führt zurück zur Übersicht.
 - **Titel und Datum**: Bei einem Termin aus dem {bereich.calendar} stehen sie fest. Bei einem freien Termin stehen sie in Feldern, die du ändern kannst.
-- **Zähler**: z. B. „3 anwesend · 0 entschuldigt · 1 fehlt“. Ist alles gespeichert, steht darunter die Aufteilung nach Gruppen, z. B. „anwesend: Mitglieder 3“.
+- **Terminarten**: darunter die gewählten Arten der Liste (oder „keine“). Ein Tipp auf **Terminarten** klappt die Haken auf, je Art einer, z. B. **Versammlung** und **Arbeitsdienst**; mehrere gehen (nur, wenn ein {rolle.admin} Terminarten eingerichtet hat). Eine neue Liste übernimmt die Arten ihres Termins im {bereich.calendar}; hat der keine, schlägt die App passende aus dem Titel vor. Jeder Haken ist sofort gespeichert, ohne deine Häkchen bei den Personen zu speichern.
+- **Zähler**: z. B. „3 anwesend · 0 entschuldigt · 1 fehlt · 5 ohne Auswahl“. **Ohne Auswahl** sind die Personen, bei denen noch kein Kästchen angekreuzt ist.
 - **Person suchen …**: zeigt nur Personen, deren Name passt.
 - **Alle anwesend**: setzt alle gezeigten Personen auf anwesend (bei einer Suche nur die gefundenen).
 - **Die Liste**: alle Personen mit einer Rolle, außer {rolle.guest}. Je Person gibt es ein Kästchen für **anwesend**, **entschuldigt** und **fehlt**. Neben dem Namen steht die Rolle, wenn sie nicht {rolle.member} ist. **{bereich.points} gebucht** heißt: Diese Person hat für diese Liste schon {bereich.points} bekommen.
-- **Speichern**: speichert deine Änderungen. Ist alles gespeichert, steht dort **Gespeichert**.
+- **zugesagt** bzw. **abgesagt** unter dem Namen: die Rückmeldung der Person zum Termin, mit ihrem Hinweis (nur bei Listen zu Terminen aus dem {bereich.calendar} und wenn Zu- und Absagen eingeschaltet sind). Solange man noch zu- und absagen kann, steht dort eine Auswahl, mit der du die Rückmeldung für die Person einträgst.
+- **Absagen übernehmen**: setzt alle, die abgesagt haben und noch kein Häkchen haben, auf **entschuldigt**. Der Knopf erscheint nur, wenn es solche Personen gibt.
+- **Speichern**: speichert deine Änderungen. Ist alles gespeichert, steht dort **Gespeichert**. Ohne Verbindung steht dort **Auf dem Gerät gespeichert** (siehe „Ohne Internet eintragen“ unten).
+- **Noch nicht übertragen**: Hinweis über der Liste, solange offline gespeicherte Änderungen noch nicht beim Server sind. Mit **Jetzt übertragen** versucht die App es sofort.
 - **{bereich.points} für … Anwesende** und **Eintrag für … Fehlende**: nur, wenn du {bereich.points} bzw. {bereich.penalties} vergeben darfst.
 - **Liste löschen**: ganz unten.
 
@@ -29,6 +34,24 @@ Tippe unten auf **Verwaltung**, dann auf **{bereich.attendance}**. Tippe dort au
 3. Tippe auf **Speichern**.
 
 ![Häkchen setzen in der Liste](bild:anwesenheitsliste-eintragen)
+
+### Vorab entschuldigen (kommender Termin)
+1. Öffne die Liste über **Kommende Termine** (oder lege einen freien Termin mit einem Datum in der Zukunft an).
+2. Über der Liste steht „Der Termin kommt erst noch. Bis dahin kannst du nur „entschuldigt“ eintragen.“ Die Kästchen für **anwesend** und **fehlt** sind gesperrt, **Alle anwesend** und die Knöpfe zum Buchen fehlen.
+3. Setze bei jeder entschuldigten Person das Häkchen bei **entschuldigt** und tippe auf **Speichern**.
+4. Ab dem Tag des Termins trägst du in derselben Liste wie gewohnt die übrigen ein.
+
+### Absagen als entschuldigt übernehmen
+1. Öffne die Liste zu einem Termin aus dem {bereich.calendar}.
+2. Wer abgesagt hat und noch keinen Eintrag hat, ist schon als **entschuldigt** vorausgewählt. Über der Liste steht dann „Wer abgesagt hat, ist als „entschuldigt“ vorausgewählt.“
+3. Prüfe die Auswahl. Hast du einzelne Häkchen entfernt, setzt **Absagen übernehmen** sie wieder alle.
+4. Tippe auf **Speichern**. Erst dann ist es eingetragen.
+
+### Für jemanden zu- oder absagen
+Meldet sich jemand z. B. per Telefon ab:
+1. Öffne die Liste zum Termin.
+2. Wähle unter dem Namen **zugesagt**, **abgesagt** oder **keine Rückmeldung**. Das ist sofort gespeichert und steht im Änderungsprotokoll.
+3. Bei einer Absage ist **entschuldigt** vorausgewählt. Tippe auf **Speichern**, um es einzutragen.
 
 ### {bereich.points} für die Anwesenden buchen
 1. Tippe auf **{bereich.points} für … Anwesende**. Ungespeicherte Änderungen speichert die App vorher.
@@ -42,18 +65,34 @@ Tippe unten auf **Verwaltung**, dann auf **{bereich.attendance}**. Tippe dort au
 2. Das Formular für {bereich.penalties} öffnet sich mit allen {rolle.member}, die gefehlt haben. Als Grund steht „Gefehlt:“ und der Titel der Liste.
 3. Prüfe die Auswahl und trage den Eintrag ein wie sonst unter **Verwaltung** → **{bereich.penalties} +**.
 
+### Ohne Internet eintragen
+1. Öffne die Liste, solange du noch Netz hast. Die App merkt sich dann ihren Stand, auch die Übersicht.
+2. Ohne Verbindung setzt du die Häkchen wie gewohnt und tippst auf **Speichern**.
+3. Es erscheint „Keine Verbindung zum Server. Auf diesem Gerät gespeichert, die App überträgt es, sobald es wieder geht.“ Über der Liste steht **Noch nicht übertragen**, in der Übersicht steht das auch bei der Liste.
+4. Hast du wieder Netz, überträgt die App die Änderungen von selbst (beim Start der App, sobald das Handy wieder online ist, und beim Öffnen der Liste). Danach erscheint „Offline gespeicherte Anwesenheit übertragen“.
+
 ### Eine Liste löschen
 1. Tippe ganz unten auf **Liste löschen**.
 2. Bestätige die Frage.
 
 ## Gut zu wissen
 - In der Liste stehen auch Personen, deren Rolle nicht zur Kompanie gehört (z. B. Anwärter). {bereich.points} und {bereich.penalties} bekommen aber nur Personen, die zur Kompanie gehören.
+- Darfst du auch Mitglieder anlegen, zeigt die App nach dem Speichern oben, wer dadurch neu die Voraussetzung für die Aufnahme als {rolle.member} erfüllt (siehe *Verwaltung → Aufnahmen*).
 - Wer für diese Liste schon {bereich.points} hat, bekommt sie kein zweites Mal. Haben alle Anwesenden schon welche, steht dort „{bereich.points} für alle Anwesenden bereits gebucht.“
 - Bei {bereich.penalties} merkt sich die Liste nicht, wer schon einen Eintrag hat. Lege ihn also nicht zweimal an.
 - Löschst du eine Liste, bleiben die schon gebuchten {bereich.points} erhalten.
+- Verschiebst du einen freien Termin in die Zukunft, entferne vorher die Häkchen bei **anwesend** und **fehlt**. Sonst lässt sich die Liste nicht speichern.
 - Unten steht, wer die Liste zuletzt gespeichert hat.
-- Was im Zähler als eigene Gruppe erscheint, legt ein {rolle.admin} unter **Einstellungen** → **Rollen** im Abschnitt **{bereich.attendance}: Gruppen im Zähler** fest. Ohne Einstellung zählen alle Rollen, die zur Kompanie gehören, als {rolle.member}, die übrigen (z. B. Anwärter) je für sich.
+- Offline gespeichert wird nur auf diesem Gerät und nur für dich. Übertragen werden nur die Personen, die du geändert hast. Hat jemand anderes inzwischen dieselbe Person geändert, gilt, was zuletzt beim Server ankommt.
+- Ohne Verbindung lässt sich keine neue Liste anlegen, auch nicht zu einem Termin ohne Liste. Für Punkte, Strafen und Zu- oder Absagen braucht die App weiterhin eine Verbindung.
+- Genauso speichert die App auf dem Gerät, wenn der Server nicht nach 20 Sekunden antwortet, gestört oder im Wartungsmodus ist oder deine Anmeldung abgelaufen ist.
+- Lehnt der Server offline gespeicherte Änderungen ab (z. B. weil die Liste inzwischen gelöscht ist), steht oben in der App **Nicht übertragen** mit der Liste und dem Grund, bis du den Hinweis mit ✕ wegtippst.
+- Meldest du dich ab, bevor alles übertragen ist, fragt die App nach: Beim Abmelden gehen nicht übertragene Änderungen verloren.
+- Eine Zusage trägt nichts ein: Ob jemand da war, steht erst am Termin fest.
+- Für jemanden zu- oder absagen geht nur bei Personen, die selbst zu- und absagen dürfen, und nur bis zur selben Frist (Beginn bzw. Anmeldeschluss). Danach siehst du die Rückmeldungen nur noch. Ein Hinweis der Person bleibt dabei erhalten.
+- Wird ein Termin aus dem {bereich.calendar} gelöscht, zeigt seine Liste keine Rückmeldungen mehr. Die Einträge der Liste bleiben.
 - Jede Person sieht ihre eigenen Einträge unter **Meins** → **{bereich.attendance}**.
+- **Nur sehen:** Mit dem Recht **{bereich.attendance} sehen** ohne **Listen je Termin führen** siehst du unter **{bereich.attendance}** nur die vorhandenen Listen. Eine Liste zeigt dann je Person, ob sie anwesend, entschuldigt oder nicht da war; ändern, anlegen und löschen kannst du nichts.
 
 ## Siehe auch
 - [{bereich.attendance} erfassen](seite:anwesenheit-erfassen)

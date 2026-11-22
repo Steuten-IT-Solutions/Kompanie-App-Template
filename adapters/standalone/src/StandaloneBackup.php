@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Standalone;
 
 use KompanieApp\Core\App;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\BackupProvider;
 use KompanieApp\Core\Storage\Backup;
 use KompanieApp\Core\Storage\GalleryRepository;
@@ -80,10 +81,10 @@ final class StandaloneBackup implements BackupProvider
     {
         $data = Backup::parse($json);
         if (($data['variant'] ?? '') !== 'standalone') {
-            throw new \RuntimeException('Sicherungen aus dem WordPress-Plugin lassen sich (noch) nicht in die eigenständige Version übernehmen: Die Benutzer sind dort WordPress-Konten.');
+            throw new \RuntimeException(I18n::t('Sicherungen aus dem WordPress-Plugin lassen sich (noch) nicht in die eigenständige Version übernehmen: Die Benutzer sind dort WordPress-Konten.'));
         }
         if (empty($data['tables']['users']) || !in_array('admin', array_column($data['tables']['users'], 'level'), true)) {
-            throw new \RuntimeException('Die Sicherung enthält keinen Admin; danach könnte sich niemand mehr anmelden.');
+            throw new \RuntimeException(I18n::t('Die Sicherung enthält keinen Admin; danach könnte sich niemand mehr anmelden.'));
         }
         $files = Backup::parseFiles($data['files'] ?? null);
         $db = $this->kernel->db();

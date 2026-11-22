@@ -45,6 +45,22 @@ awk '{print} /^Herzlich willkommen!$/ {print "### Name des Repos"; print ""; pri
 if php scripts/issue-to-kompanie.php --mode=neu --body="$T/doppelt.md" --out="$T/d" 2> /dev/null; then fail "Doppeltes Feld angenommen"; fi
 grep -q "doppelt" "$T/d/fehler.txt" && ok "Doppeltes Feld (Überschrift im Text) wird abgelehnt" || fail "Doppelt: $(cat "$T/d/fehler.txt")"
 
+# Basissprache: Deutsch ist die Vorgabe und steht nicht in der Datei; Englisch nur beim Anlegen, danach fest
+[ "$(get "$K" language)" = "" ] && ok "Ohne Wahl der Basissprache Deutsch (kein Eintrag)" || fail "Basissprache: $(get "$K" language)"
+printf '### Basissprache\n\nEnglish\n\n' | cat - tests/formular/neu.md > "$T/en.md"
+php scripts/issue-to-kompanie.php --mode=neu --body="$T/en.md" --out="$T/en" > /dev/null
+[ "$(get "$T/en/kompanie.json" language)" = "en" ] && ok "Basissprache English → language en" || fail "Englisch: $(cat "$T/en/kompanie.json")"
+(cd packages/branding && node -e "
+  const Ajv = require('ajv/dist/2020').default; const fs = require('fs');
+  const v = new Ajv({ strict: false, validateFormats: false }).compile(JSON.parse(fs.readFileSync('../../config/kompanie.schema.json')));
+  process.exit(v(JSON.parse(fs.readFileSync(process.argv[1]))) ? 0 : 1);" "$T/en/kompanie.json") && ok "Basissprache passt zum Schema" || fail "Schema mit language"
+printf '### Basissprache\n\nFrançais\n\n' | cat - tests/formular/neu.md > "$T/fr.md"
+if php scripts/issue-to-kompanie.php --mode=neu --body="$T/fr.md" --out="$T/fr" 2> /dev/null; then fail "Unbekannte Basissprache angenommen"; fi
+grep -q "Basissprache" "$T/fr/fehler.txt" && ok "Unbekannte Basissprache abgelehnt" || fail "Fehler: $(cat "$T/fr/fehler.txt")"
+printf '### Name des Repos\n\nschuetzen-musterdorf\n\n### Basissprache\n\nEnglish\n' > "$T/aendern-lang.md"
+if php scripts/issue-to-kompanie.php --mode=aendern --body="$T/aendern-lang.md" --out="$T/al" --current="$K" 2> /dev/null; then fail "Basissprache beim Ändern angenommen"; fi
+grep -q "nicht mehr ändern" "$T/al/fehler.txt" && ok "Basissprache lässt sich beim Ändern nicht wechseln" || fail "Ändern: $(cat "$T/al/fehler.txt")"
+
 for url in "https://example.org/logo.png" "http://github.com/user-attachments/assets/x" "https://github.com.example.org/user-attachments/x" \
   "https://github-production-user-asset-6210df.s3.amazonaws.com/x.png"; do   # S3 nur als Weiterleitungsziel von GitHub
   if php scripts/fetch-logo.php --url="$url" --out="$T/logo" 2> /dev/null; then fail "Logo von $url geladen"; fi

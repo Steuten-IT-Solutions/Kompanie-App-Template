@@ -4,7 +4,7 @@ reihenfolge: 38
 rechte: [manage_news]
 bereiche: [news]
 ---
-Hier schreibst du Beiträge für die {bereich.news} direkt in der App, aus Blöcken mit formatiertem Text, Bildern und vorgefertigten Blöcken wie einem **Countdown**, und änderst oder löschst sie später. Das geht nur, wenn ein {rolle.admin} als Quelle der {bereich.news} **In der App schreiben** gewählt hat (Einstellungen → Neuigkeiten).
+Hier schreibst du Beiträge für die {bereich.news} direkt in der App, aus Blöcken mit formatiertem Text, Bildern und vorgefertigten Blöcken wie einem **Countdown**, und änderst oder löschst sie später. Das geht, wenn ein {rolle.admin} als Quelle der {bereich.news} **In der App schreiben** gewählt hat (Einstellungen → Neuigkeiten). Läuft eure App als WordPress-Plugin mit der Quelle **Beiträge dieser WordPress-Seite**, schreibst du die Beiträge im Editor von WordPress; die App öffnet ihn für dich (siehe [Mit WordPress: Beiträge der Webseite schreiben](#mit-wordpress-beitrage-der-webseite-schreiben)).
 
 ## So öffnest du die Seite
 Tippe unten auf **{bereich.news}**. Oben steht der Knopf **Neuer Beitrag**. Zum Ändern öffnest du einen Beitrag; unter dem Text stehen **Bearbeiten** (Stift) und **Löschen** (Mülleimer).
@@ -25,7 +25,7 @@ Tippe unten auf **{bereich.news}**. Oben steht der Knopf **Neuer Beitrag**. Zum 
 
 ### Weitere Blöcke einfügen
 - **Knopf mit Link**: Trage eine **Beschriftung** und ein **Ziel** ein: eine Webseite mit https://, eine E-Mail-Adresse mit mailto:, eine Telefonnummer mit tel: oder eine Seite der App wie #/termine. Bei **Aussehen** wählst du **Hervorgehoben** oder **Zurückhaltend**.
-- **Nächste Einträge**: Wähle eine **Überschrift** und **Wie viele Einträge** (1 bis 20). Der Block zeigt immer die nächsten Einträge ab heute aus {bereich.events}.
+- **Nächste Termine**: Wähle eine **Überschrift** und **Wie viele Termine** (1 bis 20). Der Block zeigt immer die nächsten Termine ab heute aus {bereich.events}.
 - **Ansprechpartner**: Hake bei **Ämter** die Ämter an, deren Inhaber erscheinen sollen. E-Mail-Adresse und Handynummer sehen nur Personen, die persönliche Angaben sehen dürfen.
 - **Hinweis-Kasten**: ein kurzer **Hinweis**, farbig als **Info**, **Warnung** oder **Erfolg**.
 - **Trennlinie**: eine **Linie** oder **Nur Abstand** zwischen zwei Blöcken.
@@ -38,7 +38,7 @@ Tippe unten auf **{bereich.news}**. Oben steht der Knopf **Neuer Beitrag**. Zum 
 - **Karte zur Anfahrt**: Trage einen **Ort oder eine Adresse** ein. Der Block zeigt den Ort mit dem Knopf **Karte**, der ihn in der Karten-App des Geräts öffnet, wie beim Ort eines Termins.
 
 ### Einen Countdown einfügen
-1. Wähle bei **+ Block einfügen** **Countdown**.
+1. Tippe auf **+ Block einfügen** und wähle im Fenster **Countdown**.
 2. Trage bei Bedarf eine **Überschrift** ein und wähle bei **Zählt bis** ein **Datum** (mit **Uhrzeit**) oder einen **Termin** aus den {bereich.events}. Ein verschobener Termin zählt von selbst mit.
 3. Optional: ein Ende (**Ende am**, **Ende um**) mit einem **Text, solange es läuft**, und bei **Danach** einen **Text danach** oder **Block ausblenden**.
 4. Die **Vorschau** zeigt, wie der Countdown gerade aussieht. Er zeigt immer zwei Angaben: Tage und Stunden, am letzten Tag Stunden und Minuten, in der letzten Stunde Minuten und Sekunden. Er zählt nach dem Kalender in der Zeitzone eurer App: Liegt bis dahin eine Zeitumstellung, zeigt er die Restzeit wie auf der Uhr, also z. B. von 21:47 Uhr bis 0:00 Uhr immer 2 Stunden 13 Minuten.
@@ -47,17 +47,36 @@ Tippe unten auf **{bereich.news}**. Oben steht der Knopf **Neuer Beitrag**. Zum 
 1. Öffne den Beitrag und tippe auf **Bearbeiten**.
 2. Ändere Titel oder Blöcke und tippe auf **Speichern**. Das Datum bleibt das der Veröffentlichung.
 
+### Einen Beitrag auf Englisch schreiben
+Ist in der App Englisch eingeschaltet, steht beim Bearbeiten oben **Schreiben auf: Deutsch | English**.
+1. Veröffentliche den Beitrag wie gewohnt auf Deutsch.
+2. Öffne ihn, tippe auf **Bearbeiten** und wähle oben **English**.
+3. Trage den englischen Titel und die Texte der Blöcke ein. Leere Felder zeigen grau den deutschen Text.
+4. Tippe auf **Speichern**.
+
+Titelbild, Blöcke und ihre Einstellungen änderst du auf Deutsch; sie gelten für beide Sprachen. Wer die App auf Englisch nutzt, sieht die englische Fassung. Was fehlt, erscheint auf Deutsch mit dem Hinweis *Nur auf Deutsch verfügbar*.
+
 ### Einen Beitrag löschen
 1. Öffne den Beitrag und tippe auf **Löschen**.
 2. Bestätige die Rückfrage. Der Beitrag und seine Bilder sind dann endgültig weg.
 
+### Mit WordPress: Beiträge der Webseite schreiben
+Mit der Quelle **Beiträge dieser WordPress-Seite** stehen die {bereich.news} als Beiträge auf eurer Webseite. Du schreibst sie dann im Editor von WordPress, mit allem, was er kann (Blöcke, Bilder aus der Mediathek, Kategorien, Entwürfe, geplante Veröffentlichung).
+1. Tippe unter **{bereich.news}** auf **Neuer Beitrag**. Der Editor von WordPress öffnet sich in einem eigenen Fenster.
+2. Schreibe den Beitrag und tippe dort auf **Veröffentlichen**. Ein Entwurf oder ein geplanter Beitrag erscheint in der App erst, wenn er veröffentlicht ist.
+3. Wechsle zurück in die App. Sie lädt die Liste neu, der Beitrag steht oben.
+4. Zum Ändern öffnest du den Beitrag in der App und tippst unter dem Text auf **In WordPress bearbeiten** (Stift). Löschen kannst du ihn im Editor von WordPress (**In den Papierkorb verschieben**).
+
 ## Gut zu wissen
-- Wer die {bereich.news} mit Benachrichtigungen abonniert hat, bekommt bei einem neuen Beitrag eine Benachrichtigung, beim Ändern nicht.
+- Wer die {bereich.news} mit Benachrichtigungen abonniert hat, bekommt bei einem neuen Beitrag eine Benachrichtigung, beim Ändern nicht. Sie kommt in der Sprache der Person; den englischen Titel enthält sie nur, wenn er beim Versand schon eingetragen ist.
+- Beiträge, die als WordPress-Beiträge oder aus einem Feed kommen, haben nur ihre eine Sprache.
 - Hat jemand den Beitrag gespeichert, während du ihn bearbeitet hast, meldet die App das beim Speichern. Lade den Beitrag dann neu und trage deine Änderungen noch einmal ein.
 - Bilder, die in keinem Block mehr stehen, löscht die App beim Speichern, ebenso ein ersetztes oder entferntes Titelbild.
 - Bei jedem Block wählst du **Für alle, die die Seite sehen** oder **Nur Mitglieder**. Blöcke nur für Mitglieder samt ihren Bildern fehlen ohne Anmeldung und für Gäste.
 - Wechselt ein {rolle.admin} die Quelle wieder auf eine Webseite oder einen Feed, verschwinden die Beiträge aus der App, bleiben aber gespeichert. Mit **In der App schreiben** sind sie wieder da.
-- Das Recht dazu heißt **{bereich.news} schreiben**. Mit der Quelle **In der App schreiben** legt die App die Rolle „{bereich.news} verwalten“ an; die vergibt ein {rolle.admin}.
+- Das Recht dazu heißt **{bereich.news} schreiben**. Mit der Quelle **In der App schreiben** und mit WordPress auch mit **Beiträge dieser WordPress-Seite** legt die App die Rolle „{bereich.news} verwalten“ an; die vergibt ein {rolle.admin}.
+- Mit WordPress gibt dir das Recht im Editor von WordPress die Rechte für alle Beiträge: schreiben, ändern, veröffentlichen, löschen und Bilder in die Mediathek hochladen. Seiten der Webseite, neue Kategorien und die übrigen Einstellungen von WordPress gehören nicht dazu.
+- Bist du im Fenster des Editors nicht angemeldet (das kann bei einer auf dem iPhone installierten App vorkommen), melde dich dort mit deinem Konto an.
 
 ## Siehe auch
 - [{bereich.news}](seite:neuigkeiten)

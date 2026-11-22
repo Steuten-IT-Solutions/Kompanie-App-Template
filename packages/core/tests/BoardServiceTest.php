@@ -87,9 +87,9 @@ final class BoardServiceTest extends TestCase
         $this->assertSame(200, $this->as($this->cand)->call('GET', '/board')->status, 'Anwärter liest');
         $this->assertSame(403, $this->call('POST', '/board', ['title' => 'T', 'text' => 'x'])->status);
 
-        // Standardrolle des Bereichs („Schwarzes Brett verwalten“: member + post_board)
+        // Standardrolle des Bereichs („Schwarzes Brett verwalten“: member, view_board_history, post_board)
         $roles = array_column($this->app->roles()->describe(), 'capabilities', 'key');
-        $this->assertSame(TestApp::caps(['member', 'post_board']), $roles['board'] ?? null);
+        $this->assertSame(TestApp::caps(['member', 'view_board_history', 'post_board']), $roles['board'] ?? null);
         $poster = $this->users->add('schreiber', 'board');
         $item = $this->as($poster)->post('Treffen fällt aus');
         $this->assertSame(['kind' => 'message', 'text' => 'Treffen fällt aus', 'author_name' => 'Schreiber'], array_intersect_key($item, array_flip(['kind', 'text', 'author_name'])));

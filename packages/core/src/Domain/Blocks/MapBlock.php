@@ -6,6 +6,7 @@ namespace KompanieApp\Core\Domain\Blocks;
 
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 
 /**
  * Karte zur Anfahrt (Entscheidung vom 08.11.2026): keine eingebettete Karte eines fremden Anbieters, sondern wie beim Ort
@@ -25,11 +26,11 @@ final class MapBlock implements BlockType
 
     public function validate(array $in): array
     {
-        $place = Field::line($in['place'] ?? '', self::PLACE_MAX, 'Der Ort');
+        $place = Field::line($in['place'] ?? '', self::PLACE_MAX, I18n::t('Der Ort'));
         if ($place === '') {
-            throw ApiError::invalid('Bitte einen Ort oder eine Adresse eingeben.');
+            throw ApiError::invalid(I18n::t('Bitte einen Ort oder eine Adresse eingeben.'));
         }
-        return ['title' => Field::line($in['title'] ?? '', self::TITLE_MAX, 'Die Überschrift der Karte'), 'place' => $place];
+        return ['title' => Field::line($in['title'] ?? '', self::TITLE_MAX, I18n::t('Die Überschrift der Karte')), 'place' => $place];
     }
 
     public function render(array $data, ?User $viewer, bool $manager): ?array
@@ -45,6 +46,6 @@ final class MapBlock implements BlockType
             return '';
         }
         $title = (string) ($data['title'] ?? '');
-        return ($title !== '' ? $title . "\n" : '') . $place . "\nKarte: https://www.google.com/maps/search/?api=1&query=" . rawurlencode($place);
+        return ($title !== '' ? $title . "\n" : '') . $place . "\n" . I18n::t('Karte: {url}', ['url' => 'https://www.google.com/maps/search/?api=1&query=' . rawurlencode($place)]);
     }
 }

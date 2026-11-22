@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 
 /** Gemeinsame Prüfungen für Eingaben. */
 final class Input
@@ -23,7 +24,7 @@ final class Input
             return $today->format('Y-m-d');
         }
         if (!self::isDate($value)) {
-            throw ApiError::invalid('Ungültiges Datum.');
+            throw ApiError::invalid(I18n::t('Ungültiges Datum.'));
         }
         return $value;
     }
@@ -68,7 +69,7 @@ final class Input
             throw ApiError::invalid($message);
         }
         if (mb_strlen($url) > 255) {
-            throw ApiError::invalid('Der Link ist zu lang (höchstens 255 Zeichen).');
+            throw ApiError::invalid(I18n::t('Der Link ist zu lang (höchstens 255 Zeichen).'));
         }
         return $url;
     }
@@ -88,7 +89,7 @@ final class Input
         if ($url === '') {
             return '';
         }
-        $invalid = sprintf('„%s“ ist keine gültige Webadresse. Beispiel: beispiel.de oder https://beispiel.de/seite', $field);
+        $invalid = I18n::t('„{field}“ ist keine gültige Webadresse. Beispiel: beispiel.de oder https://beispiel.de/seite', ['field' => $field]);
         if (preg_match('/[\s"<>\x00-\x1F\x7F]/u', $url)) {
             throw ApiError::invalid($invalid);
         }
@@ -98,7 +99,7 @@ final class Input
         }
         $scheme = strtolower((string) ($parts['scheme'] ?? ''));
         if ($scheme === 'http') {
-            throw ApiError::invalid(sprintf('„%s“ muss mit https:// beginnen (sichere Verbindung), nicht mit http://.', $field));
+            throw ApiError::invalid(I18n::t('„{field}“ muss mit https:// beginnen (sichere Verbindung), nicht mit http://.', ['field' => $field]));
         }
         if (
             $scheme !== 'https'
@@ -109,7 +110,7 @@ final class Input
             throw ApiError::invalid($invalid);
         }
         if (mb_strlen($url) > self::URL_MAX) {
-            throw ApiError::invalid(sprintf('„%s“ ist zu lang (höchstens %d Zeichen).', $field, self::URL_MAX));
+            throw ApiError::invalid(I18n::t('„{field}“ ist zu lang (höchstens {max} Zeichen).', ['field' => $field, 'max' => self::URL_MAX]));
         }
         return 'https' . substr($url, strlen($scheme));
     }

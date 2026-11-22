@@ -13,21 +13,22 @@ Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **Rollen**.
 ## Was du hier siehst
 Oben schaltest du zwischen **Rollen** (die Liste) und **Wer sieht was** (die Übersicht) um.
 
-- **Liste der Rollen**: je Rolle der Name, wie viele Personen sie haben (davon als Zusatzrolle) und ihre Rechte. Bei eigenen Rollen steht außerdem **für neue Konten** oder **aufnehmen als {rolle.member}**, wenn das eingestellt ist. Weicht der {bereich.points}faktor von 1 ab, steht er als Abzeichen neben dem Namen, z. B. „×0,5“.
+- **Liste der Rollen**: je Rolle der Name, wie viele Personen sie haben (davon als Zusatzrolle) und ihre Rechte. Bei eigenen Rollen steht außerdem **für neue Konten** oder **Anwärter-Rolle**, wenn das eingestellt ist. Weicht der {bereich.points}faktor von 1 ab, steht er als Abzeichen neben dem Namen, z. B. „×0,5“.
 - **Griff** links neben jeder Rolle: zum Ändern der Reihenfolge.
 - **Ansehen** (Auge): zeigt die App so, wie diese Rolle sie sieht (siehe [App als Rolle ansehen](seite:admin-vorschau)). Bei {rolle.admin} fehlt der Knopf.
 - **Bearbeiten** (Stift): öffnet die Rolle zum Ändern.
 - **+ Neue Rolle**: legt eine weitere Rolle an.
-- **App ohne Anmeldung ansehen**: zeigt die App, wie Besucher ohne Konto sie sehen.
-- **{bereich.attendance}: Gruppen im Zähler** (nur wenn {bereich.attendance} an ist): als was jede Rolle in den Anwesenheitslisten zählt.
+- **App ohne Anmeldung ansehen**: zeigt die App, wie Besucher ohne Konto sie sehen. Wie eine bestimmte Person die App mit all ihren Rollen sieht, zeigt **App als … ansehen** auf ihrer Seite unter **Konto und Rolle**.
+- **{bereich.attendance}: Gruppen im Zähler** (nur wenn {bereich.attendance} an ist): als was jede Rolle im Zähler über der Mitgliederliste zählt. Ohne Einstellung zählen alle Rollen, die zur Kompanie gehören, als {rolle.member}, die übrigen (z. B. Anwärter) je für sich.
 - **Wer sieht was**: eine Tabelle mit allen Rechten als Zeilen und allen Rollen als Spalten. So siehst du auf einen Blick, welche Rolle welchen Knopf sieht, und änderst es direkt.
 
 ## So gehst du vor
 ### Eine Rolle anlegen
 1. Tippe auf **+ Neue Rolle**.
 2. Trage den **Name der Rolle** ein (höchstens 30 Zeichen).
-3. Setze unter **Rechte** die Häkchen für alles, was die Rolle sieht und darf. Eine neue Rolle sieht zuerst, was {rolle.member} sieht. Die Rechte stehen in Gruppen; tippe auf den Namen einer Gruppe, um sie auf- oder zuzuklappen. Der Haken vor der Gruppe setzt oder entfernt alle Rechte der Gruppe auf einmal.
-4. Stelle bei Bedarf unter **Konten** ein, ob die Rolle **Beim Anlegen neuer Konten wählbar** ist (dann auch für alle, die nur Mitglieder anlegen dürfen; wer Rollen vergeben darf, wählt beim Anlegen ohnehin jede Rolle, die er vergeben darf) und ob, wer Mitglieder anlegen darf, Personen mit dieser Rolle als {rolle.member} aufnimmt.
+3. Setze unter **Rechte** die Häkchen für alles, was die Rolle sieht und darf. Eine neue Rolle sieht zuerst, was {rolle.member} sieht. Die Rechte stehen in Gruppen; tippe auf den Namen einer Gruppe, um sie auf- oder zuzuklappen. Der Haken vor der Gruppe setzt oder entfernt alle Rechte der Gruppe auf einmal. Bereiche, die man sehen und ändern kann, z. B. **{bereich.points}**, stehen in einer Zeile mit den zwei Haken **Lesen** und **Schreiben**; darunter steht, was beide erlauben. **Schreiben** setzt **Lesen** mit.
+4. Stelle bei Bedarf unter **Konten** ein, ob die Rolle **Beim Anlegen neuer Konten wählbar** ist (dann auch für alle, die nur Mitglieder anlegen dürfen; wer Rollen vergeben darf, wählt beim Anlegen ohnehin jede Rolle, die er vergeben darf) und ob sie eine **Anwärter-Rolle** ist. Dann nimmt, wer Mitglieder anlegen darf, Personen mit dieser Rolle unter *Verwaltung → Aufnahmen* als {rolle.member} auf. Das geht mit der Rolle als Rolle der Person (sie wird beim Aufnehmen zu {rolle.member}) und als Zusatzrolle zu {rolle.member} (sie wird beim Aufnehmen entfernt).
+   Bei einer Anwärter-Rolle legst du darunter die **Voraussetzung für die Aufnahme** fest. Sie besteht aus Bedingungen: **+ Teilnahmen** (mindestens so viele Teilnahmen („anwesend“) an Terminen einer Art) und **+ Dauer** (mindestens so viele Monate als Anwärter). Oben wählst du, wie sie zusammenhängen: **Alle müssen erfüllt sein** (UND) oder **Eine reicht** (ODER). Mit **+ Gruppe** fügst du eine eingerückte Gruppe mit eigener Wahl ein, z. B. „12 Monate als Anwärter **und** (6 Teilnahmen an Versammlung **oder** 10 Teilnahmen an Arbeitsdienst)“; Gruppen können wieder Gruppen enthalten. Darunter liest die App die ganze Voraussetzung in einem Satz vor. Es gehen bis zu 20 Bedingungen und 20 Gruppen; ohne Bedingung gibt es keine Voraussetzung. Die Terminarten legst du unter *Einstellungen → Kalender* an. Wer die Voraussetzung erfüllt, steht unter *Verwaltung → Aufnahmen* oben.
 5. Nutzt ihr {bereich.points} und gehört die Rolle zur Kompanie, trage den **{bereich.points}faktor** ein (z. B. 0,5 für die Hälfte).
 6. Tippe auf **Anlegen**.
 
@@ -37,6 +38,8 @@ Oben schaltest du zwischen **Rollen** (die Liste) und **Wer sieht was** (die Üb
 1. Tippe bei der Rolle auf **Bearbeiten**.
 2. Ändere Name, Rechte, Konten oder {bereich.points}faktor und tippe auf **Speichern**. Mit **Abbrechen** verwirfst du die Änderungen.
 3. Zum Löschen einer eigenen Rolle tippst du stattdessen auf **Löschen**. Haben noch Personen die Rolle, wählst du vorher bei **Beim Löschen bekommen die … Personen die Rolle**, welche Rolle sie stattdessen bekommen. Bestätige die Rückfrage.
+
+Den Namen einer Rolle auf Englisch (wenn eure App Englisch eingeschaltet hat) trägst du unter [Sprachen](seite:admin-sprachen) im Abschnitt **Übersetzungen** ein.
 
 ### In der Übersicht festlegen, wer was sieht
 1. Tippe oben auf **Wer sieht was**.
@@ -48,7 +51,7 @@ Oben schaltest du zwischen **Rollen** (die Liste) und **Wer sieht was** (die Üb
 1. Halte eine Rolle am Griff links fest und ziehe sie nach oben oder unten. Am Computer geht das am Griff auch mit den Pfeiltasten.
 2. Lass los. Die App speichert die neue Reihenfolge sofort.
 
-### Festlegen, wie Rollen in der {bereich.attendance} zählen
+### Festlegen, wie Rollen im Zähler zählen
 1. Wähle unter **{bereich.attendance}: Gruppen im Zähler** je Rolle **Eigene Gruppe** oder **zählt als …** eine andere Rolle.
 2. Tippe auf **Gruppen speichern**.
 
@@ -58,9 +61,19 @@ Jedes Recht gilt für sich; keines schließt ein anderes ein. Die Rechte stehen 
 - **Mitgliederbereich**: **Gehört zur Kompanie** (die Person bekommt {bereich.points}, {bereich.penalties} und {bereich.ranks} und steht in Listen und in der {bereich.attendance}), die eigenen {bereich.points}, {bereich.penalties}, den eigenen {begriff.rank} und die eigene {bereich.attendance} in **Meins**, den internen Kalender, die internen Bilder der {bereich.gallery}, die {bereich.birthdays} der anderen und das Teilnehmen an {bereich.polls}.
 - **Intern**: je Knopf unter **Intern** ein Recht: {bereich.directory}, {bereich.offices}, Ehemalige, {bereich.documents}, {bereich.board} lesen, {bereich.ranks} und {bereich.catalog}.
 - **Inhalte verwalten** und **Kompanie verwalten**: je Bereich mit eigenen Aufgaben ein Recht, zum Beispiel **{bereich.points} vergeben, Katalog pflegen** oder **Öffentliche {bereich.events} pflegen**.
-- **Mitglieder und Rollen**: **Persönliche Angaben sehen** (Adresse, Handynummer, E-Mail-Adresse und Geburtsdatum der Mitglieder auf ihrer Seite in der Verwaltung), **Persönliche Angaben pflegen** (diese Angaben ändern), **Mitglieder anlegen und Startpasswörter erzeugen** und **Rollen vergeben**.
+- **Mitglieder und Rollen**: **Persönliche Angaben sehen** (Adresse, Handynummer, E-Mail-Adresse und Geburtsdatum der Mitglieder auf ihrer Seite in der Verwaltung), **Persönliche Angaben pflegen** (diese Angaben ändern), **Mitglieder anlegen und Startpasswörter erzeugen**, **Ehemalige verwalten** (Liste der Ehemaligen, Ehemalige anlegen und importieren, Mitglieder als ehemalig eintragen und wieder aufnehmen) und **Rollen vergeben**.
 
-Die eigenen Daten in **Meins** und alle Rechte zum Verwalten gibt es nur zusammen mit **Gehört zur Kompanie**: Hakst du eines davon an, hakt die App **Gehört zur Kompanie** mit an. Nimmst du es weg, entfallen sie. Ebenso gibt es **Persönliche Angaben pflegen** nur zusammen mit **Persönliche Angaben sehen**. Die übrigen Rechte zum Sehen gehen auch ohne, z. B. für Anwärter.
+Die eigenen Daten in **Meins** und alle Rechte zum Verwalten gibt es nur zusammen mit **Gehört zur Kompanie**: Hakst du eines davon an, hakt die App **Gehört zur Kompanie** mit an. Nimmst du es weg, entfallen sie. Die übrigen Rechte zum Sehen gehen auch ohne, z. B. für Anwärter.
+
+Viele Bereiche haben ein Recht zum Sehen und eines zum Ändern, z. B. **{bereich.points} aller Mitglieder sehen** und **{bereich.points} vergeben**. Wer nur sehen darf, sieht dieselben Angaben, aber ohne Knöpfe und Formulare zum Ändern. Das Recht zum Ändern gibt es nur zusammen mit dem zum Sehen: Hakst du es an, hakt die App das Sehen mit an; nimmst du das Sehen weg, entfällt auch das Ändern. So ist es bei:
+- **Persönliche Angaben sehen** und **Persönliche Angaben pflegen**
+- **{bereich.points} aller Mitglieder sehen** und **{bereich.points} vergeben, Katalog pflegen**
+- **{bereich.penalties} aller Mitglieder sehen** und **{bereich.penalties} vergeben und als bezahlt markieren**
+- **Beförderungen sehen** ({begriff.rank} der Mitglieder mit Verlauf und die Beförderungsübersicht) und **{bereich.ranks} pflegen, befördern und degradieren**
+- **{bereich.titles} sehen** und **{bereich.titles} pflegen und vergeben**
+- **{bereich.attendance} sehen** und **{bereich.attendance}: Listen je Termin führen**
+
+Jedes dieser Rechte zum Sehen öffnet auch die Mitgliederliste der Verwaltung.
 
 Einstellungen, Updates und Datensicherung bleiben immer den {rolle.admin}s vorbehalten; dieses Recht kannst du keiner anderen Rolle geben.
 
@@ -68,6 +81,9 @@ Einstellungen, Updates und Datensicherung bleiben immer den {rolle.admin}s vorbe
 - **Feste Rollen:** {rolle.guest} gilt auch für alle, die die App ohne Anmeldung öffnen. {rolle.member} ist die Rolle neuer Konten und gehört immer zur Kompanie. {rolle.admin} darf alles. Diese drei kannst du umbenennen, aber nicht löschen. Bei {rolle.member} und {rolle.guest} kannst du jedes Recht anhaken, auch Rechte zum Verwalten, z. B. **Bilder und Videos einreichen**; das bekommt dann jede Person mit dieser Rolle. {rolle.guest} gehört nie zur Kompanie; Rechte, die sonst **Gehört zur Kompanie** voraussetzen, gehen bei {rolle.guest} auch ohne. Bei {rolle.admin} lassen sich die Rechte nicht ändern. Den {bereich.points}faktor kannst du bei {rolle.member} und {rolle.admin} ändern.
 - **{rolle.guest} ohne Anmeldung:** Was {rolle.guest} sieht und darf, sieht und darf jeder, der die App öffnet, auch ohne Konto. Gib {rolle.guest} deshalb z. B. die {bereich.documents} oder die {bereich.birthdays} nur, wenn sie wirklich öffentlich sein sollen. Ein Recht zum Verwalten bei {rolle.guest} heißt: Jeder im Internet kann das, z. B. Termine ändern oder löschen. Funktionen, die eine Person brauchen (z. B. eigene Einreichungen), verlangen trotzdem eine Anmeldung. Auch die Shortcodes auf der Webseite zeigen nur, was {rolle.guest} sieht.
 - **Persönliche Angaben:** Seine eigenen Angaben sieht und ändert jede Person unter **Meins → Konto**. Wer Mitglieder anlegen darf, trägt sie beim Anlegen mit ein, sieht sie danach aber nur mit **Persönliche Angaben sehen**. Rollen, die vor diesem Recht **Mitglieder anlegen** hatten, haben nach dem Update beide Rechte für persönliche Angaben; nimm sie dort weg, wenn die Rolle sie nicht braucht.
+- **Ehemalige:** Die Kachel **Ehemalige** und alles dazu gibt es mit dem Recht **Ehemalige verwalten**. Rollen, die vorher **Mitglieder anlegen** hatten, haben nach dem Update auch dieses Recht. Soll z. B. die Rolle, die {bereich.points} vergibt, auch Ehemalige pflegen, hake es dort an. Wie lange die Daten Ehemaliger aufbewahrt werden, stellen nur {rolle.admin}s ein. Das Recht **Ehemalige** unter **Intern** erlaubt nur das Ansehen in der Mitgliederliste.
+- **Zu- und absagen:** Das Recht **Bei Terminen des internen Kalenders zu- und absagen** gibt es nur zusammen mit **Interner Kalender**, nicht aber nur mit **Gehört zur Kompanie**, damit auch Anwärter zusagen können. Nach dem Update hat es jede Rolle mit dem internen Kalender außer {rolle.guest}.
+- **Sehen und Ändern getrennt:** Rollen und Personen, die vor dieser Trennung ein Recht zum Ändern hatten, haben nach dem Update auch das passende Recht zum Sehen. Soll jemand z. B. die {bereich.points} nur sehen, nimm **{bereich.points} vergeben** weg. Eigene Rechte zum Sehen gibt es für {bereich.points}, {bereich.penalties}, Dienstgrade mit Beförderungen, {bereich.titles}, {bereich.attendance}, {bereich.inventory}, {bereich.lists}, den Verlauf der {bereich.mail}, die Zu- und Absagen bei Terminen, die Passiven, die Einreichungen der {bereich.gallery}, die Fehlermeldungen, die Konten, eingeschränkte {bereich.documents}, alle Ergebnisse der {bereich.polls}, den Verlauf des {bereich.board}s und die Zuordnung zu {bereich.companies}.
 - **Nach dem Update:** Jede Rolle sieht zuerst genau das, was sie vorher sah. Danach kannst du jedes Recht einzeln wegnehmen oder dazugeben.
 - **Rollen der Bereiche:** Schaltest du einen Bereich mit eigenen Aufgaben ein, kommt eine Rolle dazu, die wie der Bereich mit „verwalten“ dahinter heißt, z. B. „{bereich.points} verwalten“. Sie sieht, was {rolle.member} anfangs sieht, und hat das Recht des Bereichs (siehe [Bereiche](seite:admin-bereiche)).
 - **Grundrolle und Zusatzrollen:** Jede Person hat genau eine Grundrolle und dazu auf Wunsch Zusatzrollen; sie hat die Rechte aller ihrer Rollen zusammen. Zusatzrollen können nur eigene Rollen und Rollen der Bereiche sein. Sie gibt es nur zu einer Grundrolle, die zur Kompanie gehört.

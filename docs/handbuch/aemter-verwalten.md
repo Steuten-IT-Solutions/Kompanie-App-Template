@@ -68,6 +68,9 @@ Haben alle Ämter einer Gruppe immer dieselben Jahre, z. B. ein Königshaus oder
 1. Öffne das Amt und ändere unter **Amt bearbeiten** **Bezeichnung**, **Einzahl** oder **Gruppe**; tippe auf **Speichern**.
 2. **Amt löschen** löscht das Amt mit allen Amtszeiten. **‹ Alle {bereich.offices}** führt zurück.
 
+### Englische Namen eintragen
+Hat eure App außer Deutsch auch Englisch eingeschaltet, trägt ein Admin die englischen Namen der Gruppen und Ämter unter **Einstellungen → Sprachen** im Abschnitt **Übersetzungen** ein. Hier pflegst du die deutschen Namen. Wer die App auf Englisch nutzt, sieht den englischen Namen, auch in Berichten; fehlt er, steht dort der deutsche. Die Einzahl gibt es nur auf Deutsch, auf Englisch gilt der englische Name auch für eine einzelne Amtszeit.
+
 ### Namen mit Mitgliedern verknüpfen
 Steht jemand in Amtszeiten nur mit seinem Namen (**Ohne Profil**), ist aber inzwischen als Mitglied (auch ohne Zugang) oder Ehemaliger angelegt, verknüpfst du die Einträge mit ihm.
 1. Tippe auf **Namen mit Mitgliedern verknüpfen**.

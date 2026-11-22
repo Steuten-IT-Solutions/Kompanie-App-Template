@@ -31,7 +31,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf den Knopf **{
 Hat jemand anderes die Seite gespeichert, während du sie bearbeitet hast, speichert die App deine Fassung nicht und sagt, wer sie geändert hat. Kopiere dann deine Änderungen, tippe auf **Neu laden** und trage sie noch einmal ein. Beim Neu laden gehen deine Änderungen verloren.
 
 ### Blöcke einfügen, verschieben und entfernen
-- Wähle bei **+ Block einfügen** die Art des Blocks: **Text**, **Countdown**, **Knopf mit Link**, **Nächste Einträge**, **Ansprechpartner**, **Hinweis-Kasten**, **Trennlinie**, **Ablauf**, **Zahlen und Fakten**, **Umfrage**, **Album**, **Dokument**, **{bereich.sponsors}** oder **Karte zur Anfahrt**. Mit **+ Block darunter einfügen** kommt der neue Block direkt unter einen bestehenden.
+- Tippe auf **+ Block einfügen**. Im Fenster steht jede Art des Blocks mit Symbol und kurzer Erklärung; tippe die gewünschte an: **Text**, **Countdown**, **Knopf mit Link**, **Nächste Termine**, **Ansprechpartner**, **Hinweis-Kasten**, **Trennlinie**, **Ablauf**, **Zahlen und Fakten**, **Umfrage**, **Album**, **Dokument**, **{bereich.sponsors}** oder **Karte zur Anfahrt**. Mit **+ Block darunter einfügen** kommt der neue Block direkt unter einen bestehenden.
 - Mit **↑** und **↓** verschiebst du einen Block nach oben oder unten, mit **Entfernen** nimmst du ihn heraus.
 - Bei jedem Block wählst du, für wen er ist: **Für alle, die die Seite sehen** oder **Nur Mitglieder**. So kann eine öffentliche Seite einzelne Teile nur für Mitglieder enthalten, zum Beispiel einen internen Treffpunkt. Ohne Anmeldung und für Gäste fehlen diese Blöcke samt ihren Bildern.
 - Erst **Speichern** (bzw. **Anlegen**) übernimmt die Änderungen.
@@ -54,10 +54,10 @@ Ein Countdown zählt bis zu einem Zeitpunkt herunter und zeigt immer zwei Angabe
 Webseiten öffnen sich in einem neuen Fenster, Seiten der App im selben.
 
 ### Die nächsten Termine zeigen
-1. Füge einen Block **Nächste Einträge** ein.
-2. Trage bei Bedarf eine **Überschrift** ein und wähle bei **Wie viele Einträge**, wie viele erscheinen (1 bis 20).
+1. Füge einen Block **Nächste Termine** ein.
+2. Trage bei Bedarf eine **Überschrift** ein und wähle bei **Wie viele Termine**, wie viele erscheinen (1 bis 20).
 
-Der Block zeigt immer die nächsten Termine ab heute aus den {bereich.events}, mit Datum, Uhrzeit und Ort, darunter **Alle Termine**. Du musst ihn nie anpassen. Wer die {bereich.events} nicht sehen darf, sieht dort „Zurzeit keine anstehenden Termine.“ Sind die {bereich.events} ausgeschaltet, fehlt der Block.
+Der Block zeigt immer die nächsten Termine ab heute aus den {bereich.events}, mit Datum, Uhrzeit und Ort, darunter **Alle Termine**. Du musst ihn nie anpassen. Wer die {bereich.events} nicht sehen darf, sieht dort „Zurzeit steht nichts an.“ Sind die {bereich.events} ausgeschaltet, fehlt der Block.
 
 ### Ansprechpartner zeigen
 1. Füge einen Block **Ansprechpartner** ein.
@@ -88,6 +88,15 @@ Trage optional eine **Überschrift** und den **Ort oder die Adresse** ein (z. B.
 ### Die Reihenfolge ändern
 Halte einen Eintrag am Griff links fest, ziehe ihn an die gewünschte Stelle und lass los. Die Reihenfolge ist sofort gespeichert. Am Computer geht es auch mit der Tastatur: Griff mit der Tab-Taste auswählen, dann Pfeil hoch oder runter. Die Reihenfolge gilt in der Standardnavigation; mit eurer eigenen Navigation bestimmt die dort den Platz jeder Seite.
 
+### Eine Seite auf Englisch schreiben
+Ist in der App Englisch eingeschaltet, übersetzt ein Admin die Seiten unter **Einstellungen → Sprachen** im Abschnitt **Übersetzungen** in der Gruppe **{bereich.pages}**. Hier steht dazu ein Hinweis mit Link dorthin.
+1. Klappe die Gruppe **{bereich.pages}** auf. Bei jeder Seite steht, wie viele Texte schon übersetzt sind, z. B. **3 von 4 übersetzt**.
+2. Tippe bei der Seite auf **Übersetzen**.
+3. Trage den englischen Titel und die Texte der Blöcke ein. Leere Felder zeigen grau den deutschen Text; beim Textblock klappt **Deutscher Text** ihn auf.
+4. Tippe auf **Speichern**.
+
+Auf Englisch schreibst du nur Texte. Welche Blöcke es gibt, ihre Reihenfolge, **Für wen?** und Einstellungen wie Datum, Link oder Termine änderst du hier auf Deutsch; sie gelten für beide Sprachen. Ein Block, den du auf Deutsch behältst, behält auch seine englische Fassung.
+
 ### Eine Seite löschen
 Tippe auf **Löschen** und bestätige. Die Bilder der Seite sind damit ebenfalls weg, und die Seite verschwindet aus der Navigation.
 
@@ -101,7 +110,9 @@ Tippe auf **Löschen** und bestätige. Die Bilder der Seite sind damit ebenfalls
 - Ist ein Termin gelöscht oder sind die {bereich.events} ausgeschaltet, verhält sich ein Countdown auf diesen Termin wie nach dem Ende.
 - Wer {bereich.pages} verwalten darf, sieht alle Seiten. Das Recht vergeben {rolle.admin}s unter **Einstellungen** → **Rollen**; mit dem Bereich entsteht die Rolle *{bereich.pages} verwalten*.
 - Wo jede Seite steht, unten in der Leiste oder in einem Untermenü, legen {rolle.admin}s unter **Einstellungen** → **Navigation** fest. Ohne eigene Navigation stehen die Seiten nach den Bereichen; wer das Recht **Intern** hat, findet sie unter **Intern**, wenn unten kein Platz mehr ist. Eine neue Seite erscheint mit eigener Navigation hinten in der Leiste, bis ein {rolle.admin} ihr einen Platz gibt.
-- Die Seiten samt Bildern sind Teil der Datensicherung.
+- Wer die App auf Englisch nutzt, sieht die englische Fassung. Was dort fehlt, erscheint auf Deutsch, oben mit dem Hinweis *Nur auf Deutsch verfügbar* (oder *Teilweise nur auf Deutsch verfügbar*).
+- Bei **Ablauf** und **Zahlen und Fakten** gilt die englische Fassung nur, solange sie so viele Zeilen hat wie die deutsche. Fügst du auf Deutsch eine Zeile hinzu, trage die englischen Zeilen danach noch einmal ein.
+- Die Seiten samt Bildern und englischer Fassung sind Teil der Datensicherung.
 
 ## Siehe auch
 - [{bereich.pages}](seite:seiten)

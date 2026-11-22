@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core\Infra;
 
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\FileStorage;
 
 /**
@@ -27,7 +28,7 @@ final class LocalFileStorage implements FileStorage
         $path = $base . '/' . $relative;
         $dir = dirname($path);
         if (!is_dir($dir) && !@mkdir($dir, 0775, true) && !is_dir($dir)) {
-            throw new \RuntimeException('Verzeichnis kann nicht angelegt werden: ' . $dir);
+            throw new \RuntimeException(I18n::t('Verzeichnis kann nicht angelegt werden: {path}', ['path' => $dir]));
         }
         $this->protect($base, $public);
         return $path;
@@ -52,7 +53,7 @@ final class LocalFileStorage implements FileStorage
         $dir = $this->tempDir !== '' ? $this->tempDir : sys_get_temp_dir();
         $file = tempnam($dir, 'kompanie-');
         if ($file === false) {
-            throw new \RuntimeException('Es kann keine temporäre Datei angelegt werden.');
+            throw new \RuntimeException(I18n::t('Es kann keine temporäre Datei angelegt werden.'));
         }
         return $file;
     }

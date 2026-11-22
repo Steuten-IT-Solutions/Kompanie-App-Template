@@ -8,6 +8,7 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Domain\RichText;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 
 /**
  * Inhalte aus Blöcken (eigene Seiten, News in der App, Schwarzes Brett): eine geordnete Liste, jeder Block mit id, type,
@@ -23,6 +24,24 @@ final class Blocks
     public const MAX = 50;
     public const AUDIENCES = ['all', 'members'];
     private const ID = '/^[a-z0-9]{1,16}$/';
+
+    /**
+     * Felder je Typ, die eine Fassung je weiterer Sprache bekommen können (Plan „Mehrsprachigkeit“, PR 9b). Aufbau,
+     * Daten, Links und Verweise (Termine, Ämter, Umfragen …) gelten für alle Sprachen; Listen (items) nur als Ganzes und
+     * nur, solange sie gleich viele Einträge haben wie auf Deutsch.
+     */
+    public const TRANSLATABLE = [
+        'text' => ['html'],
+        'countdown' => ['title', 'running_text', 'after_text'],
+        'button' => ['label'],
+        'events' => ['title'],
+        'contacts' => ['title'],
+        'notice' => ['title', 'text'],
+        'schedule' => ['title', 'items'],
+        'facts' => ['title', 'items'],
+        'sponsors' => ['title'],
+        'map' => ['title'],
+    ];
 
     /** @var array<string, BlockType>|null */
     private ?array $types = null;
@@ -53,10 +72,10 @@ final class Blocks
     public function validate(mixed $in, int $textMax): array
     {
         if (!is_array($in) || !array_is_list($in)) {
-            throw ApiError::invalid('Ungültige Blöcke.');
+            throw ApiError::invalid(I18n::t('Ungültige Blöcke.'));
         }
         if (count($in) > self::MAX) {
-            throw ApiError::invalid(sprintf('Höchstens %d Blöcke.', self::MAX));
+            throw ApiError::invalid(I18n::t('Höchstens {max} Blöcke.', ['max' => self::MAX]));
         }
         $types = $this->types();
         $out = [];
@@ -64,15 +83,15 @@ final class Blocks
         $text = 0;
         foreach ($in as $block) {
             if (!is_array($block)) {
-                throw ApiError::invalid('Ungültiger Block.');
+                throw ApiError::invalid(I18n::t('Ungültiger Block.'));
             }
             $type = $types[$block['type'] ?? ''] ?? null;
             if ($type === null) {
-                throw ApiError::invalid('Unbekannter Block: ' . (is_string($block['type'] ?? null) ? $block['type'] : '?') . '.');
+                throw ApiError::invalid(I18n::t('Unbekannter Block: {type}.', ['type' => is_string($block['type'] ?? null) ? $block['type'] : '?']));
             }
             $audience = $block['audience'] ?? 'all';
             if (!in_array($audience, self::AUDIENCES, true)) {
-                throw ApiError::invalid('Für wen ist der Block? Erlaubt sind all (alle) und members (Mitglieder).');
+                throw ApiError::invalid(I18n::t('Für wen ist der Block? Erlaubt sind all (alle) und members (Mitglieder).'));
             }
             $id = is_string($block['id'] ?? null) ? $block['id'] : '';
             if (preg_match(self::ID, $id) !== 1 || isset($seen[$id])) {
@@ -86,7 +105,7 @@ final class Blocks
             $out[] = ['id' => $id, 'type' => $type->type(), 'audience' => $audience] + $data;
         }
         if ($text > $textMax) {
-            throw ApiError::invalid('Der Text ist zu lang.');
+            throw ApiError::invalid(I18n::t('Der Text ist zu lang.'));
         }
         return $out;
     }
@@ -106,26 +125,27 @@ final class Blocks
             return null;
         }
         if ($in['body'] !== null && !is_string($in['body'])) {
-            throw ApiError::invalid('Ungültiger Text.');
+            throw ApiError::invalid(I18n::t('Ungültiger Text.'));
         }
         $html = RichText::sanitize((string) $in['body']);
         $html = RichText::isEmpty($html) ? '' : $html;
         if (strlen($html) > $textMax) {
-            throw ApiError::invalid('Der Text ist zu lang.');
+            throw ApiError::invalid(I18n::t('Der Text ist zu lang.'));
         }
         return self::fromBody($html);
     }
 
     /**
      * Spalten blocks und body zum Speichern; Bilder der Textblöcke gehören danach $ownerType/$ownerId, nicht mehr
-     * verwendete werden gelöscht ($prune; am Schwarzen Brett nicht, dort braucht sie der Verlauf).
+     * verwendete werden gelöscht ($prune; am Schwarzen Brett nicht, dort braucht sie der Verlauf; $keep wie bei claim).
      *
      * @param list<array<string, mixed>> $blocks
+     * @param list<string> $keep
      * @return array{blocks: string, body: string}
      */
-    public function columns(array $blocks, User $actor, string $ownerType, int $ownerId, bool $prune = true): array
+    public function columns(array $blocks, User $actor, string $ownerType, int $ownerId, bool $prune = true, array $keep = []): array
     {
-        $blocks = $this->claim($blocks, $actor, $ownerType, $ownerId, $prune);
+        $blocks = $this->claim($blocks, $actor, $ownerType, $ownerId, $prune, $keep);
         $body = self::publicBody($blocks);
         return ['blocks' => self::encode($blocks, $body), 'body' => $body];
     }
@@ -182,14 +202,15 @@ final class Blocks
 
     /**
      * Bilder der Textblöcke gehören danach $ownerType/$ownerId (RichImageService::claim je Block); Bilder des Besitzers,
-     * die in keinem Block mehr stehen, werden gelöscht (außer ohne $prune).
+     * die in keinem Block mehr stehen, werden gelöscht (außer ohne $prune; $keep: Bilder, die woanders stehen, z. B. in
+     * der Fassung einer weiteren Sprache).
      *
      * @param list<array<string, mixed>> $blocks
+     * @param list<string> $keep
      * @return list<array<string, mixed>>
      */
-    public function claim(array $blocks, User $actor, string $ownerType, int $ownerId, bool $prune = true): array
+    public function claim(array $blocks, User $actor, string $ownerType, int $ownerId, bool $prune = true, array $keep = []): array
     {
-        $keep = [];
         foreach ($blocks as $i => $b) {
             if (($b['type'] ?? '') !== TextBlock::TYPE || ($b['html'] ?? '') === '') {
                 continue;
@@ -278,7 +299,7 @@ final class Blocks
                 $part = $text === '' ? '' : '<p>' . nl2br(htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'), false) . '</p>';
             }
             if ($part !== '' && $members && $mark) {
-                $part = '<p><em>Nur für Mitglieder:</em></p>' . $part;
+                $part = '<p><em>' . htmlspecialchars(I18n::t('Nur für Mitglieder:'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</em></p>' . $part;
             }
             $html .= $part;
         }
@@ -321,6 +342,155 @@ final class Blocks
             $found = true;
         }
         return $found;
+    }
+
+    /**
+     * Blöcke in einer weiteren Sprache: Felder aus $tr (Kennung des Blocks => Feld => Wert), sonst die deutschen. Dazu,
+     * wie viele übersetzbare Felder (mit deutschem Inhalt) es gibt und wie viele davon übersetzt sind.
+     *
+     * @param list<array<string, mixed>> $blocks
+     * @param array<string, array<string, mixed>> $tr
+     * @return array{0: list<array<string, mixed>>, 1: int, 2: int} Blöcke, übersetzbare Felder, davon übersetzt
+     */
+    public static function translate(array $blocks, array $tr): array
+    {
+        $total = 0;
+        $done = 0;
+        foreach ($blocks as $i => $b) {
+            $own = $tr[(string) ($b['id'] ?? '')] ?? [];
+            foreach (self::TRANSLATABLE[$b['type'] ?? ''] ?? [] as $field) {
+                if (self::isEmptyValue($b[$field] ?? null)) {
+                    continue;
+                }
+                $total++;
+                $value = $own[$field] ?? null;
+                if (self::isEmptyValue($value) || (is_array($b[$field]) && (!is_array($value) || count($value) !== count($b[$field])))) {
+                    continue;
+                }
+                $blocks[$i][$field] = $value;
+                $done++;
+            }
+        }
+        return [$blocks, $total, $done];
+    }
+
+    /**
+     * Fassung in einer weiteren Sprache aus der App prüfen: nur Blöcke, die es auf Deutsch gibt, nur übersetzbare
+     * Felder, leere fallen weg. Jeder Block wird mit den deutschen Feldern zusammen von seinem Typ geprüft (Längen).
+     *
+     * @param list<array<string, mixed>> $blocks die deutschen Blöcke
+     * @return array<string, array<string, mixed>> Kennung => Feld => Wert
+     */
+    public function validateTranslation(array $blocks, mixed $in, int $textMax): array
+    {
+        if ($in === null || $in === []) {
+            return [];
+        }
+        if (!is_array($in)) {
+            throw ApiError::invalid(I18n::t('Ungültige Blöcke.'));
+        }
+        $types = $this->types();
+        $out = [];
+        $text = 0;
+        foreach ($blocks as $b) {
+            $id = (string) ($b['id'] ?? '');
+            $given = $in[$id] ?? null;
+            $type = $types[$b['type'] ?? ''] ?? null;
+            $fields = self::TRANSLATABLE[$b['type'] ?? ''] ?? [];
+            if (!is_array($given) || $type === null || $fields === []) {
+                continue;
+            }
+            $merged = $b;
+            foreach ($fields as $field) {
+                if (array_key_exists($field, $given)) {
+                    $merged[$field] = $given[$field];
+                }
+            }
+            $clean = $type->validate($merged);
+            $own = [];
+            foreach ($fields as $field) {
+                if (array_key_exists($field, $given) && !self::isEmptyValue($clean[$field] ?? null)) {
+                    $own[$field] = $clean[$field];
+                }
+            }
+            if ($own !== []) {
+                $out[$id] = $own;
+                $text += strlen((string) ($own['html'] ?? ''));
+            }
+        }
+        if ($text > $textMax) {
+            throw ApiError::invalid(I18n::t('Der Text ist zu lang.'));
+        }
+        return $out;
+    }
+
+    /**
+     * Bilder in den Textblöcken einer Fassung gehören danach $ownerType/$ownerId (wie claim, ohne zu löschen).
+     *
+     * @param array<string, array<string, mixed>> $tr
+     * @return array<string, array<string, mixed>>
+     */
+    public function claimTranslation(array $tr, User $actor, string $ownerType, int $ownerId): array
+    {
+        foreach ($tr as $id => $fields) {
+            if (is_string($fields['html'] ?? null) && $fields['html'] !== '') {
+                $tr[$id]['html'] = $this->app->richImages()->claim($actor, $fields['html'], $ownerType, $ownerId);
+            }
+        }
+        return $tr;
+    }
+
+    /**
+     * Bilder in den Textblöcken einer Fassung.
+     *
+     * @param array<string, array<string, mixed>> $tr
+     * @return list<string>
+     */
+    public static function translationImages(array $tr): array
+    {
+        $uids = [];
+        foreach ($tr as $fields) {
+            array_push($uids, ...RichText::imageUids(is_string($fields['html'] ?? null) ? $fields['html'] : ''));
+        }
+        return $uids;
+    }
+
+    /**
+     * Fassung zum Bearbeiten: Bilder als Adressen wie bei den deutschen Blöcken (RichImageService::render).
+     *
+     * @param array<string, array<string, mixed>> $tr
+     * @return array<string, array<string, mixed>>
+     */
+    public function renderTranslation(array $tr): array
+    {
+        foreach ($tr as $id => $fields) {
+            if (is_string($fields['html'] ?? null) && $fields['html'] !== '') {
+                $tr[$id]['html'] = $this->app->richImages()->render($fields['html']);
+            }
+        }
+        return $tr;
+    }
+
+    /**
+     * Gespeicherte Fassung (JSON) als Kennung => Feld => Wert.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public static function decodeTranslation(?string $json): array
+    {
+        $data = is_string($json) && $json !== '' ? json_decode($json, true) : null;
+        return is_array($data) ? array_filter($data, 'is_array') : [];
+    }
+
+    /** @param array<string, array<string, mixed>> $tr */
+    public static function encodeTranslation(array $tr): string
+    {
+        return $tr === [] ? '' : (string) json_encode($tr, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+
+    private static function isEmptyValue(mixed $v): bool
+    {
+        return $v === null || $v === '' || $v === [];
     }
 
     /** @param array<string, bool> $seen */

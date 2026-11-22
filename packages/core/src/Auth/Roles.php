@@ -47,7 +47,7 @@ final class Roles
      * für Mitglied und die Rollen, die die Bereiche mitbringen; ohne sie, was beim Update für member galt (expandLegacy).
      */
     public const MEMBER_DEFAULTS = [
-        'member', 'calendar', 'view_intern', ...self::PUBLIC_DEFAULTS, 'view_gallery_internal', 'view_own_points',
+        'member', 'calendar', 'respond_calendar', 'view_intern', ...self::PUBLIC_DEFAULTS, 'view_gallery_internal', 'view_own_points',
         'view_own_penalties', 'view_own_rank', 'view_own_attendance', 'view_birthdays', 'vote_polls', 'view_documents',
         'view_board', 'view_ranks', 'view_catalog',
     ];
@@ -72,12 +72,12 @@ final class Roles
      * @var array<string, string[]>
      */
     public const LEGACY = [
-        self::ORGANIZER => [...self::MEMBER_DEFAULTS, ...self::ADDED_VIEW, 'manage_events', 'manage_documents'],
-        self::MANAGER => [...self::MEMBER_DEFAULTS, ...self::ADDED_VIEW, 'manage_events', 'manage_documents', 'manage_points', 'manage_penalties'],
+        self::ORGANIZER => [...self::MEMBER_DEFAULTS, ...self::ADDED_VIEW, 'manage_events', 'view_restricted_documents', 'manage_documents'],
+        self::MANAGER => [...self::MEMBER_DEFAULTS, ...self::ADDED_VIEW, 'manage_events', 'view_restricted_documents', 'manage_documents', 'view_points', 'manage_points', 'view_penalties', 'manage_penalties'],
     ];
 
     /** Frühere feste Rolle „Anwärter“: interner Kalender und das Brett (wie damals mit dem Kalender), dazu das Öffentliche. */
-    public const CANDIDATE_DEFAULTS = ['calendar', 'view_board', ...self::PUBLIC_DEFAULTS, ...self::ADDED_VIEW];
+    public const CANDIDATE_DEFAULTS = ['calendar', 'respond_calendar', 'view_board', ...self::PUBLIC_DEFAULTS, ...self::ADDED_VIEW];
 
     /**
      * Rechte, die der Admin einer Rolle geben kann, in der Reihenfolge der Anzeige (Gruppen in capabilities.ts).
@@ -99,6 +99,7 @@ final class Roles
         Capability::ViewOwnRank,
         Capability::ViewOwnAttendance,
         Capability::Calendar,
+        Capability::RespondCalendar,
         Capability::ViewGalleryInternal,
         Capability::ViewBirthdays,
         Capability::VotePolls,
@@ -112,32 +113,52 @@ final class Roles
         Capability::ViewCatalog,
         // Inhalte verwalten
         Capability::ManageEvents,
+        Capability::ViewResponses,
         Capability::ManageCalendar,
         Capability::ManageNews,
+        Capability::ViewRestrictedDocuments,
         Capability::ManageDocuments,
+        Capability::ViewBoardHistory,
         Capability::PostBoard,
+        Capability::ViewPollResults,
         Capability::ManagePolls,
+        Capability::ViewLists,
         Capability::ManageLists,
+        Capability::ViewMail,
         Capability::SendMail,
         Capability::ManageSponsors,
+        Capability::ViewCompanyMembers,
         Capability::ManageCompanies,
         Capability::SubmitGallery,
+        Capability::ViewSubmissions,
         Capability::ReviewGallery,
         Capability::ManageGallery,
         Capability::ManagePages,
+        Capability::ManageWebsite,
         // Kompanie verwalten
+        Capability::ViewPoints,
         Capability::ManagePoints,
+        Capability::ViewPenalties,
         Capability::ManagePenalties,
+        Capability::ViewPromotions,
         Capability::ManageRanks,
+        Capability::ViewTitles,
         Capability::ManageTitles,
+        Capability::ViewAttendance,
         Capability::ManageAttendance,
         Capability::ManageOffices,
+        Capability::ViewInventory,
         Capability::ManageInventory,
         // Mitglieder und Rollen
         Capability::ViewPersonal,
         Capability::ManagePersonal,
+        Capability::ViewAccounts,
         Capability::CreateUsers,
+        Capability::ManageFormer,
+        Capability::ViewPassive,
+        Capability::ManagePassive,
         Capability::PromoteUsers,
+        Capability::ViewReports,
         Capability::ReviewReports,
         Capability::ViewChanges,
     ];

@@ -1,3 +1,5 @@
+import { t } from './i18n';
+
 /**
  * Hochgeladene Sicherungsdatei: verschlüsselt (Storage\BackupCrypto, beginnt mit MAGIC) oder JSON wie bisher.
  * Verschlüsselte Dateien gehen als Base64 an POST /admin/backup, mit dem Passwort für Sicherungen.
@@ -50,7 +52,7 @@ export function readBase64(file: Blob): Promise<string> {
     const reader = new FileReader();
     // Nur der Base64-Teil: spart auf dem Server eine Kopie der Datei.
     reader.onload = () => resolve(String(reader.result).replace(/^data:[^,]*,/, ''));
-    reader.onerror = () => reject(new Error('Die Datei konnte nicht gelesen werden.'));
+    reader.onerror = () => reject(new Error(t('Die Datei konnte nicht gelesen werden.')));
     reader.readAsDataURL(file);
   });
 }

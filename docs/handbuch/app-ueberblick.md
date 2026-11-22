@@ -16,7 +16,7 @@ Hier lernst du den Aufbau der App kennen: die Kopfleiste oben, die Leiste mit de
 - **?**: öffnet die Hilfe passend zum aktuellen Bildschirm.
 - **Mond bzw. Sonne**: wechselt zwischen dunkler und heller Darstellung.
 - **Login** (oben rechts, nur ohne Anmeldung): führt zur Anmeldung, siehe [Anmelden](seite:anmelden).
-- **Untere Leiste**: Hier wechselst du zwischen den Bereichen. Der Bereich, in dem du gerade bist, ist hervorgehoben. Hältst du das Handy quer, steht die Leiste links.
+- **Untere Leiste**: Hier wechselst du zwischen den Bereichen. Der Bereich, in dem du gerade bist, ist hervorgehoben. Hältst du das Handy quer oder nutzt du die App an einem Computer oder Tablet, steht die Leiste links.
 
 Welche Bereiche unten stehen, hängt davon ab, welche die {kompanie.name} nutzt und ob du angemeldet bist:
 - **{bereich.events}**, **{bereich.news}** und **{bereich.gallery}**: für alle, auch ohne Anmeldung.
@@ -53,6 +53,16 @@ Wer den Link öffnet, landet direkt auf diesem Bildschirm. Ist er nur für Angem
 
 Hast du die App schon länger installiert und sie bleibt hochkant, öffne sie einmal neu; es kann bis zu einem Tag dauern, bis das Handy die Änderung übernimmt.
 
+### Am Computer oder Tablet
+Ist das Fenster mindestens 900 Pixel breit, nutzt die App die ganze Breite:
+- Die Leiste mit den Bereichen steht als senkrechte Leiste am linken Rand.
+- Listen stehen in mehreren Spalten, in Formularen stehen drei oder vier kurze Felder nebeneinander. Lange Textfelder gehen über die ganze Zeile.
+- Lesetexte wie Neuigkeiten oder das Handbuch bleiben in einer gut lesbaren Spalte in der Mitte, Seiten mit Kacheln ebenso.
+- Listen, die du per Ziehen sortierst, stehen in einer Spalte in der Mitte.
+- Das eigene Profil unter **Meins** und ein Mitglied in der Verwaltung stehen in zwei Spalten.
+
+Machst du das Fenster schmaler, sieht die App wieder aus wie auf dem Handy.
+
 ### Zwischen hell und dunkel wechseln
 1. Tippe oben auf den Mond, um die dunkle Darstellung einzuschalten, oder auf die Sonne für die helle.
 2. Wechselst du damit zu der Darstellung, die dein Gerät gerade hat, richtet sich die App wieder nach dem Gerät.
@@ -63,7 +73,9 @@ Fest einstellen kannst du die Darstellung unter **Meins** → **Konto**, siehe [
 Unter der Kopfleiste erscheinen manchmal Hinweise:
 - **Die App aufs Handy holen**: Tippe auf **So geht's** für die bebilderte Anleitung oder, wenn dein Browser es anbietet, auf **Installieren**. Mit **✕** blendest du den Hinweis aus. Steht oben schon eine Nachricht vom {bereich.board} oder der Hinweis auf die Wartung, wartet dieser Hinweis, bis sie weg ist. Mehr dazu unter [Die App aufs Handy holen](seite:app-installieren).
 - **{bereich.board}**: Angemeldete {rolle.member} und Personen mit dem internen Kalender (z. B. Anwärter) sehen hier dringende Nachrichten der Kompanie, {rolle.member} außerdem {bereich.polls}, die sie noch nicht beantwortet haben. Ein Tipp auf den Titel öffnet die Nachricht am Brett, mit **×** blendest du einen Eintrag auf diesem Gerät aus.
-- **Offline – angezeigt werden die zuletzt geladenen Daten.**: Du hast gerade keine Internetverbindung. Was du zuletzt geladen hast, bleibt sichtbar.
+- **Offline – angezeigt werden die zuletzt geladenen Daten.**: Du hast gerade keine Internetverbindung. Was du zuletzt geladen hast, bleibt sichtbar, auch Fotos und Logos, die du schon einmal gesehen hast.
+- **Schlechte Verbindung – angezeigt werden die zuletzt geladenen Daten.**: Das Netz antwortet gerade nicht oder nur sehr langsam. Nach einigen Sekunden zeigt die App, was du zuletzt geladen hast; kommt die Antwort doch noch, erscheint der neue Stand von selbst.
+- **Die App wurde aktualisiert**: Es gibt eine neue Version der App, und sie ist schon auf deinem Gerät geladen. Tippe auf **Neu starten**, damit du die Neuerungen gleich siehst. Hast du etwas eingegeben und noch nicht gespeichert, fragt die App vorher nach. Mit **✕** blendest du den Hinweis aus; beim nächsten Öffnen der App gilt die neue Version dann von selbst. Die App sucht nach einer neuen Version, wenn du sie wieder nach vorn holst (höchstens alle 15 Minuten) und solange sie offen ist einmal pro Stunde.
 - **Diese Seite ist erst nach der Anmeldung zu sehen.**: Du hast einen Link auf einen Bildschirm für Angemeldete geöffnet. Tippe auf **Anmelden**.
 
 ![Hinweis „Die App aufs Handy holen“ mit dem Knopf „So geht's“](bild:app-ueberblick-hinweis)
@@ -71,6 +83,7 @@ Unter der Kopfleiste erscheinen manchmal Hinweise:
 ## Gut zu wissen
 - Fragt die App nach, bevor sie etwas tut (z. B. „Wirklich löschen?“), öffnet sich ein eigenes Fenster der App mit **Abbrechen** und **OK**. Der Rest der Seite ist dabei abgedunkelt. Löschen und Entfernen steht auf einem roten Knopf. **Abbrechen**, **✕** oder die Taste Esc ändern nichts.
 - Ist ein Fenster der App offen (z. B. zum Verschieben eines Fotos oder eine Rückfrage), schließt **Zurück** (Taste oder Geste des Handys, Zurück-Knopf des Browsers) zuerst das Fenster, ohne etwas zu ändern. Du bleibst auf der Seite. Erst wenn nichts mehr offen ist, führt **Zurück** auf die Seite davor.
+- Hast du etwas eingegeben und noch nicht gespeichert (z. B. weil gerade keine Internetverbindung besteht), fragt die App, bevor du die Seite verlässt: **Verlassen** verwirft die Eingaben, **Abbrechen** bleibt auf der Seite. Das gilt auch für **Zurück** und für das Neuladen der Seite. Kommt eine Änderung ohne Verbindung nicht an, meldet die App „Keine Verbindung – nicht gespeichert“; speichere dann erneut, sobald du wieder Netz hast.
 - Wird die App gerade gewartet, siehst du statt der Inhalte nur einen Hinweis darauf. Mit **Erneut versuchen** prüfst du, ob sie wieder da ist.
 - Die Bezeichnungen der Bereiche (z. B. **{bereich.events}**) legt jede Kompanie selbst fest. Deshalb können sie bei dir anders heißen als in anderen Apps.
 

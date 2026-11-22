@@ -23,7 +23,7 @@ Tippe unten auf **Intern**, dann auf **{bereich.documents}** und oben auf **{ber
 2. Ändere bei Bedarf den **Titel**.
 3. Wähle die **Kategorie** oder **Ohne Kategorie**.
 4. Trage bei **Stand** das Datum des Dokuments ein. Vorbelegt ist heute.
-5. Wähle bei **Sichtbar für**, wer es sieht: **Alle Mitglieder** oder **Nur wer {bereich.documents} pflegt**.
+5. Wähle bei **Sichtbar für**, wer es sieht: **Alle Mitglieder** oder **Nur wer eingeschränkte {bereich.documents} sehen darf**.
 6. Tippe auf **Hochladen**.
 
 ![Das ausgefüllte Formular Dokument hochladen](bild:dokumente-pflegen-hochladen)
@@ -56,10 +56,13 @@ Die alte Datei wird dabei gelöscht. Passt der Stand nicht mehr, ändere ihn dan
 
 In dieser Reihenfolge stehen die Kategorien auch bei den {rolle.member}n.
 
+### Namen auch auf Englisch
+Hat der Admin unter **Einstellungen → Sprachen** Englisch eingeschaltet, trägt ein Admin die englischen Titel der {bereich.documents} und Namen der Kategorien dort im Abschnitt **Übersetzungen** in den Gruppen **{bereich.documents}** und **Kategorien der Dokumente** ein. Hier im Formular steht dazu nur ein Hinweis mit Link dorthin. Wer die App auf Englisch nutzt, sieht diese Namen; ohne Eintrag erscheint der deutsche. Die Datei selbst ist für alle Sprachen dieselbe. Hier bearbeitest du immer die deutschen Namen, auch wenn du die App selbst auf Englisch benutzt.
+
 ## Gut zu wissen
 - Erlaubt sind PDF, Word, Excel, PowerPoint, OpenDocument sowie JPG- und PNG-Bilder, höchstens 20 MB. Nimmt der Server nur kleinere Dateien an, steht die Grenze unter dem Formular.
 - Der Titel darf höchstens 191 Zeichen lang sein. Zwei Kategorien dürfen nicht gleich heißen.
-- **Nur wer {bereich.documents} pflegt** eignet sich z. B. für Kassenberichte. Andere {rolle.member} sehen solche {bereich.documents} gar nicht; in der Liste steht bei ihnen **Eingeschränkt**.
+- **Nur wer eingeschränkte {bereich.documents} sehen darf** eignet sich z. B. für Kassenberichte. Das sind alle, die {bereich.documents} pflegen, und alle mit dem Recht **Eingeschränkte {bereich.documents} sehen**. Andere {rolle.member} sehen solche {bereich.documents} gar nicht; in der Liste steht bei ihnen **Eingeschränkt**.
 - Löschst du eine Kategorie, bleiben ihre {bereich.documents} erhalten und stehen danach unter **Weitere {bereich.documents}**.
 - Wer ein Dokument auf dem Gerät gespeichert hatte, bekommt nach einer neuen Fassung beim nächsten Öffnen die neue. Gelöschte {bereich.documents} entfernt die App auch von den Geräten der {rolle.member}, sobald sie dort die Liste der {bereich.documents} öffnen.
 - Beim Hochladen gibt es keine Benachrichtigung.

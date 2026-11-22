@@ -59,6 +59,8 @@ const gruppe: Gruppe = async (f) => {
 
   // Eine Liste bearbeiten
   await p.locator('.card.row', { hasText: 'Ausflug – Anmeldung' }).getByRole('button', { name: 'Öffnen' }).click();
+  // Der Titel der neuen Liste ist nur getippt: Die App fragt vor dem Verlassen nach.
+  await p.locator('.ask-dialog').getByRole('button', { name: 'Verlassen' }).click();
   await p.locator('.list-editor').waitFor();
   await f.foto('liste-bearbeiten');
   const spalten = p.locator('section.card', { has: p.getByRole('heading', { name: 'Spalten' }) });
@@ -92,6 +94,7 @@ const gruppe: Gruppe = async (f) => {
 
   // Eine Anwesenheitsliste: Übersicht (mit gebuchten Punkten), eintragen, Punkte und Einträge daraus
   await p.locator('.attendance-lists .card', { hasText: 'Übungsabend' }).click();
+  await p.locator('.ask-dialog').getByRole('button', { name: 'Verlassen' }).click();
   await p.locator('.attendance-list').waitFor();
   await f.foto('anwesenheitsliste');
   await f.oeffnen('verwaltung/anwesenheit');

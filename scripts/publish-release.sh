@@ -10,7 +10,8 @@
 #   DIST (gebaute Oberfläche), BRAND (Ordner mit brand.json, theme.css, logo.png, favicon.png),
 #   SCREENSHOTS (Ordner mit PNGs, optional; Fotos des Handbuchs kommen aus DIST/handbuch/bilder), GH_TOKEN (Schreibrecht auf das Kompanie-Repo), KOMPANIE_SIGNING_KEY,
 #   optional STATUS_URL (Empfang der Statusmeldungen, https://…), REPORT_URL (Empfang der Fehlermeldungen, https://…)
-#   und SUPPORT (Kontakt für Hilfe).
+#   und SUPPORT (Kontakt für Hilfe), WARTUNG (Variable KOMPANIE_WARTUNG: „Wartung bis“ dieser Kompanie kommt in die
+#   Update-Liste, scripts/wartung.php).
 #   Für Tests: GIT_REMOTE (statt GitHub), GH (Befehl statt gh), STABLE_CORE (statt der Datei), TRUST_SIGNING_KEY=1.
 #
 # Ablauf und Wiederholbarkeit: Das Release entsteht als Entwurf (unsichtbar) und wird erst veröffentlicht,
@@ -134,10 +135,12 @@ $GH release create "v$VERSION" "${FILES[@]}" --repo "$REPO" --target "$KOMPANIE_
 # Bildschirmfotos des Handbuchs (scripts/handbuch-bilder.sh im Build-Job) liegen in der gebauten Oberfläche.
 BILDER=""
 [ -d "$DIST/handbuch/bilder" ] && BILDER="$DIST/handbuch/bilder"
+# „Wartung bis“ für die Update-Liste (die App zeigt es Admins); ohne Eintrag keine Angabe
+MAINTENANCE="$(php "$ROOT/scripts/wartung.php" --until="$REPO")"   # eigene Zuweisung: Fehler im Aufbau brechen ab
 # Update-Liste und Download-Seite; bei gleichzeitiger Änderung (Push abgelehnt) neu holen und wiederholen
 for attempt in 1 2 3 4 5; do
   [ "$attempt" -gt 1 ] && fetch_pages
-  ADDED="$(updates --add="$WORK/release/release.json" --base-url="$BASE_URL" --stable-core="$STABLE_CORE")"
+  ADDED="$(updates --add="$WORK/release/release.json" --base-url="$BASE_URL" --stable-core="$STABLE_CORE" --maintenance="${MAINTENANCE:-keine}")"
   echo "$ADDED"
   if grep -q "schon in der Liste" <<< "$ADDED"; then
     # Der vorige Push kam an, nur die Rückmeldung nicht.

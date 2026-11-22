@@ -7,6 +7,7 @@ namespace KompanieApp\Core\Domain;
 use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Push\PushService;
 use KompanieApp\Core\Storage\GalleryRepository;
 use KompanieApp\Core\Storage\GallerySubmissionRepository as Repo;
@@ -25,6 +26,9 @@ use KompanieApp\Core\Storage\GallerySubmissionRepository as Repo;
  * - Videos (MP4, WebM bis 1 GB, Issue #350) kommen in Stücken über VideoUploadService, unverändert; die Vorschau
  *   ist das Standbild aus dem Browser. Prüfende sehen das Video vor der Freigabe (deliverVideo).
  * - Freigegebene lassen sich wieder entfernen (das Bild verschwindet, die Einreichung gilt als abgelehnt).
+ * - Mit Google Drive als Ablage (GalleryDriveService) bringt die Aufgabe der Galerie offene Einreichungen in einen
+ *   privaten Ordner in Drive (drive_file_id); Freigeben verschiebt sie von dort ins Album, Ablehnen und Zurückziehen
+ *   legen sie in den Papierkorb von Drive.
  * - Konto gelöscht (UserData::purge): alle Zeilen der Person verschwinden, freigegebene Bilder bleiben ohne Verknüpfung.
  *   Die Dateien offener Einreichungen löscht userDeleted(); was ohne App gelöscht wurde (WordPress-Netzwerk), räumt
  *   pruneOrphans() in der Aufgabe der Galerie auf.
@@ -101,7 +105,7 @@ final class GallerySubmissionService
     public function assertEnabled(): void
     {
         if (!$this->enabled()) {
-            throw ApiError::forbidden('Das Einreichen von Bildern und Videos ist ausgeschaltet.');
+            throw ApiError::forbidden(I18n::t('Das Einreichen von Bildern und Videos ist ausgeschaltet.'));
         }
     }
 
@@ -141,7 +145,7 @@ final class GallerySubmissionService
     {
         $this->assertEnabled();
         if ($consent !== true) {
-            throw ApiError::invalid('Bitte bestätigen, dass du die Rechte an den Bildern hast und die erkennbaren Personen einverstanden sind.');
+            throw ApiError::invalid(I18n::t('Bitte bestätigen, dass du die Rechte an den Bildern hast und die erkennbaren Personen einverstanden sind.'));
         }
         $id = Input::integer($albumId) ?? 0;
         $this->album($id);
@@ -151,7 +155,7 @@ final class GallerySubmissionService
     /** @return array<string, mixed> */
     public function album(int $id): array
     {
-        return (new GalleryRepository($this->app->db))->album($id) ?? throw ApiError::notFound('Album nicht gefunden.');
+        return (new GalleryRepository($this->app->db))->album($id) ?? throw ApiError::notFound(I18n::t('Album nicht gefunden.'));
     }
 
     /**
@@ -187,6 +191,10 @@ final class GallerySubmissionService
             $this->app->gallery()->media()->delete($stored['key']);
             throw $e;
         }
+        if ($this->app->galleryDrive()->active()) {
+            // Mit Drive als Ablage: im Hintergrund in den Ordner „Einreichungen“
+            $this->app->scheduler->runSoon(GalleryDriveService::TASK);
+        }
         $since = gmdate('Y-m-d H:i:s', $this->app->time()->timestamp() - self::NOTIFY_GAP);
         if (!$repo->submittedSince($user->id, $since, $sid)) {
             $this->notifyReviewers($user, (string) $album['title'], $sid);
@@ -199,12 +207,12 @@ final class GallerySubmissionService
     {
         $s = $this->repo()->find($id);
         if ($s === null || (int) $s['user_id'] !== $user->id) {
-            throw ApiError::notFound('Einreichung nicht gefunden.');
+            throw ApiError::notFound(I18n::t('Einreichung nicht gefunden.'));
         }
         if ((string) $s['status'] !== Repo::PENDING) {
-            throw ApiError::invalid('Nur offene Einreichungen lassen sich zurückziehen.');
+            throw ApiError::invalid(I18n::t('Nur offene Einreichungen lassen sich zurückziehen.'));
         }
-        $this->app->gallery()->media()->delete((string) $s['file_key']);
+        $this->deleteFile($s);
         $this->repo()->delete($id);
     }
 
@@ -212,9 +220,17 @@ final class GallerySubmissionService
     public function approve(User $actor, int $id, bool $intern): array
     {
         $s = $this->pending($id);
+        if ((string) ($s['drive_file_id'] ?? '') !== '') {
+            try {
+                $photoId = $this->app->galleryDrive()->approve($s, $this->album((int) $s['album_id']), $intern);
+            } catch (\RuntimeException $e) {
+                throw ApiError::invalid(I18n::t('Die Einreichung ließ sich in Google Drive nicht ins Album verschieben: {error}', ['error' => $e->getMessage()]));
+            }
+            return $this->approved($actor, $s, $id, $photoId);
+        }
         $media = $this->app->gallery()->media();
         if ($media->path((string) $s['file_key']) === null) {
-            throw ApiError::invalid('Die Datei der Einreichung fehlt. Bitte ablehnen.');
+            throw ApiError::invalid(I18n::t('Die Datei der Einreichung fehlt. Bitte ablehnen.'));
         }
         $photoId = $this->app->galleryUploads()->insertPhoto((int) $s['album_id'], [
             'key' => (string) $s['file_key'],
@@ -225,18 +241,41 @@ final class GallerySubmissionService
             'bytes' => (int) $s['bytes'],
             'duration_ms' => (int) ($s['duration_ms'] ?? 0),
         ], $intern);
-        $this->repo()->update($id, ['status' => Repo::APPROVED, 'reviewed_by' => $actor->id, 'reviewed_at' => $this->app->time()->nowUtc(), 'photo_id' => $photoId, 'reason' => '']);
+        return $this->approved($actor, $s, $id, $photoId);
+    }
+
+    /**
+     * @param array<string, mixed> $s
+     * @return array<string, mixed>
+     */
+    private function approved(User $actor, array $s, int $id, int $photoId): array
+    {
+        $this->repo()->update($id, ['status' => Repo::APPROVED, 'reviewed_by' => $actor->id, 'reviewed_at' => $this->app->time()->nowUtc(), 'photo_id' => $photoId, 'reason' => '', 'drive_file_id' => '']);
         $this->notifySubmitter($s, true, '');
         return $this->out($this->repo()->find($id) ?? [], true);
+    }
+
+    /**
+     * Datei einer offenen Einreichung löschen: auf dem Server oder (in Drive) in den Papierkorb von Drive.
+     *
+     * @param array<string, mixed> $s
+     */
+    private function deleteFile(array $s): void
+    {
+        if ((string) ($s['drive_file_id'] ?? '') !== '') {
+            $this->app->galleryDrive()->trash((string) $s['drive_file_id']);
+            return;
+        }
+        $this->app->gallery()->media()->delete((string) $s['file_key']);
     }
 
     /** Ablehnen: Die Datei verschwindet sofort, der Grund bleibt für die einreichende Person sichtbar. */
     public function reject(User $actor, int $id, mixed $reason): array
     {
         $s = $this->pending($id);
-        $reason = $this->validReason($reason, true);
-        $this->app->gallery()->media()->delete((string) $s['file_key']);
-        $this->repo()->update($id, ['status' => Repo::REJECTED, 'reviewed_by' => $actor->id, 'reviewed_at' => $this->app->time()->nowUtc(), 'reason' => $reason, 'thumb' => null, 'file_key' => '']);
+        $reason = $this->validReason($reason, true, self::isVideo($s));
+        $this->deleteFile($s);
+        $this->repo()->update($id, ['status' => Repo::REJECTED, 'reviewed_by' => $actor->id, 'reviewed_at' => $this->app->time()->nowUtc(), 'reason' => $reason, 'thumb' => null, 'file_key' => '', 'drive_file_id' => '']);
         $this->notifySubmitter($s, false, $reason);
         return $this->out($this->repo()->find($id) ?? [], true);
     }
@@ -246,7 +285,7 @@ final class GallerySubmissionService
     {
         $s = $this->repo()->find($id);
         if ($s === null || (string) $s['status'] !== Repo::APPROVED) {
-            throw ApiError::notFound('Freigegebene Einreichung nicht gefunden.');
+            throw ApiError::notFound(I18n::t('Freigegebene Einreichung nicht gefunden.'));
         }
         $reason = $this->validReason($reason, false);
         $photo = $s['photo_id'] !== null ? (new GalleryRepository($this->app->db))->photo((int) $s['photo_id']) : null;
@@ -273,7 +312,7 @@ final class GallerySubmissionService
         $repo = $this->repo();
         foreach ($repo->ofAlbum($albumId) as $s) {
             if ((string) $s['status'] === Repo::PENDING) {
-                $this->app->gallery()->media()->delete((string) $s['file_key']);
+                $this->deleteFile($s);
             }
             $repo->delete((int) $s['id']);
         }
@@ -283,7 +322,7 @@ final class GallerySubmissionService
     public function userDeleted(int $userId): void
     {
         foreach ($this->repo()->pendingOfUser($userId) as $s) {
-            $this->app->gallery()->media()->delete((string) $s['file_key']);
+            $this->deleteFile($s);
         }
     }
 
@@ -339,11 +378,15 @@ final class GallerySubmissionService
             return ['status' => 404];
         }
         $key = (string) $s['file_key'];
+        $mime = VideoUploadService::TYPES[strtolower(pathinfo($key, PATHINFO_EXTENSION))];
+        if ((string) ($s['drive_file_id'] ?? '') !== '') {
+            // Schon im Ordner „Einreichungen“ in Drive: von dort durchreichen
+            return $this->app->gallery()->deliverDriveRange((string) $s['drive_file_id'], (int) $s['bytes'], $mime, '"s' . md5($key) . '"', true, $range, $begin, $write);
+        }
         $file = $this->app->gallery()->media()->path($key);
         if ($file === null) {
             return ['status' => 404];
         }
-        $mime = VideoUploadService::TYPES[strtolower(pathinfo($key, PATHINFO_EXTENSION))];
         return $this->app->gallery()->deliverFile($file, $mime, '"s' . md5($key) . '"', true, $range, $begin, $write);
     }
 
@@ -352,7 +395,7 @@ final class GallerySubmissionService
     {
         $s = $this->repo()->find($id);
         if ($s === null || (string) $s['status'] !== Repo::PENDING) {
-            throw ApiError::notFound('Offene Einreichung nicht gefunden.');
+            throw ApiError::notFound(I18n::t('Offene Einreichung nicht gefunden.'));
         }
         return $s;
     }
@@ -371,14 +414,16 @@ final class GallerySubmissionService
         ]);
     }
 
-    private function validReason(mixed $raw, bool $required): string
+    private function validReason(mixed $raw, bool $required, bool $video = false): string
     {
         $reason = Text::line(is_string($raw) ? $raw : '', self::REASON_MAX + 1);
         if ($required && $reason === '') {
-            throw ApiError::invalid('Bitte kurz begründen, warum das Bild nicht freigegeben wird.');
+            throw ApiError::invalid($video
+                ? I18n::t('Bitte kurz begründen, warum das Video nicht freigegeben wird.')
+                : I18n::t('Bitte kurz begründen, warum das Bild nicht freigegeben wird.'));
         }
         if (mb_strlen($reason) > self::REASON_MAX) {
-            throw ApiError::invalid(sprintf('Der Grund darf höchstens %d Zeichen lang sein.', self::REASON_MAX));
+            throw ApiError::invalid(I18n::t('Der Grund darf höchstens {max} Zeichen lang sein.', ['max' => self::REASON_MAX]));
         }
         return $reason;
     }
@@ -403,7 +448,7 @@ final class GallerySubmissionService
             'type' => self::isVideo($s) ? 'video' : 'image',
         ];
         if ($forReview && self::isVideo($s) && (string) ($s['status'] ?? '') === Repo::PENDING) {
-            // Zum Ansehen vor der Freigabe (nur mit review_gallery, siehe deliverVideo)
+            // Zum Ansehen vor der Freigabe (nur mit view_submissions, siehe deliverVideo)
             $out['video'] = $this->app->env->photoUrl((int) $s['id'], self::VIDEO_SIZE);
         }
         if ($forReview) {
@@ -413,19 +458,25 @@ final class GallerySubmissionService
         if ($forReview) {
             $user = $this->app->users->find((int) ($s['user_id'] ?? 0));
             $out['user_id'] = (int) ($s['user_id'] ?? 0);
-            $out['user_name'] = $user?->name ?? 'Gelöschtes Konto';
+            $out['user_name'] = $user?->name ?? I18n::t('Gelöschtes Konto');
         }
         return $out;
     }
 
     private function notifyReviewers(User $user, string $album, int $submissionId): void
     {
-        $gallery = $this->app->config->sectionLabel('gallery', 'Galerie');
+        $gallery = $this->app->config->sectionLabel('gallery', I18n::t('Galerie'));
         try {
             $this->app->push()->notifyAudience(
                 PushService::TYPE_GALLERY_REVIEW,
-                PushService::message($gallery . ': neue Bilder', sprintf('%s hat Bilder für „%s“ eingereicht.', $user->name, $album), 'galerie/pruefen', 'galerie-pruefen'),
-                // Wer selbst einreicht, braucht keinen Hinweis auf die eigenen Bilder.
+                // Nur die erste Datei eines Schubs löst die Nachricht aus; was danach kommt, ist noch offen.
+                PushService::message(
+                    I18n::t('{section}: neue Einreichungen', ['section' => $gallery]),
+                    I18n::t('{name} hat Bilder oder Videos für „{album}“ eingereicht.', ['name' => $user->name, 'album' => $album]),
+                    'galerie/pruefen',
+                    'galerie-pruefen',
+                ),
+                // Wer selbst einreicht, braucht keinen Hinweis auf die eigenen Einreichungen.
                 static fn (int $uid): bool => $uid !== $user->id,
             );
         } catch (\Throwable $e) {
@@ -436,17 +487,28 @@ final class GallerySubmissionService
     /** @param array<string, mixed> $s */
     private function notifySubmitter(array $s, bool $approved, string $reason): void
     {
-        $gallery = $this->app->config->sectionLabel('gallery', 'Galerie');
         $album = (string) ($s['album_title'] ?? '');
-        $body = $approved
-            ? sprintf('Dein Bild „%s“ ist jetzt im Album „%s“.', $s['name'], $album)
-            : sprintf('Dein Bild „%s“ wurde nicht freigegeben: %s', $s['name'], $reason);
+        $video = self::isVideo($s);
+        $params = ['section' => '', 'name' => (string) $s['name'], 'album' => $album, 'reason' => $reason];
         try {
-            $this->app->push()->notifyUser(
-                (int) $s['user_id'],
-                PushService::TYPE_GALLERY_SUBMISSIONS,
-                PushService::message($gallery . ($approved ? ': Bild freigegeben' : ': Bild abgelehnt'), $body, 'galerie/einreichen', 'galerie-einreichung-' . $s['id']),
-            );
+            // In der Sprache der einreichenden Person
+            $message = I18n::in($this->app->languages()->forRecipient((int) $s['user_id']), function () use ($approved, $video, $params, $s): array {
+                $params['section'] = $this->app->config->sectionLabel('gallery', I18n::t('Galerie'));
+                $title = match (true) {
+                    $approved && $video => I18n::t('{section}: Video freigegeben', $params),
+                    $approved => I18n::t('{section}: Bild freigegeben', $params),
+                    $video => I18n::t('{section}: Video abgelehnt', $params),
+                    default => I18n::t('{section}: Bild abgelehnt', $params),
+                };
+                $body = match (true) {
+                    $approved && $video => I18n::t('Dein Video „{name}“ ist jetzt im Album „{album}“.', $params),
+                    $approved => I18n::t('Dein Bild „{name}“ ist jetzt im Album „{album}“.', $params),
+                    $video => I18n::t('Dein Video „{name}“ wurde nicht freigegeben: {reason}', $params),
+                    default => I18n::t('Dein Bild „{name}“ wurde nicht freigegeben: {reason}', $params),
+                };
+                return PushService::message($title, $body, 'galerie/einreichen', 'galerie-einreichung-' . $s['id']);
+            });
+            $this->app->push()->notifyUser((int) $s['user_id'], PushService::TYPE_GALLERY_SUBMISSIONS, $message);
         } catch (\Throwable $e) {
             error_log('Kompanie-App: Benachrichtigung zu Einreichung ' . $s['id'] . ' nicht eingereiht: ' . $e->getMessage());
         }

@@ -1,41 +1,60 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { flatOrder, setupOrder, SETUP, sortByIds, startOrder } from './navigation';
 import { can, config, type Feature } from './api';
-import { canManagePolls, canPostBoard } from './board';
+import { boardSeesAll, canManagePolls } from './board';
 import brand from './generated/brand';
 import { navigate } from './router';
+import { t } from './i18n';
 import { Caps } from './ui';
 import { useAdminCounts } from './adminCounts';
 import { usePromotionsDue } from './promotionsDue';
-import { tileCount } from './tileCount';
+import { tileCount, tileSoonCount, tileTitle } from './tileCount';
+import { TileArrange, TileGrid } from './tiles';
 import { menuSources, prefetchOnTap, usePrefetchMenu } from './viewData';
 
 const sec = brand.labels.sections;
 const canPoints = (): boolean => !!config?.features.points && can('manage_points');
 const canPenalties = (): boolean => !!config?.features.penalties && can('manage_penalties');
 const canRanks = (): boolean => !!config?.features.ranks && can('manage_ranks');
-const canTitles = (): boolean => !!config?.features.titles && can('manage_titles');
-const canAttendance = (): boolean => !!config?.features.attendance && can('manage_attendance');
+// Leserechte (Rechte in Lesen und Schreiben aufgeteilt): Mitgliederliste, Bericht und die Seiten zum Ansehen
+const seePoints = (): boolean => !!config?.features.points && can('view_points');
+const seePenalties = (): boolean => !!config?.features.penalties && can('view_penalties');
+const seeRanks = (): boolean => !!config?.features.ranks && can('view_promotions');
+const seeTitles = (): boolean => !!config?.features.titles && can('view_titles');
+const seeAttendance = (): boolean => !!config?.features.attendance && can('view_attendance');
 const canOffices = (): boolean => !!config?.features.offices && can('manage_offices');
-const canLists = (): boolean => !!config?.features.lists && can('manage_lists');
-const canMail = (): boolean => !!config?.features.mail && can('send_mail');
+const seeLists = (): boolean => !!config?.features.lists && can('view_lists');
+const seeMail = (): boolean => !!config?.features.mail && can('view_mail');
+const seeInventory = (): boolean => !!config?.features.inventory && can('view_inventory');
 const canCompanies = (): boolean => !!config?.features.companies && can('manage_companies');
 const canSponsors = (): boolean => !!config?.features.sponsors && can('manage_sponsors');
 const canPages = (): boolean => !!config?.features.pages && can('manage_pages');
+const canWebsite = (): boolean => !!config?.features.website && can('manage_website');
+const canPassive = (): boolean => !!config?.features.passive && can('view_passive');
 
-/** Mitgliederliste: für alle, die Punkte oder Strafen vergeben, Dienstgrade, Titel oder Anwesenheit pflegen, Mitglieder
- * anlegen, Rollen vergeben oder Kompanien zuordnen. */
+/**
+ * Bericht als PDF: wer mindestens einen Bereich des Berichts verwalten darf (wie ReportService im Kern: Mitglieder mit
+ * den Rechten der Mitgliederliste, dazu Passive, Ämter, Inventar). Termine und Kalender allein öffnen keine Verwaltung
+ * (wer nur sie pflegt, hat dort sonst nichts); wer die Verwaltung hat, bekommt sie im Bericht dazu. Welche Bereiche
+ * genau, sagt der Server.
+ */
+export function reportAllowed(): boolean {
+  return memberListAllowed() || canPassive() || canOffices() || seeInventory();
+}
+
+/** Mitgliederliste: für alle, die Punkte, Strafen, Dienstgrade, Titel oder Anwesenheit der Mitglieder sehen, Mitglieder
+ * anlegen, Ehemalige verwalten, Rollen vergeben oder die Kompanien der Mitglieder sehen (wie Capability::memberList im Kern). */
 export function memberListAllowed(): boolean {
   return (
-    canPoints() ||
-    canPenalties() ||
-    canRanks() ||
-    canTitles() ||
-    canAttendance() ||
-    canCompanies() ||
+    seePoints() ||
+    seePenalties() ||
+    seeRanks() ||
+    seeTitles() ||
+    seeAttendance() ||
+    (!!config?.features.companies && can('view_company_members')) ||
     can('view_personal') ||
-    can('create_users') ||
-    can('promote_users')
+    can('view_accounts') ||
+    can('manage_former')
   );
 }
 
@@ -46,35 +65,41 @@ export function adminTabs(): AdminTab[] {
   const points = canPoints();
   const tabs = (
     [
-      { id: 'mitglieder', label: 'Mitglieder', on: memberListAllowed() },
-      { id: 'ehemalige', label: 'Ehemalige', on: can('create_users') },
+      { id: 'mitglieder', label: t('Mitglieder'), on: memberListAllowed() },
+      { id: 'ehemalige', label: t('Ehemalige'), on: can('manage_former') },
+      { id: 'passive', label: t('Passive'), on: canPassive() },
       // Anfragen auf einen Zugang (Issue #314): auch nach dem Ausschalten, solange welche warten; Zahl der offenen im Kreis
       {
         id: 'anfragen',
-        label: 'Anfragen',
-        on: can('create_users') && (!!config?.registration || (config?.pendingRegistrations ?? 0) > 0),
+        label: t('Anfragen'),
+        on: can('view_accounts') && (!!config?.registration || (config?.pendingRegistrations ?? 0) > 0),
       },
       // Fehlermeldungen aus der App: Zahl der offenen im Kreis
-      { id: 'meldungen', label: 'Fehlermeldungen', on: can('review_reports') },
+      { id: 'meldungen', label: t('Fehlermeldungen'), on: can('view_reports') },
       // Änderungsprotokoll: wer wann was angelegt, geändert oder gelöscht hat
-      { id: 'aenderungen', label: 'Änderungen', on: can('view_changes') },
+      { id: 'aenderungen', label: t('Änderungen'), on: can('view_changes') },
+      // Bericht als PDF: Daten mehrerer Bereiche für einen Zeitraum
+      { id: 'bericht', label: t('Bericht'), on: reportAllowed() },
       { id: 'punkte', label: `${sec.points} +`, on: points },
       { id: 'strafe', label: `${sec.penalties} +`, on: canPenalties() },
       { id: 'katalog', label: sec.catalog, on: points, group: SETUP },
       { id: 'dienstgrade', label: sec.ranks, on: canRanks(), group: SETUP },
-      { id: 'befoerderungen', label: 'Beförderungen', on: canRanks() && !!config?.features.points },
-      { id: 'titel', label: sec.titles, on: canTitles(), group: SETUP },
+      { id: 'befoerderungen', label: t('Beförderungen'), on: seeRanks() && !!config?.features.points },
+      // Aufnahmen: Anwärter, die die Voraussetzung erfüllen (Zahl im Kreis); der Server schickt die Zahl nur, wenn es passt
+      { id: 'aufnahmen', label: t('Aufnahmen'), on: can('view_accounts') && config?.admissionsDue != null },
+      { id: 'titel', label: sec.titles, on: seeTitles(), group: SETUP },
       { id: 'aemter', label: sec.offices, on: canOffices(), group: SETUP },
       { id: 'kompanien', label: sec.companies, on: canCompanies(), group: SETUP },
       { id: 'sponsoren', label: sec.sponsors, on: canSponsors(), group: SETUP },
       { id: 'seiten', label: sec.pages, on: canPages(), group: SETUP },
-      { id: 'anwesenheit', label: sec.attendance, on: canAttendance() },
-      { id: 'brett', label: sec.board, on: canPostBoard(), route: 'brett' },
+      { id: 'webseite', label: t('Webseite'), on: canWebsite(), group: SETUP },
+      { id: 'anwesenheit', label: sec.attendance, on: seeAttendance() },
+      { id: 'brett', label: sec.board, on: boardSeesAll(), route: 'brett' },
       { id: 'umfragen', label: sec.polls, on: canManagePolls(), route: 'umfragen/verwalten' },
-      { id: 'inventar', label: sec.inventory, on: !!config?.features.inventory && can('manage_inventory'), route: 'inventar' },
-      { id: 'listen', label: sec.lists, on: canLists() },
-      { id: 'mail', label: sec.mail, on: canMail() },
-      { id: 'einstellungen', label: 'Einstellungen', on: can('manage_settings'), route: 'einstellungen' },
+      { id: 'inventar', label: sec.inventory, on: seeInventory(), route: 'inventar' },
+      { id: 'listen', label: sec.lists, on: seeLists() },
+      { id: 'mail', label: sec.mail, on: seeMail() },
+      { id: 'einstellungen', label: t('Einstellungen'), on: can('manage_settings'), route: 'einstellungen' },
     ] as AdminTab[]
   ).filter((t) => t.on);
   // Reihenfolge aus Einstellungen → Navigation (Abschnitt „Verwaltung“); ohne sie die Folge oben.
@@ -89,22 +114,25 @@ export function adminTileCatalog(): Record<string, { label: string; on: boolean 
   const f = config?.features;
   const on = (...keys: Feature[]) => keys.every((k) => !!f?.[k]);
   return {
-    mitglieder: { label: 'Mitglieder', on: true },
-    ehemalige: { label: 'Ehemalige', on: true },
-    anfragen: { label: 'Anfragen', on: !!config?.registration || (config?.pendingRegistrations ?? 0) > 0 },
-    meldungen: { label: 'Fehlermeldungen', on: true },
-    aenderungen: { label: 'Änderungen', on: true },
+    mitglieder: { label: t('Mitglieder'), on: true },
+    ehemalige: { label: t('Ehemalige'), on: true },
+    passive: { label: t('Passive'), on: on('passive') },
+    anfragen: { label: t('Anfragen'), on: !!config?.registration || (config?.pendingRegistrations ?? 0) > 0 },
+    meldungen: { label: t('Fehlermeldungen'), on: true },
+    aenderungen: { label: t('Änderungen'), on: true },
+    bericht: { label: t('Bericht'), on: true },
     punkte: { label: `${sec.points} +`, on: on('points') },
     strafe: { label: `${sec.penalties} +`, on: on('penalties') },
-    befoerderungen: { label: 'Beförderungen', on: on('ranks', 'points') },
+    befoerderungen: { label: t('Beförderungen'), on: on('ranks', 'points') },
+    aufnahmen: { label: t('Aufnahmen'), on: on('attendance') },
     anwesenheit: { label: sec.attendance, on: on('attendance') },
     brett: { label: sec.board, on: on('board') },
     umfragen: { label: sec.polls, on: on('polls') },
     inventar: { label: sec.inventory, on: on('inventory') },
     listen: { label: sec.lists, on: on('lists') },
     mail: { label: sec.mail, on: on('mail') },
-    [SETUP]: { label: 'Einrichtungen', on: true },
-    einstellungen: { label: 'Einstellungen', on: true },
+    [SETUP]: { label: t('Einrichtungen'), on: true },
+    einstellungen: { label: t('Einstellungen'), on: true },
     katalog: { label: sec.catalog, on: on('points') },
     dienstgrade: { label: sec.ranks, on: on('ranks') },
     titel: { label: sec.titles, on: on('titles') },
@@ -112,6 +140,7 @@ export function adminTileCatalog(): Record<string, { label: string; on: boolean 
     kompanien: { label: sec.companies, on: on('companies') },
     sponsoren: { label: sec.sponsors, on: on('sponsors') },
     seiten: { label: sec.pages, on: on('pages') },
+    webseite: { label: t('Webseite'), on: on('website') },
   };
 }
 
@@ -131,7 +160,7 @@ function startTabs(): AdminTab[] {
   // Nur Bereiche der Einrichtungen: keine Seite mit einem einzigen Knopf, sie stehen gleich auf der Startseite.
   if (setup.length === 0 || tabs.length === 0) return adminTabs();
   // „Einrichtungen“ steht, wo die Reihenfolge es sagt (Standard: vor den Einstellungen).
-  const entry: AdminTab = { id: SETUP, label: 'Einrichtungen', on: true, route: `verwaltung/${SETUP}` };
+  const entry: AdminTab = { id: SETUP, label: t('Einrichtungen'), on: true, route: `verwaltung/${SETUP}` };
   return sortByIds([...tabs, entry], startOrder(config?.admin_order));
 }
 
@@ -244,6 +273,13 @@ const ADMIN_ICONS: Record<string, ReactNode> = {
       <path d="M9 11h7M9 14.5h7M9 18h4" />
     </>
   ),
+  // Webseite: Globus
+  webseite: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z" />
+    </>
+  ),
   mitglieder: (
     <>
       <circle cx="9" cy="8" r="3.5" />
@@ -257,6 +293,14 @@ const ADMIN_ICONS: Record<string, ReactNode> = {
       <circle cx="12" cy="8" r="3.5" />
       <path d="M5.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6" />
       <path d="M18 3.5a3 3 0 0 1 0 4" />
+    </>
+  ),
+  // Passive: Person mit Herz (gehört dazu, ohne aktiv mitzumachen)
+  passive: (
+    <>
+      <circle cx="10" cy="8" r="3.5" />
+      <path d="M3.5 20c0-3.6 2.9-6 6.5-6 1.2 0 2.3.3 3.2.8" />
+      <path d="M18 20.5s-3.5-2.1-3.5-4.4a1.8 1.8 0 0 1 3.5-.6 1.8 1.8 0 0 1 3.5.6c0 2.3-3.5 4.4-3.5 4.4z" />
     </>
   ),
   // Anfragen auf einen Zugang: Person mit Plus (wartet auf Aufnahme)
@@ -282,6 +326,14 @@ const ADMIN_ICONS: Record<string, ReactNode> = {
       <path d="M12 7.5V12l3 2" />
     </>
   ),
+  // Bericht: Blatt mit Eselsohr und Balken (Zahlen eines Zeitraums)
+  bericht: (
+    <>
+      <path d="M6 3h8.5L19 7.5V21H6z" />
+      <path d="M14 3v5h5" />
+      <path d="M9.5 17.5v-3M12.5 17.5v-6M15.5 17.5v-4.5" />
+    </>
+  ),
   punkte: <path d="M12 3l2.6 5.6 6.1.6-4.6 4.1 1.3 6L12 16.3l-5.4 3 1.3-6-4.6-4.1 6.1-.6z" />,
   strafe: (
     <>
@@ -296,6 +348,12 @@ const ADMIN_ICONS: Record<string, ReactNode> = {
     <>
       <circle cx="12" cy="12" r="9" />
       <path d="M12 16.5v-9M8 11l4-4 4 4" />
+    </>
+  ),
+  aufnahmen: (
+    <>
+      <circle cx="10" cy="8" r="4" />
+      <path d="M3 20c0-3.9 3.1-7 7-7 1.4 0 2.7.4 3.8 1.1M15 18l2 2 4-4.5" />
     </>
   ),
   titel: (
@@ -373,43 +431,59 @@ export function AdminIcon({ id }: { id: string }) {
 
 /** Startseite der Verwaltung: je Bereich ein Knopf mit Symbol; mit group die Bereiche unter „Einrichtungen“. */
 export function AdminMenu({ group }: { group?: string }) {
-  const due = usePromotionsDue();
+  const promotion = usePromotionsDue();
   useAdminCounts(!group);
-  const counts = { promotions: due, registrations: config?.pendingRegistrations, reports: config?.openReports };
+  const counts = {
+    promotions: promotion.due,
+    promotionsSoon: promotion.soon,
+    registrations: config?.pendingRegistrations,
+    reports: config?.openReports,
+    admissions: config?.admissionsDue,
+    admissionsSoon: config?.admissionsSoon,
+  };
   // Daten der Bereiche hinter den Knöpfen im Leerlauf vorab laden (auch die unter „Einrichtungen“), beim Antippen sofort.
   usePrefetchMenu(
     'verwaltung',
     (group ? setupTabs() : adminTabs()).map((t) => t.id),
   );
   return (
-    <nav aria-label={group ? 'Einrichtungen' : 'Verwaltung'}>
-      <ul className="admin-tiles">
-        {(group ? setupTabs() : startTabs()).map((t) => {
-          const badge = tileCount(t.id, counts);
-          return (
-            <li key={t.id}>
-              <button
-                type="button"
-                className="card admin-tile"
-                title={badge?.title}
-                onClick={() => navigate(t.route ?? `verwaltung/${t.id}`)}
-                {...prefetchOnTap(...menuSources('verwaltung', t.id))}
-              >
-                <AdminIcon id={t.id} />
-                <span>
-                  <Caps text={t.label} />
-                </span>
-                {badge && (
-                  // Zahl im Kreis an der Ecke: was dort gerade ansteht (erklärt im title).
-                  <span className="count-badge" aria-hidden="true">
-                    {badge.text}
+    <nav aria-label={group ? t('Einrichtungen') : t('Verwaltung')}>
+      <TileArrange pages={[group ? 'einrichtungen' : 'verwaltung']}>
+        <TileGrid
+          page={group ? 'einrichtungen' : 'verwaltung'}
+          className="admin-tiles"
+          tiles={(group ? setupTabs() : startTabs()).map((t) => {
+            const badge = tileCount(t.id, counts);
+            const soon = tileSoonCount(t.id, counts);
+            return {
+              id: t.id,
+              label: t.label,
+              node: (
+                <button
+                  type="button"
+                  className="card admin-tile"
+                  title={tileTitle(badge, soon)}
+                  onClick={() => navigate(t.route ?? `verwaltung/${t.id}`)}
+                  {...prefetchOnTap(...menuSources('verwaltung', t.id))}
+                >
+                  <AdminIcon id={t.id} />
+                  <span>
+                    <Caps text={t.label} />
                   </span>
-                )}
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+                  {(badge || soon) && (
+                    // Zahl im Kreis an der Ecke: was dort gerade ansteht (rot), daneben was bald ansteht (Akzentfarbe);
+                    // erklärt im title.
+                    <span className="count-badges" aria-hidden="true">
+                      {soon && <span className="count-badge count-badge-soon">{soon.text}</span>}
+                      {badge && <span className="count-badge">{badge.text}</span>}
+                    </span>
+                  )}
+                </button>
+              ),
+            };
+          })}
+        />
+      </TileArrange>
     </nav>
   );
 }
@@ -421,12 +495,12 @@ export function AdminBack({ from }: { from?: string } = {}) {
   if (from && setupTabs().some((t) => t.id === from) && startTabs().some((t) => t.id === SETUP))
     return (
       <button type="button" className="btn btn-link back" onClick={() => navigate(`verwaltung/${SETUP}`)}>
-        ‹ Einrichtungen
+        ‹ {t('Einrichtungen')}
       </button>
     );
   return (
     <button type="button" className="btn btn-link back" onClick={() => navigate('verwaltung')}>
-      ‹ Verwaltung
+      ‹ {t('Verwaltung')}
     </button>
   );
 }

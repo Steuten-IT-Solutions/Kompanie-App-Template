@@ -7,6 +7,7 @@ namespace KompanieApp\Core\Domain\Blocks;
 use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 
 /**
  * Knopf mit Link: Beschriftung und Ziel (https://, mailto:, tel: oder eine Seite der App, #/…), als Hauptknopf
@@ -29,13 +30,13 @@ final class ButtonBlock implements BlockType
 
     public function validate(array $in): array
     {
-        $label = Field::line($in['label'] ?? '', self::LABEL_MAX, 'Die Beschriftung des Knopfs');
+        $label = Field::line($in['label'] ?? '', self::LABEL_MAX, I18n::t('Die Beschriftung des Knopfs'));
         if ($label === '') {
-            throw ApiError::invalid('Bitte eine Beschriftung für den Knopf eingeben.');
+            throw ApiError::invalid(I18n::t('Bitte eine Beschriftung für den Knopf eingeben.'));
         }
         $style = $in['style'] ?? 'primary';
         if (!in_array($style, self::STYLES, true)) {
-            throw ApiError::invalid('Ungültige Art des Knopfs: erlaubt sind primary und secondary.');
+            throw ApiError::invalid(I18n::t('Ungültige Art des Knopfs: erlaubt sind primary und secondary.'));
         }
         return ['label' => $label, 'url' => Field::link($in['url'] ?? null), 'style' => $style];
     }

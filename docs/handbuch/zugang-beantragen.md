@@ -13,6 +13,7 @@ Tippe auf der Anmeldeseite unter **Anmelden** auf **Zugang beantragen**. Ohne An
 - **E-Mail-Adresse**: deine Adresse.
 - **Benutzername**: die App schlägt ihn aus deinem Namen vor (z. B. „max.mueller“). Du kannst ihn ändern; erlaubt sind Buchstaben (a–z), Ziffern sowie . _ - @.
 - **Passwort (mind. 8 Zeichen)** und **Passwort wiederholen**: dein Passwort für die App.
+- **Deine Kompanie**: nur, wenn die {kompanie.name} den Bereich {bereich.companies} nutzt. Hier musst du wählen: deine Kompanie (zu mehreren geht auch), **Keine Kompanie** oder **Passiv**. Vorausgewählt ist nichts. So muss niemand bei dir nachfragen.
 - **Nachricht an die Admins (freiwillig)**: z. B. wer du bist oder wer dich kennt. Das hilft bei der Freigabe.
 - Ein Haken, dass du die **Datenschutzerklärung** gelesen hast.
 - **Anfrage senden**: schickt die Anfrage ab.
@@ -23,8 +24,9 @@ Tippe auf der Anmeldeseite unter **Anmelden** auf **Zugang beantragen**. Ohne An
 1. Trage **Vorname**, **Nachname** und **E-Mail-Adresse** ein.
 2. Prüfe den vorgeschlagenen **Benutzername** und ändere ihn, wenn du willst.
 3. Wähle ein **Passwort** und wiederhole es.
-4. Schreib, wenn du willst, eine kurze **Nachricht an die Admins**.
-5. Setz den Haken bei der Datenschutzerklärung und tippe auf **Anfrage senden**.
+4. Wähle, wenn es die Auswahl gibt, unter **Deine Kompanie** deine Kompanie, **Keine Kompanie** oder **Passiv**.
+5. Schreib, wenn du willst, eine kurze **Nachricht an die Admins**.
+6. Setz den Haken bei der Datenschutzerklärung und tippe auf **Anfrage senden**.
 
 Wie es weitergeht, hängt davon ab, ob die {kompanie.name} den Mailversand eingerichtet hat:
 
@@ -40,6 +42,7 @@ Wie es weitergeht, hängt davon ab, ob die {kompanie.name} den Mailversand einge
 - Meldest du dich an, bevor die Anfrage freigegeben ist, sagt dir die App, dass sie noch wartet (oder dass sie abgelehnt wurde).
 - Eine Anfrage, die 30 Tage lang niemand bearbeitet, löscht die App. Du kannst dann eine neue stellen.
 - Gespeichert werden nur deine Angaben aus dem Formular, dein Passwort nur verschlüsselt. Wird die Anfrage abgelehnt oder läuft sie ab, löscht die App sie.
+- Wer freigibt, sieht deine gewählte Kompanie und ordnet dich ihr mit der Freigabe zu. Wer Kompanien verwalten darf, kann die Wahl dabei noch ändern.
 - Wer freigibt, kann deinen Benutzernamen noch ändern, z. B. wenn er inzwischen vergeben ist. Mit Mailversand steht der Benutzername dann in der Mail; anmelden kannst du dich immer auch mit deiner E-Mail-Adresse.
 - Zu viele Anfragen in kurzer Zeit nimmt die App nicht an. Dann versuche es später noch einmal.
 

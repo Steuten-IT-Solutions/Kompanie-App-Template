@@ -8,6 +8,7 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 
 /**
  * „Mit Google verbinden“ für beide Adapter: Beginn (Client speichern, Adresse der Anmeldung bei Google), Rückkehr von
@@ -71,13 +72,13 @@ final class GoogleConnect
         $user = $this->admin();
         $drive = $this->app->drive();
         if (!$drive->checkState($state, $user->id, $this->app->authenticator->sessionKey())) {
-            return $this->result(false, 'Die Anmeldung bei Google ist abgelaufen oder ungültig. Bitte noch einmal „Speichern und mit Google verbinden“ wählen.', $return);
+            return $this->result(false, I18n::t('Die Anmeldung bei Google ist abgelaufen oder ungültig. Bitte noch einmal „Speichern und mit Google verbinden“ wählen.'), $return);
         }
         $error = is_string($query['error'] ?? null) ? Text::line($query['error'], 100) : '';
         if ($error !== '') {
             return $this->result(false, $error === 'access_denied'
-                ? 'Die Anmeldung bei Google wurde abgebrochen. Es ist nichts verbunden.'
-                : 'Google meldet einen Fehler: ' . $error, $return);
+                ? I18n::t('Die Anmeldung bei Google wurde abgebrochen. Es ist nichts verbunden.')
+                : I18n::t('Google meldet einen Fehler: {error}', ['error' => $error]), $return);
         }
         $hadCalendarIds = $this->app->calendar()->calendarIds() !== [];
         // Die Rückkehr läuft außerhalb der API: ins Änderungsprotokoll wie „Google-Zugang“ (POST /admin/google/connect).
@@ -91,13 +92,16 @@ final class GoogleConnect
             return null;
         });
         if ($failed !== null) {
-            return $this->result(false, 'Die Verbindung mit Google ist fehlgeschlagen: ' . $failed, $return);
+            return $this->result(false, I18n::t('Die Verbindung mit Google ist fehlgeschlagen: {error}', ['error' => $failed]), $return);
         }
         $email = $drive->oauthEmail();
-        $message = 'Mit Google verbunden' . ($email !== '' ? ' (' . $email . ')' : '') . '.';
-        $message .= $drive->calendarAccess()
-            ? ' Die Verbindung darf Google Drive und Google Kalender lesen.'
-            : ' Den Kalender darf die Verbindung nicht lesen (Häkchen nicht gesetzt). Für einen privaten Kalender trenne sie und verbinde neu, dabei beide Häkchen setzen.';
+        $message = $email !== '' ? I18n::t('Mit Google verbunden ({email}).', ['email' => $email]) : I18n::t('Mit Google verbunden.');
+        $message .= ' ' . ($drive->writeAccess()
+            ? I18n::t('Die Verbindung darf Google Drive lesen und darin Dateien ablegen.')
+            : I18n::t('Die Verbindung darf Google Drive nur lesen.'));
+        $message .= ' ' . ($drive->calendarAccess()
+            ? I18n::t('Den Google Kalender darf sie lesen.')
+            : I18n::t('Den Kalender darf die Verbindung nicht lesen (Häkchen nicht gesetzt). Für einen privaten Kalender trenne sie und verbinde neu, dabei beide Häkchen setzen.'));
         return $this->result(true, $message, $return);
     }
 
@@ -148,10 +152,10 @@ final class GoogleConnect
     {
         $user = $this->app->authContext->currentUser();
         if ($user === null) {
-            throw new ApiError(401, 'not_logged_in', 'Bitte zuerst als Admin anmelden und die Verbindung mit Google dann erneut starten.');
+            throw new ApiError(401, 'not_logged_in', I18n::t('Bitte zuerst als Admin anmelden und die Verbindung mit Google dann erneut starten.'));
         }
         if (!$user->can(Capability::ManageSettings)) {
-            throw ApiError::forbidden('Nur Admins können die App mit Google verbinden.');
+            throw ApiError::forbidden(I18n::t('Nur Admins können die App mit Google verbinden.'));
         }
         return $user;
     }

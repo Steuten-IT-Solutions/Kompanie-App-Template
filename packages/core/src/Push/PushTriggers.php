@@ -6,7 +6,9 @@ namespace KompanieApp\Core\Push;
 
 use KompanieApp\Core\App;
 use KompanieApp\Core\Domain\BoardService;
+use KompanieApp\Core\Domain\PassiveMemberService;
 use KompanieApp\Core\Domain\RankService;
+use KompanieApp\Core\I18n\I18n;
 
 /**
  * Wann eine Benachrichtigung entsteht (Issue #19):
@@ -30,8 +32,63 @@ use KompanieApp\Core\Domain\RankService;
  */
 final class PushTriggers
 {
+    /** @var array<int, string> Sprache je Konto (LanguageService::forRecipient), je Lauf gemerkt */
+    private array $locales = [];
+
     public function __construct(private readonly App $app, private readonly PushService $push)
     {
+    }
+
+    /** Sprache, in der ein Konto Push bekommt; Gäste (0) in der Ausgangssprache. */
+    private function localeOf(int $userId): string
+    {
+        return $this->locales[$userId] ??= $userId > 0 ? $this->app->languages()->forRecipient($userId) : I18n::base();
+    }
+
+    /**
+     * Nachricht für eine Person in ihrer Sprache.
+     *
+     * @param \Closure(): array{title: string, body: string, route: string, tag: string, image?: string} $build
+     * @return array{title: string, body: string, route: string, tag: string, image?: string}
+     */
+    private function forUser(int $userId, \Closure $build): array
+    {
+        return I18n::in($this->localeOf($userId), $build);
+    }
+
+    /**
+     * Nachricht an viele: je eingeschalteter Sprache eine eigene, an die Konten mit dieser Sprache (Gäste: Deutsch). Ist
+     * nur Deutsch an, ein einziger Versand wie bisher. $send baut die Nachricht in der aktuellen Sprache und schickt sie
+     * an die, die $only zulässt (null: alle).
+     *
+     * @param \Closure((\Closure(int): bool)|null): int $send
+     */
+    private function perLanguage(\Closure $send): int
+    {
+        $languages = $this->app->languages()->enabled();
+        if (count($languages) === 1) {
+            return I18n::in($languages[0], static fn (): int => $send(null));
+        }
+        $count = 0;
+        foreach ($languages as $lang) {
+            $count += I18n::in($lang, fn (): int => $send(fn (int $uid): bool => $this->localeOf($uid) === $lang));
+        }
+        return $count;
+    }
+
+    /**
+     * Beide Bedingungen (null zählt als „alle“).
+     *
+     * @param (\Closure(int): bool)|null $a
+     * @param (\Closure(int): bool)|null $b
+     * @return (\Closure(int): bool)|null
+     */
+    private static function both(?\Closure $a, ?\Closure $b): ?\Closure
+    {
+        if ($a === null || $b === null) {
+            return $a ?? $b;
+        }
+        return static fn (int $uid): bool => $a($uid) && $b($uid);
     }
 
     /** @param array<int, array<string, mixed>> $rows gebuchte Punkte (ScoreService::givePoints) */
@@ -41,9 +98,13 @@ final class PushTriggers
         $messages = [];
         foreach ($rows as $r) {
             $value = (float) $r['points'];
-            $title = $value < 0 ? $label . ' abgezogen' : $label . ' erhalten';
             $body = ($value > 0 ? '+' : '−') . self::number(abs($value)) . ' – ' . (string) $r['reason'];
-            $messages[] = [(int) $r['user_id'], PushService::message($title, $body, 'meins/punkte/' . $r['id'], 'punkte-' . $r['id'])];
+            $messages[] = [(int) $r['user_id'], $this->forUser((int) $r['user_id'], static fn (): array => PushService::message(
+                $value < 0 ? I18n::t('{points} abgezogen', ['points' => $label]) : I18n::t('{points} erhalten', ['points' => $label]),
+                $body,
+                'meins/punkte/' . $r['id'],
+                'punkte-' . $r['id'],
+            ))];
         }
         // Alle Personen einer Buchung gemeinsam (Abos mit einer Abfrage, ein INSERT in die Warteschlange)
         $this->push->notifyUsers(PushService::TYPE_POINTS, $messages);
@@ -57,10 +118,19 @@ final class PushTriggers
     public function rankChanged(int $userId, array $entry): void
     {
         $label = $this->app->config->rankLabel();
-        $title = $entry['kind'] === RankService::KIND_PROMOTION ? 'Beförderung' : $label . ' geändert';
-        $body = $entry['to_title'] !== '' ? sprintf('Dein %s: %s', $label, $entry['to_title']) : sprintf('Du hast keinen %s mehr.', $label);
-        $image = ($entry['to_rank_id'] ?? null) !== null ? $this->app->ranks()->badgePushImage((int) $entry['to_rank_id']) : null;
-        $this->push->notifyUser($userId, PushService::TYPE_RANKS, PushService::message($title, $body, 'meins/dienstgrad', 'dienstgrad', $image));
+        $rankId = ($entry['to_rank_id'] ?? null) !== null ? (int) $entry['to_rank_id'] : null;
+        $image = $rankId !== null ? $this->app->ranks()->badgePushImage($rankId) : null;
+        $ranks = $this->app->ranks();
+        // Bezeichnung in der Sprache der Person (eigener Name je Sprache, sonst die deutsche)
+        $this->push->notifyUser($userId, PushService::TYPE_RANKS, $this->forUser($userId, static fn (): array => PushService::message(
+            $entry['kind'] === RankService::KIND_PROMOTION ? I18n::t('Beförderung') : I18n::t('{rank} geändert', ['rank' => $label]),
+            $entry['to_title'] !== ''
+                ? I18n::t('Dein {rank}: {title}', ['rank' => $label, 'title' => $rankId !== null ? $ranks->displayTitle($rankId, $entry['to_title']) : $entry['to_title']])
+                : I18n::t('Du hast keinen {rank} mehr.', ['rank' => $label]),
+            'meins/dienstgrad',
+            'dienstgrad',
+            $image,
+        )));
     }
 
     /** @param list<string> $titles neu verliehene Titel (TitleService::assign) */
@@ -69,10 +139,14 @@ final class PushTriggers
         if ($titles === []) {
             return;
         }
-        $body = count($titles) === 1
-            ? sprintf('Dir wurde der Titel „%s“ verliehen.', $titles[0])
-            : sprintf('Dir wurden die Titel %s verliehen.', implode(', ', array_map(static fn (string $t): string => '„' . $t . '“', $titles)));
-        $this->push->notifyUser($userId, PushService::TYPE_TITLES, PushService::message('Neuer Titel', $body, 'meins', 'titel'));
+        $this->push->notifyUser($userId, PushService::TYPE_TITLES, $this->forUser($userId, static fn (): array => PushService::message(
+            I18n::t('Neuer Titel'),
+            count($titles) === 1
+                ? I18n::t('Dir wurde der Titel „{title}“ verliehen.', ['title' => $titles[0]])
+                : I18n::t('Dir wurden die Titel {titles} verliehen.', ['titles' => implode(', ', array_map(static fn (string $t): string => I18n::t('„{title}“', ['title' => $t]), $titles))]),
+            'meins',
+            'titel',
+        )));
     }
 
     /**
@@ -91,13 +165,23 @@ final class PushTriggers
     {
         $expires = $item['expires_at'] !== null ? (int) strtotime($item['expires_at']) : 0;
         $ttl = min($expires - $this->app->time()->timestamp(), PushService::MAX_TTL);
-        $title = $this->app->config->sectionLabel('board', 'Schwarzes Brett') . ($item['author_name'] !== null ? ': ' . $item['author_name'] : '');
+        $label = fn (): string => $this->app->config->sectionLabel('board', 'Schwarzes Brett') . ($item['author_name'] !== null ? ': ' . $item['author_name'] : '');
         $public = ($item['audience'] ?? null) === BoardService::AUDIENCE_PUBLIC;
         if ($public) {
             $this->push->offerTypeToExisting(PushService::TYPE_BOARD_PUBLIC);
         }
         $only = $this->app->board()->readerIds(['audience' => (string) ($item['audience'] ?? BoardService::AUDIENCE_MEMBERS), 'audience_ids' => $item['audience_ids'] ?? []]);
-        return $this->push->notifyBoard(PushService::message($title, $item['title'], 'brett/' . $item['id'], 'brett-' . $item['id']), $authorId, $ttl, $public, $only);
+        $board = $this->app->board();
+        $german = $board->repository()->find((int) $item['id'])['title'] ?? $item['title'];
+        // Je Sprache der Empfänger: Bezeichnung des Bereichs und Titel aus der Fassung dieser Sprache (sonst deutsch).
+        return $this->perLanguage(fn (?\Closure $lang): int => $this->push->notifyBoard(
+            PushService::message($label(), $board->titleIn((int) $item['id'], $german, I18n::locale()), 'brett/' . $item['id'], 'brett-' . $item['id']),
+            $authorId,
+            $ttl,
+            $public,
+            $only,
+            $lang,
+        ));
     }
 
     /**
@@ -107,15 +191,19 @@ final class PushTriggers
      */
     public function pollCreated(array $poll, int $creatorId): int
     {
-        $title = $this->app->config->sectionLabel('polls', 'Umfragen') . ': neue Umfrage';
-        $body = $poll['title'] . ($poll['ends_at'] !== null ? ' (bis ' . $this->pollEnd($poll['ends_at']) . ')' : '');
-        return $this->push->notifyAudience(
+        $label = $this->app->config->sectionLabel('polls', 'Umfragen');
+        return $this->perLanguage(fn (?\Closure $only): int => $this->push->notifyAudience(
             PushService::TYPE_POLLS,
-            PushService::message($title, $body, 'umfragen/' . $poll['id'], 'umfrage-' . $poll['id']),
-            static fn (int $uid): bool => $uid !== $creatorId,
+            PushService::message(
+                I18n::t('{polls}: neue Umfrage', ['polls' => $label]),
+                $poll['ends_at'] !== null ? I18n::t('{title} (bis {end})', ['title' => $this->app->polls()->titleIn($poll['id'], $poll['title'], I18n::locale()), 'end' => $this->pollEnd($poll['ends_at'])]) : $this->app->polls()->titleIn($poll['id'], $poll['title'], I18n::locale()),
+                'umfragen/' . $poll['id'],
+                'umfrage-' . $poll['id'],
+            ),
+            self::both(static fn (int $uid): bool => $uid !== $creatorId, $only) ?? static fn (int $uid): bool => true,
             'high',
             $this->ttlUntil($poll['ends_at']),
-        );
+        ));
     }
 
     /**
@@ -127,15 +215,21 @@ final class PushTriggers
     public function pollReminder(array $poll, array $voters): int
     {
         $voted = array_flip($voters);
-        $title = $this->app->config->sectionLabel('polls', 'Umfragen') . ': endet bald';
-        $body = $poll['title'] . ($poll['ends_at'] !== null ? ' – noch bis ' . $this->pollEnd($poll['ends_at']) : '') . '. Du hast noch nicht teilgenommen.';
-        return $this->push->notifyAudience(
+        $label = $this->app->config->sectionLabel('polls', 'Umfragen');
+        return $this->perLanguage(fn (?\Closure $only): int => $this->push->notifyAudience(
             PushService::TYPE_POLLS,
-            PushService::message($title, $body, 'umfragen/' . $poll['id'], 'umfrage-' . $poll['id']),
-            static fn (int $uid): bool => !isset($voted[$uid]),
+            PushService::message(
+                I18n::t('{polls}: endet bald', ['polls' => $label]),
+                $poll['ends_at'] !== null
+                    ? I18n::t('{title} – noch bis {end}. Du hast noch nicht teilgenommen.', ['title' => $this->app->polls()->titleIn($poll['id'], $poll['title'], I18n::locale()), 'end' => $this->pollEnd($poll['ends_at'])])
+                    : I18n::t('{title}. Du hast noch nicht teilgenommen.', ['title' => $this->app->polls()->titleIn($poll['id'], $poll['title'], I18n::locale())]),
+                'umfragen/' . $poll['id'],
+                'umfrage-' . $poll['id'],
+            ),
+            self::both(static fn (int $uid): bool => !isset($voted[$uid]), $only) ?? static fn (int $uid): bool => true,
             'high',
             $this->ttlUntil($poll['ends_at']),
-        );
+        ));
     }
 
     /**
@@ -145,15 +239,42 @@ final class PushTriggers
     public function birthday(int $userId, string $name, ?int $age): int
     {
         $title = $this->app->config->sectionLabel('birthdays', 'Geburtstage');
-        $body = 'Heute hat ' . $name . ' Geburtstag' . ($age !== null ? ' (wird ' . $age . ')' : '');
         $midnight = $this->app->time()->today()->modify('+1 day')->getTimestamp();
-        return $this->push->notifyAudience(
+        return $this->perLanguage(fn (?\Closure $only): int => $this->push->notifyAudience(
             PushService::TYPE_BIRTHDAYS,
-            PushService::message($title, $body, 'termine', 'geburtstag-' . $userId),
-            static fn (int $uid): bool => $uid !== $userId,
+            PushService::message(
+                $title,
+                $age !== null ? I18n::t('Heute hat {name} Geburtstag (wird {age})', ['name' => $name, 'age' => $age]) : I18n::t('Heute hat {name} Geburtstag', ['name' => $name]),
+                'termine',
+                'geburtstag-' . $userId,
+            ),
+            self::both(static fn (int $uid): bool => $uid !== $userId, $only) ?? static fn (int $uid): bool => true,
             'high',
             $midnight - $this->app->time()->timestamp(),
-        );
+        ));
+    }
+
+    /**
+     * Geburtstag eines Passiven (PassiveMemberService::remindBirthdays): an alle, die Passive verwalten und Geburtsdaten
+     * sehen dürfen; zustellbar bis zum Ende des Geburtstags (Zeitzone der Kompanie).
+     */
+    public function passiveBirthday(int $passiveId, string $name, string $date, int $age, int $days): int
+    {
+        $body = static fn (): string => match ($days) {
+            0 => I18n::t('{name} wird heute {age} Jahre alt.', ['name' => $name, 'age' => $age]),
+            1 => I18n::t('{name} wird morgen {age} Jahre alt.', ['name' => $name, 'age' => $age]),
+            default => I18n::t('{name} wird am {date} {age} Jahre alt.', ['name' => $name, 'date' => substr($date, 8, 2) . '.' . substr($date, 5, 2) . '.', 'age' => $age]),
+        };
+        $end = (new \DateTimeImmutable($date, $this->app->time()->timezone()))->modify('+1 day')->getTimestamp();
+        $reminds = fn (int $uid): bool => PassiveMemberService::remindsBirthdays($this->app->users->find($uid));
+        return $this->perLanguage(fn (?\Closure $only): int => $this->push->notifyAudience(
+            PushService::TYPE_PASSIVE_BIRTHDAYS,
+            PushService::message(I18n::t('Geburtstag eines Passiven'), $body(), 'verwaltung/passive', 'passiv-geburtstag-' . $passiveId),
+            self::both($reminds, $only) ?? $reminds,
+            PushService::URGENCY,
+            $end - $this->app->time()->timestamp(),
+            PushService::MAX_TTL,
+        ));
     }
 
     private function ttlUntil(?string $iso): int
@@ -163,19 +284,20 @@ final class PushTriggers
 
     private function pollEnd(string $iso): string
     {
-        return $this->app->time()->format((int) strtotime($iso), 'd.m.Y, H:i') . ' Uhr';
+        return I18n::t('{time} Uhr', ['time' => $this->app->time()->format((int) strtotime($iso), 'd.m.Y, H:i')]);
     }
 
     /** @param array<int, array<string, mixed>> $rows Strafen (ScoreService::givePenalty) */
     public function penaltiesAdded(array $rows): void
     {
-        $title = $this->app->config->sectionLabel('penalties', 'Strafen') . ': neuer Eintrag';
+        $label = $this->app->config->sectionLabel('penalties', 'Strafen');
         $messages = [];
         foreach ($rows as $r) {
             $tag = 'strafe-' . $r['id'];
+            $title = I18n::in($this->localeOf((int) $r['user_id']), static fn (): string => I18n::t('{penalties}: neuer Eintrag', ['penalties' => $label]));
             $messages[] = [
                 (int) $r['user_id'],
-                PushService::message($title, 'Tippen zum Ansehen.', 'meins/strafen/' . $r['id'], $tag),
+                $this->forUser((int) $r['user_id'], static fn (): array => PushService::message($title, I18n::t('Tippen zum Ansehen.'), 'meins/strafen/' . $r['id'], $tag)),
                 PushService::message($title, self::euro((int) $r['amount_cents']) . ' – ' . (string) $r['reason'], 'meins/strafen/' . $r['id'], $tag),
             ];
         }
@@ -194,10 +316,9 @@ final class PushTriggers
         if (!$this->isUpcoming($event) || ($before !== null && self::signature($before) === self::signature($event))) {
             return 0;
         }
-        $message = $before !== null
-            ? PushService::message($this->eventsTitle('geändert'), $this->changeBody($before, $event), self::eventRoute('p' . $event['id']), 'termin-p' . $event['id'])
-            : PushService::message($this->eventsTitle('neu'), $this->eventBody($event), self::eventRoute('p' . $event['id']), 'termin-p' . $event['id']);
-        return $this->push->notifyAll(PushService::TYPE_EVENTS, $message, false);
+        return $this->perLanguage(fn (?\Closure $only): int => $this->push->notifyAll(PushService::TYPE_EVENTS, $before !== null
+            ? PushService::message($this->eventsTitle(true), $this->changeBody($this->inLanguage($before, true), $this->inLanguage($event, true)), self::eventRoute('p' . $event['id']), 'termin-p' . $event['id'])
+            : PushService::message($this->eventsTitle(false), $this->eventBody($this->inLanguage($event, true)), self::eventRoute('p' . $event['id']), 'termin-p' . $event['id']), false, $only));
     }
 
     /**
@@ -220,6 +341,7 @@ final class PushTriggers
             $count += $this->checkNews();
         }
         $count += $this->sendReminders($now);
+        $count += $this->sendResponseReminders($now);
         $this->push->expireGuests();
         return $count;
     }
@@ -262,7 +384,8 @@ final class PushTriggers
     public function checkCalendar(): int
     {
         try {
-            $events = $this->app->calendar()->latest();
+            // Deutsch (auch nach einer Änderung in der englischen App): Die gemerkten Signaturen sind deutsch.
+            $events = I18n::in(I18n::base(), fn (): array => $this->app->calendar()->latest());
         } catch (\RuntimeException) {
             return 0;
         }
@@ -276,11 +399,16 @@ final class PushTriggers
         }
         $count = 0;
         if (count($diff['new']) >= 4) {
-            $titles = implode(', ', array_map(static fn (array $e): string => (string) $e['title'], array_slice($diff['new'], 0, 3)));
-            $count += $this->push->notifyAll(PushService::TYPE_EVENTS, PushService::message($this->eventsTitle('neu'), sprintf('%d neue Einträge, z. B. %s', count($diff['new']), $titles), 'termine', 'termine-neu'), true);
+            $titles = fn (): string => implode(', ', array_map(fn (array $e): string => (string) $this->inLanguage($e, false)['title'], array_slice($diff['new'], 0, 3)));
+            $count += $this->perLanguage(fn (?\Closure $only): int => $this->push->notifyAll(PushService::TYPE_EVENTS, PushService::message(
+                $this->eventsTitle(false),
+                I18n::tn('{count} neuer Eintrag, z. B. {titles}', '{count} neue Einträge, z. B. {titles}', count($diff['new']), ['titles' => $titles()]),
+                'termine',
+                'termine-neu',
+            ), true, $only));
         } else {
             foreach ($diff['new'] as $ev) {
-                $count += $this->push->notifyAll(PushService::TYPE_EVENTS, PushService::message($this->eventsTitle('neu'), $this->eventBody($ev), self::eventRoute((string) $ev['id']), 'termin-' . $ev['id']), true);
+                $count += $this->perLanguage(fn (?\Closure $only): int => $this->push->notifyAll(PushService::TYPE_EVENTS, PushService::message($this->eventsTitle(false), $this->eventBody($this->inLanguage($ev, false)), self::eventRoute((string) $ev['id']), 'termin-' . $ev['id']), true, $only));
             }
         }
         foreach ($diff['changed'] as ['event' => $ev, 'before' => $sig]) {
@@ -288,8 +416,12 @@ final class PushTriggers
             $before = is_array($sig) && count($sig) === 3 && is_string($sig[0] ?? null)
                 ? ['start' => $sig[0], 'end' => (string) $sig[1], 'location' => (string) $sig[2], 'all_day' => strlen($sig[0]) === 10]
                 : null;
-            $body = $before !== null ? $this->changeBody($before, $ev) : $this->eventBody($ev);
-            $count += $this->push->notifyAll(PushService::TYPE_EVENTS, PushService::message($this->eventsTitle('geändert'), $body, self::eventRoute((string) $ev['id']), 'termin-' . $ev['id']), true);
+            $count += $this->perLanguage(fn (?\Closure $only): int => $this->push->notifyAll(PushService::TYPE_EVENTS, PushService::message(
+                $this->eventsTitle(true),
+                $before !== null ? $this->changeBody($before, $this->inLanguage($ev, false)) : $this->eventBody($this->inLanguage($ev, false)),
+                self::eventRoute((string) $ev['id']),
+                'termin-' . $ev['id'],
+            ), true, $only));
         }
         return $count;
     }
@@ -332,15 +464,29 @@ final class PushTriggers
         if ($next !== $stored) {
             $this->app->settings->set(PushService::NEWS_SETTING, $next);
         }
-        $label = $this->app->config->sectionLabel('news', 'News');
-        $plain = static fn (array $i): string => html_entity_decode(strip_tags((string) $i['title']), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        // Bezeichnung in der Sprache der Nachricht, der Titel auch, wenn der Beitrag aus der App eine Fassung darin hat
+        $label = fn (): string => $this->app->config->sectionLabel('news', 'News');
+        $app = $this->app->newsService()->inApp() ? $this->app->newsService()->appSource() : null;
+        $plain = static fn (array $i): string => html_entity_decode(strip_tags(
+            ($app !== null && I18n::locale() !== I18n::base() ? $app->titleIn((string) $i['id'], I18n::locale()) : null) ?? (string) $i['title'],
+        ), ENT_QUOTES | ENT_HTML5, 'UTF-8');
         if (count($fresh) > 3) {
             $titles = implode(', ', array_map($plain, array_slice(array_reverse($fresh), 0, 3)));
-            return $this->push->notifyAll(PushService::TYPE_NEWS, PushService::message($label, sprintf('%d neue Beiträge, z. B. %s', count($fresh), $titles), 'news', 'news-neu'));
+            return $this->perLanguage(fn (?\Closure $only): int => $this->push->notifyAll(PushService::TYPE_NEWS, PushService::message(
+                $label(),
+                I18n::tn('{count} neuer Beitrag, z. B. {titles}', '{count} neue Beiträge, z. B. {titles}', count($fresh), ['titles' => $titles]),
+                'news',
+                'news-neu',
+            ), null, $only));
         }
         $count = 0;
         foreach ($fresh as $item) {
-            $count += $this->push->notifyAll(PushService::TYPE_NEWS, PushService::message($label, $plain($item), 'news/' . rawurlencode((string) $item['id']), 'news-' . $item['id']));
+            $count += $this->perLanguage(fn (?\Closure $only): int => $this->push->notifyAll(
+                PushService::TYPE_NEWS,
+                PushService::message($label(), $plain($item), 'news/' . rawurlencode((string) $item['id']), 'news-' . $item['id']),
+                null,
+                $only,
+            ));
         }
         return $count;
     }
@@ -360,21 +506,99 @@ final class PushTriggers
         $count = 0;
         if ($this->app->features()->enabled('calendar') && $this->app->calendar()->isConfigured()) {
             try {
-                $list = $this->eventsOn($this->app->calendar()->events(), $tomorrow);
+                $list = $this->eventsOn(I18n::in(I18n::base(), fn (): array => $this->app->calendar()->events()), $tomorrow);
                 if ($list !== []) {
-                    $count += $this->push->notifyAll(PushService::TYPE_REMINDER, $this->reminderMessage($list, ''), true);
+                    // Wer abgesagt hat, wird an diesen Termin nicht erinnert: eigene Nachricht ohne ihn bzw. keine.
+                    $declined = $this->app->eventResponses()->declined($list);
+                    $count += $this->perLanguage(fn (?\Closure $only): int => $this->push->notifyAll(
+                        PushService::TYPE_REMINDER,
+                        $this->reminderMessage($this->listInLanguage($list, false), ''),
+                        true,
+                        self::both(static fn (int $uid): bool => !isset($declined[$uid]), $only),
+                    ));
+                    $own = [];
+                    foreach ($declined as $uid => $ids) {
+                        $rest = array_values(array_filter($list, static fn (array $ev): bool => !isset($ids[(string) $ev['id']])));
+                        if ($rest !== [] && $this->push->usesCalendar($this->app->users->find($uid))) {
+                            $own[] = [$uid, $this->forUser($uid, fn (): array => $this->reminderMessage($this->listInLanguage($rest, false), ''))];
+                        }
+                    }
+                    $count += $this->push->notifyUsers(PushService::TYPE_REMINDER, $own);
                 }
             } catch (\RuntimeException) {
                 // Kalender nicht erreichbar: dann eben keine Erinnerung aus dem Kalender.
             }
         }
         if ($this->app->features()->enabled('events')) {
-            $list = $this->eventsOn($this->app->events()->upcoming(), $tomorrow);
+            $list = $this->eventsOn(I18n::in(I18n::base(), fn (): array => $this->app->events()->upcoming()), $tomorrow);
             if ($list !== []) {
-                $count += $this->push->notifyAll(PushService::TYPE_REMINDER, $this->reminderMessage($list, 'p'), false);
+                $count += $this->perLanguage(fn (?\Closure $only): int => $this->push->notifyAll(PushService::TYPE_REMINDER, $this->reminderMessage($this->listInLanguage($list, true), 'p'), false, $only));
             }
         }
         return $count;
+    }
+
+    /**
+     * Erinnerung an die eigene Zu- oder Absage (Einstellungen → Kalender, nur wenn Zu- und Absagen an sind; Erinnerung
+     * dann standardmäßig an): einmal am Tag zur Uhrzeit der
+     * Erinnerung, an alle ohne Rückmeldung zu den Terminen, deren Anmeldeschluss morgen ist bzw. die in den Tagen des
+     * Vorlaufs beginnen (EventResponseService::dueForReminder). Je Person eine Nachricht.
+     */
+    public function sendResponseReminders(?\DateTimeImmutable $now = null): int
+    {
+        if (!$this->app->features()->enabled('calendar') || !$this->app->calendar()->isConfigured()
+            || !$this->app->eventResponses()->enabled() || !$this->app->eventResponses()->reminderSettings()['enabled']) {
+            return 0;
+        }
+        $now ??= $this->app->time()->today()->setTimestamp($this->app->time()->timestamp());
+        $now = $now->setTimezone($this->app->time()->timezone());
+        $hour = (int) $now->format('G');
+        $from = $this->push->reminderHour();
+        $today = $now->format('Y-m-d');
+        if ($hour < $from || $hour >= $from + 4 || $this->app->settings->get(PushService::RESPONSES_DATE_SETTING) === $today) {
+            return 0;
+        }
+        $this->app->settings->set(PushService::RESPONSES_DATE_SETTING, $today);
+        // Bestehende Abos bekommen die neue Art einmalig dazu (wie bei einem neu eingeschalteten Bereich).
+        $this->push->offerTypeToExisting(PushService::TYPE_RESPONSES);
+        try {
+            $due = $this->app->eventResponses()->dueForReminder($this->app->calendar()->events(), $today);
+        } catch (\RuntimeException) {
+            return 0; // Kalender nicht erreichbar: dann eben keine Erinnerung.
+        }
+        if ($due === []) {
+            return 0;
+        }
+        $messages = [];
+        foreach ($this->app->eventResponses()->withoutResponse($due) as $uid => $events) {
+            $messages[] = [$uid, $this->forUser($uid, fn (): array => $this->responseMessage($events))];
+        }
+        return $this->push->notifyUsers(PushService::TYPE_RESPONSES, $messages);
+    }
+
+    /**
+     * „Zu- oder absagen: Probe“ mit Datum und Frist; bei mehreren Terminen die Liste.
+     *
+     * @param list<array<string, mixed>> $events
+     * @return array{title: string, body: string, route: string, tag: string}
+     */
+    private function responseMessage(array $events): array
+    {
+        if (count($events) === 1) {
+            $ev = $events[0];
+            $until = $ev['respond_until'] ?? null;
+            $body = is_string($until) && $until !== ''
+                ? I18n::t('{when} – Anmeldeschluss morgen. Du hast noch nicht zu- oder abgesagt.', ['when' => $this->when($ev)])
+                : I18n::t('{when}. Du hast noch nicht zu- oder abgesagt.', ['when' => $this->when($ev)]);
+            return PushService::message(I18n::t('Zu- oder absagen: {title}', ['title' => (string) $ev['title']]), $body, self::eventRoute((string) $ev['id']), 'rueckmeldung');
+        }
+        $titles = implode(' · ', array_map(static fn (array $ev): string => (string) $ev['title'], $events));
+        return PushService::message(
+            I18n::tn('Zu- oder absagen: {count} Termin', 'Zu- oder absagen: {count} Termine', count($events)),
+            I18n::t('{titles}. Du hast noch nicht zu- oder abgesagt.', ['titles' => $titles]),
+            'termine',
+            'rueckmeldung',
+        );
     }
 
     /**
@@ -406,12 +630,42 @@ final class PushTriggers
     {
         $parts = [];
         foreach ($events as $ev) {
-            $extra = array_filter([empty($ev['all_day']) ? $this->start($ev)->format('H:i') . ' Uhr' : '', trim((string) ($ev['location'] ?? ''))]);
+            $extra = array_filter([empty($ev['all_day']) ? I18n::t('{time} Uhr', ['time' => $this->start($ev)->format('H:i')]) : '', trim((string) ($ev['location'] ?? ''))]);
             $parts[] = (string) $ev['title'] . ($extra !== [] ? ' (' . implode(', ', $extra) . ')' : '');
         }
-        $title = count($events) === 1 ? 'Morgen: ' . $events[0]['title'] : sprintf('Morgen: %d Termine', count($events));
+        $title = count($events) === 1
+            ? I18n::t('Morgen: {title}', ['title' => (string) $events[0]['title']])
+            : I18n::tn('Morgen: {count} Termin', 'Morgen: {count} Termine', count($events));
         $route = count($events) === 1 ? self::eventRoute($prefix . $events[0]['id']) : 'termine';
         return PushService::message($title, implode(' · ', $parts), $route, 'erinnerung');
+    }
+
+    /**
+     * Termin in der Sprache der laufenden Benachrichtigung (perLanguage): die Fassung aus der App (öffentliche Termine,
+     * interner Kalender mit der Quelle „app“), sonst wie er ist.
+     *
+     * @param array<string, mixed> $ev
+     * @return array<string, mixed>
+     */
+    private function inLanguage(array $ev, bool $public): array
+    {
+        $locale = I18n::locale();
+        if ($locale === I18n::base()) {
+            return $ev;
+        }
+        if ($public) {
+            return $this->app->events()->inLocale($ev, $locale);
+        }
+        return $this->app->calendar()->inApp() ? $this->app->internalEvents()->inLocale($ev, $locale) : $ev;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $events
+     * @return list<array<string, mixed>>
+     */
+    private function listInLanguage(array $events, bool $public): array
+    {
+        return array_map(fn (array $ev): array => $this->inLanguage($ev, $public), $events);
     }
 
     /** @param array<string, mixed> $ev */
@@ -435,14 +689,27 @@ final class PushTriggers
     /** „Sa 05.09.2026, 14:00 Uhr“ bzw. „Fr 04.09.2026 – Mo 07.09.2026“ */
     private function when(array $ev): string
     {
-        $days = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
-        $day = static fn (\DateTimeImmutable $d): string => $days[(int) $d->format('w')] . ' ' . $d->format('d.m.Y');
+        $day = static fn (\DateTimeImmutable $d): string => self::weekday($d) . ' ' . $d->format('d.m.Y');
         $start = $this->start($ev);
         if (!empty($ev['all_day'])) {
             $last = (new \DateTimeImmutable((string) $ev['end'], $this->app->time()->timezone()))->modify('-1 day');
             return $last > $start ? $day($start) . ' – ' . $day($last) : $day($start);
         }
-        return $day($start) . ', ' . $start->format('H:i') . ' Uhr';
+        return $day($start) . ', ' . I18n::t('{time} Uhr', ['time' => $start->format('H:i')]);
+    }
+
+    /** Kurzer Wochentag (So, Mo, …) in der aktuellen Sprache */
+    private static function weekday(\DateTimeImmutable $d): string
+    {
+        return match ((int) $d->format('w')) {
+            0 => I18n::t('So'),
+            1 => I18n::t('Mo'),
+            2 => I18n::t('Di'),
+            3 => I18n::t('Mi'),
+            4 => I18n::t('Do'),
+            5 => I18n::t('Fr'),
+            default => I18n::t('Sa'),
+        };
     }
 
     /** @param array<string, mixed> $ev */
@@ -466,18 +733,18 @@ final class PushTriggers
         $timed = empty($before['all_day']) && empty($ev['all_day']);
         if ($this->when($before) !== $this->when($ev)) {
             if ($timed && $this->start($before)->format('Y-m-d') === $this->start($ev)->format('Y-m-d')) {
-                $parts[] = self::change('Uhrzeit', $this->start($before)->format('H:i') . ' Uhr', $this->start($ev)->format('H:i') . ' Uhr');
+                $parts[] = self::change(I18n::t('Uhrzeit'), I18n::t('{time} Uhr', ['time' => $this->start($before)->format('H:i')]), I18n::t('{time} Uhr', ['time' => $this->start($ev)->format('H:i')]));
             } else {
-                $parts[] = self::change('Datum', $this->when($before), $this->when($ev));
+                $parts[] = self::change(I18n::t('Datum'), $this->when($before), $this->when($ev));
             }
         }
         if ($timed && $this->duration($before) !== $this->duration($ev)) {
-            $parts[] = self::change('Ende', $this->endTime($before), $this->endTime($ev));
+            $parts[] = self::change(I18n::t('Ende'), $this->endTime($before), $this->endTime($ev));
         }
         $old = trim((string) ($before['location'] ?? ''));
         $new = trim((string) ($ev['location'] ?? ''));
         if ($old !== $new) {
-            $parts[] = self::change('Ort', $old, $new);
+            $parts[] = self::change(I18n::t('Ort'), $old, $new);
         }
         return $parts !== [] ? (string) $ev['title'] . ' – ' . implode(' · ', $parts) : $this->eventBody($ev);
     }
@@ -488,7 +755,7 @@ final class PushTriggers
         if ($old === '') {
             return $label . ': ' . $new;
         }
-        return $new === '' ? $label . ': entfällt (vorher ' . $old . ')' : $label . ': ' . $old . ' → ' . $new;
+        return $new === '' ? I18n::t('{label}: entfällt (vorher {old})', ['label' => $label, 'old' => $old]) : $label . ': ' . $old . ' → ' . $new;
     }
 
     /** @param array<string, mixed> $ev */
@@ -505,9 +772,8 @@ final class PushTriggers
         }
         $tz = $this->app->time()->timezone();
         $end = (new \DateTimeImmutable((string) $ev['end'], $tz))->setTimezone($tz);
-        $days = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
-        $date = $end->format('Y-m-d') !== $this->start($ev)->format('Y-m-d') ? $days[(int) $end->format('w')] . ' ' . $end->format('d.m.Y') . ', ' : '';
-        return $date . $end->format('H:i') . ' Uhr';
+        $date = $end->format('Y-m-d') !== $this->start($ev)->format('Y-m-d') ? self::weekday($end) . ' ' . $end->format('d.m.Y') . ', ' : '';
+        return $date . I18n::t('{time} Uhr', ['time' => $end->format('H:i')]);
     }
 
     /**
@@ -533,8 +799,9 @@ final class PushTriggers
     }
 
     /** Titel einer Benachrichtigung zu Terminen, neutral mit dem Namen des Bereichs (Issue #362), z. B. „Termine: neu“. */
-    private function eventsTitle(string $what): string
+    private function eventsTitle(bool $changed): string
     {
-        return $this->app->config->sectionLabel('events', 'Termine') . ': ' . $what;
+        $events = $this->app->config->sectionLabel('events', 'Termine');
+        return $changed ? I18n::t('{events}: geändert', ['events' => $events]) : I18n::t('{events}: neu', ['events' => $events]);
     }
 }

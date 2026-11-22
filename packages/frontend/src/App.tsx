@@ -1,14 +1,18 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError, can, config, CONFIG_CHANGED, toLogin, newsTitle, type Capability } from './api';
+import { locale, t } from './i18n';
+import type { Fassungen } from './views/Hilfe';
+import { LanguageButton } from './language';
 import brand from './generated/brand';
 import logoUrl from './generated/logo-small.webp';
 import { detectPlatform, isStandalone, promptInstall, useCanPrompt } from './install';
 import BoardBanner from './BoardBanner';
 import { caps } from './sharpS';
 import PushHint from './PushHint';
-import { boardReadable, boardVisible, canManagePolls, canPostBoard, pollsVisible } from './board';
+import UpdateBanner from './UpdateBanner';
+import OfflineRejectedBanner from './OfflineRejectedBanner';
+import { boardReadable, canManagePolls, canPostBoard, pollsVisible } from './board';
 import { ErrorBoundary, lazyView, Loading } from './ui';
-import { birthdaysVisible } from './upcomingBirthdays';
 import { forgetPushOnLogout } from './push';
 import { endPreview, previewRole, PUBLIC_PREVIEW, stopPreview } from './preview';
 import { navigate, redirect, useRoute, viewKey } from './router';
@@ -16,16 +20,34 @@ import { focusId } from './focus';
 import { AdminBack, adminTabs } from './adminNav';
 import { MenuBack, InternMenu } from './internNav';
 import { targetIcons, targetLabels } from './navLabels';
-import { buildNav, isPageTarget, menuOf, pageTarget, startOf, tabbarClass, viewPath, type NavEntry, type NavTarget } from './navigation';
+import {
+  buildNav,
+  targetAllowed,
+  type FixedTarget,
+  isGuestView,
+  isPageTarget,
+  navigationFor,
+  menuOf,
+  pageTarget,
+  startOf,
+  tabbarClass,
+  viewPath,
+  type NavEntry,
+  type NavTarget,
+} from './navigation';
 import { helpSlug } from './helpSlug';
 import { setReportOrigin } from './lastError';
-import { shareLink, shareUrl } from './share';
+import { photoFromPath, shareLink, shareUrl } from './share';
 import { toggleTheme, useTheme } from './theme';
 import News from './views/News';
 import Termine, { canManageCalendar } from './views/Termine';
 import { canManageGallery } from './galleryManage';
-import { hasEvents, prefetcher, tabSources, type TabId } from './viewData';
+import { prefetcher, tabSources, type TabId } from './viewData';
 import { whenIdle } from './prefetch';
+import { clearOfflineChanges } from './attendanceSync';
+import { pendingOfflineCount, syncOffline } from './offlineSync';
+import { confirmAsk } from './ask';
+import { CONNECTION_CHANGED, isStale } from './connection';
 
 // Erst bei Bedarf laden: Der App-Start braucht nur die Ansichten, mit denen Gäste meist beginnen (Termine, News).
 // Der Service Worker speichert alle Teile trotzdem vorab, damit sie auch offline da sind.
@@ -45,7 +67,15 @@ const Einstellungen = lazyView(() => import('./views/Einstellungen'));
 const Installieren = lazyView(() => import('./views/Installieren'));
 const TermineVerwalten = lazyView(() => import('./views/TermineVerwalten'));
 const Verwaltung = lazyView(() => import('./views/Verwaltung'));
-const Hilfe = lazyView(() => import('./views/Hilfe'));
+// Auf Englisch mit den Fassungen des Handbuchs (eigenes Teilstück, nur dann geladen)
+const Hilfe = lazyView(async () => {
+  const [view, en] = await Promise.all([
+    import('./views/Hilfe'),
+    locale() === 'en' ? import('./generated/handbuch.en.json') : Promise.resolve(null),
+  ]);
+  view.setTranslations(en ? (en.default as Fassungen) : null);
+  return view;
+});
 const Benachrichtigungen = lazyView(() => import('./views/Benachrichtigungen'));
 const Dokumente = lazyView(() => import('./views/Dokumente'));
 const DokumenteVerwalten = lazyView(() => import('./views/DokumenteVerwalten'));
@@ -140,10 +170,10 @@ const tabLabels = (): Record<Tab | 'menue', string> => ({
   seiten: sec.pages,
   intern: sec.intern,
   // Untermenü der einrichtbaren Navigation: Titel ist sein Name (App)
-  menue: 'Menü',
+  menue: t('Menü'),
   ...internLabels(),
-  meins: 'Meins',
-  verwaltung: 'Verwaltung',
+  meins: t('Meins'),
+  verwaltung: t('Verwaltung'),
 });
 
 function internLabels(): Record<InternView, string> {
@@ -168,19 +198,19 @@ const titles = (): Record<View, string> => ({
   brett: sec.board,
   umfragen: sec.polls,
   inventar: sec.inventory,
-  benachrichtigungen: 'Benachrichtigungen',
-  installieren: 'App installieren',
-  anmelden: 'Anmelden',
-  registrieren: 'Zugang beantragen',
-  einstellungen: 'Einstellungen',
-  einrichtung: 'Einrichtung',
-  hilfe: 'Hilfe',
+  benachrichtigungen: t('Benachrichtigungen'),
+  installieren: t('App installieren'),
+  anmelden: t('Anmelden'),
+  registrieren: t('Zugang beantragen'),
+  einstellungen: t('Einstellungen'),
+  einrichtung: t('Einrichtung'),
+  hilfe: t('Hilfe'),
 });
 
 /** Kopfzeile: zwischen hell und dunkel wechseln (feste Wahl und „Wie Gerät“ unter Meins → Konto). */
 function ThemeButton() {
   const dark = useTheme().shown === 'dark';
-  const label = dark ? 'Helle Darstellung' : 'Dunkle Darstellung';
+  const label = dark ? t('Helle Darstellung') : t('Dunkle Darstellung');
   return (
     <button className="btn btn-link topbar-theme" onClick={toggleTheme} aria-label={label} title={label}>
       <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
@@ -273,25 +303,25 @@ function InstallBanner({ onToast }: { onToast: (msg: string) => void }) {
   };
   async function install() {
     const result = await promptInstall();
-    if (result === 'accepted') onToast('Die App wird installiert – gleich ist sie auf dem Startbildschirm');
+    if (result === 'accepted') onToast(t('Die App wird installiert – gleich ist sie auf dem Startbildschirm'));
   }
   return (
     <div className="install-hint" role="note">
       <img src={logoUrl} alt="" className="install-hint-logo" />
       <div className="install-hint-text">
-        <strong>Die App aufs Handy holen</strong>
-        <span>Mit unserem Logo auf dem Startbildschirm – wie jede andere App.</span>
+        <strong>{t('Die App aufs Handy holen')}</strong>
+        <span>{t('Mit unserem Logo auf dem Startbildschirm – wie jede andere App.')}</span>
       </div>
       {canPrompt ? (
         <button className="btn btn-small install-hint-btn" onClick={install}>
-          Installieren
+          {t('Installieren')}
         </button>
       ) : (
         <button className="btn btn-small install-hint-btn" onClick={() => navigate('installieren')}>
-          So geht's
+          {t("So geht's")}
         </button>
       )}
-      <button className="btn btn-link install-hint-close" onClick={dismiss} aria-label="Hinweis schließen">
+      <button className="btn btn-link install-hint-close" onClick={dismiss} aria-label={t('Hinweis schließen')}>
         ✕
       </button>
     </div>
@@ -299,7 +329,8 @@ function InstallBanner({ onToast }: { onToast: (msg: string) => void }) {
 }
 
 /**
- * Vorschau „App als Rolle ansehen“ (Issue #63): auf jeder Seite oben, mit „Beenden“ (zurück zu Einstellungen → Rollen).
+ * Vorschau „App als Rolle ansehen“ (Issue #63): auf jeder Seite oben, mit „Beenden“ (zurück zu Einstellungen → Rollen,
+ * als Person zu ihrer Seite). Als Person stehen ihre Rollen dahinter.
  * Änderungen lehnt der Server in der Vorschau ab; die Knöpfe bleiben, wie die Rolle sie sieht.
  */
 function PreviewBanner() {
@@ -308,10 +339,11 @@ function PreviewBanner() {
   return (
     <div className="preview-banner" role="status">
       <span>
-        <strong>{p.role === PUBLIC_PREVIEW ? 'Vorschau ohne Anmeldung' : `Vorschau als ${p.label}`}</strong> – nur ansehen
+        <strong>{p.role === PUBLIC_PREVIEW ? t('Vorschau ohne Anmeldung') : t('Vorschau als {role}', { role: p.label })}</strong>
+        {p.person !== undefined && p.roles && p.roles.length > 0 && ` (${p.roles.join(', ')})`} – {t('nur ansehen')}
       </span>
       <button className="btn btn-small" onClick={endPreview}>
-        Beenden
+        {t('Beenden')}
       </button>
     </div>
   );
@@ -333,6 +365,23 @@ async function clearCaches() {
 async function logout(onError: (msg: string) => void) {
   // In der Vorschau: erst beenden, sonst lehnte der Server das Abmelden der Benachrichtigungen ab.
   if (previewRole()) stopPreview();
+  // Offline gespeicherte Änderungen (offlineSync.ts) erst übertragen: Beim Abmelden löscht die App sie vom Gerät.
+  if (pendingOfflineCount() > 0) {
+    await syncOffline();
+    if (
+      pendingOfflineCount() > 0 &&
+      !(await confirmAsk(
+        t(
+          'Offline gespeicherte Änderungen (Anwesenheit, Zu- und Absagen, Punkte und Strafen) sind noch nicht übertragen und gehen beim Abmelden verloren. Trotzdem abmelden?',
+        ),
+        {
+          okLabel: t('Abmelden'),
+        },
+      ))
+    ) {
+      return;
+    }
+  }
   // Solange die Sitzung noch gilt: Dieses Gerät bekommt keine Nachrichten des Kontos mehr.
   const finishPush = await forgetPushOnLogout();
   if (config?.auth.mode === 'form') {
@@ -342,12 +391,13 @@ async function logout(onError: (msg: string) => void) {
       // 401: Die Sitzung ist auf dem Server schon beendet.
       if (!(err instanceof ApiError && err.status === 401)) {
         await finishPush(false);
-        onError('Abmelden hat nicht geklappt. Bitte mit Internetverbindung erneut versuchen.');
+        onError(t('Abmelden hat nicht geklappt. Bitte mit Internetverbindung erneut versuchen.'));
         return;
       }
     }
   }
   await finishPush(true);
+  clearOfflineChanges();
   await clearCaches().catch(() => undefined);
   if (config?.auth.mode === 'redirect' && config.auth.logoutUrl) {
     window.location.href = config.auth.logoutUrl;
@@ -365,32 +415,27 @@ export default function App({ notice = null }: { notice?: string | null }) {
   const rawPath = useRoute();
   const path = ALIASES[rawPath[0]] ?? rawPath;
   const user = config?.user ?? null;
-  // Jeder Knopf mit eigenem Recht (wie die Routen im Kern); ohne Anmeldung die Rechte von Gast (can).
-  const docsAllowed = !!features?.documents && (can('view_documents') || can('manage_documents'));
-  // Mitgliederliste, Ehemalige und Ämter (Issue #112) unter einem Knopf.
-  const membersAllowed = !!(
-    (features?.directory && (can('view_directory') || can('view_former'))) ||
-    (features?.offices && can('view_offices'))
-  );
-  // Dienstgrade und Punktekatalog zum Nachschlagen.
-  const ranksAllowed = !!features?.ranks && can('view_ranks');
-  const catalogAllowed = !!features?.points && can('view_catalog');
+  // Jeder Knopf mit eigenem Recht (wie die Routen im Kern); ohne Anmeldung die Rechte von Gast (can). Die Bereiche der
+  // Navigation nach einer Regel (targetAllowed), die auch Einstellungen → Navigation nutzt.
+  const shown = (t: FixedTarget): boolean => targetAllowed(t, can, (f) => !!features?.[f]);
   const pageIds = new Set((config?.pages ?? []).map((p) => p.id));
   const allowed: Record<View, boolean> = {
     // Geburtstage (Issue #1) stehen bei den Terminen: für alle, die sie sehen, auch wenn es sonst keine Termine gibt.
-    termine: hasEvents() || birthdaysVisible(),
-    news: !!features?.news && can('view_news'),
-    galerie: !!features?.gallery && (can('view_gallery') || can('view_gallery_internal')),
+    termine: shown('termine'),
+    news: shown('news'),
+    galerie: shown('galerie'),
     // Kompanien (Issue #280): mit view_companies sehen, mit manage_companies (Verwaltung) ohnehin
-    kompanien: !!features?.companies && (can('view_companies') || can('manage_companies')),
+    kompanien: shown('kompanien'),
     // Sponsoren (Issue #279): mit view_sponsors sehen, mit manage_sponsors (Verwaltung) ohnehin
-    sponsoren: !!features?.sponsors && (can('view_sponsors') || can('manage_sponsors')),
+    sponsoren: shown('sponsoren'),
     // Eigene Seiten (Issue #287): #/seiten/<id>, wenn es eine gibt, die die Person lesen darf; wer sie pflegt, ohnehin
     seiten: !!features?.pages && ((config?.pages?.length ?? 0) > 0 || can('manage_pages')),
-    dokumente: docsAllowed,
-    mitglieder: membersAllowed,
-    dienstgrade: ranksAllowed,
-    punktekatalog: catalogAllowed,
+    dokumente: shown('dokumente'),
+    // Mitgliederliste, Ehemalige und Ämter (Issue #112) unter einem Knopf
+    mitglieder: shown('mitglieder'),
+    // Dienstgrade und Punktekatalog zum Nachschlagen
+    dienstgrade: shown('dienstgrade'),
+    punktekatalog: shown('punktekatalog'),
     // Intern bzw. ein Untermenü: unten aus der Navigation bestimmt
     intern: false,
     menue: false,
@@ -402,9 +447,9 @@ export default function App({ notice = null }: { notice?: string | null }) {
     // interne mit view_board; mit post_board schreiben. In der Navigation nur mit view_board (unten).
     brett: boardReadable(),
     // Umfragen (Issue #4): mit vote_polls antworten, manage_polls verwaltet; laufende stehen am Brett.
-    umfragen: pollsVisible() || canManagePolls(),
-    // Inventar (Issue #6): nur mit manage_inventory, Einstieg über das Menü der Verwaltung.
-    inventar: !!features?.inventory && can('manage_inventory'),
+    umfragen: pollsVisible() || canManagePolls() || (!!features?.polls && can('view_poll_results')),
+    // Inventar (Issue #6): sehen mit view_inventory, ändern mit manage_inventory, Einstieg über das Menü der Verwaltung.
+    inventar: !!features?.inventory && can('view_inventory'),
     benachrichtigungen: true,
     installieren: true,
     anmelden: !user && config?.auth.mode === 'form',
@@ -416,10 +461,12 @@ export default function App({ notice = null }: { notice?: string | null }) {
   };
   // Tab-Leiste: eingerichtet (Einstellungen → Navigation, Issue #277) oder die Standardnavigation; nur, was die Person
   // sehen darf. Das Brett zum Lesen (view_board); wer schreibt, hat es außerdem in der Verwaltung.
-  const navEntries = buildNav(config?.navigation, {
+  // Gäste (ohne Anmeldung oder mit der Grundrolle Gast, auch in der Vorschau) haben ggf. eine eigene Leiste und Startseite.
+  const guestView = isGuestView(user);
+  const navEntries = buildNav(navigationFor(config, guestView), {
     // Eigene Seiten (Issue #287): jede, die die Person lesen darf (/config), als eigener Punkt
     visible: (t: NavTarget) =>
-      t === 'brett' ? boardVisible() : isPageTarget(t) ? allowed.seiten && pageIds.has(Number(t.slice(7))) : allowed[t],
+      t === 'brett' ? shown('brett') : isPageTarget(t) ? allowed.seiten && pageIds.has(Number(t.slice(7))) : allowed[t],
     intern: can('view_intern'),
     label: (t: NavTarget) => targetLabels()[t] ?? t,
     pages: (config?.pages ?? []).map((p) => pageTarget(p.id)),
@@ -439,7 +486,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
   allowed.menue = requested === 'menue' && navEntries.some((e) => e.key === `menue/${path[1]}`);
   // Startseite (Issue #362): eingestellt für Gäste bzw. Angemeldete, wenn sie in der Leiste der Person steht, sonst der
   // erste Punkt. Neue Installation ohne Bereiche: Der Admin landet direkt in der Einrichtung.
-  const startKey = startOf(tabs, user ? config?.navigation_start?.member : config?.navigation_start?.guest);
+  const startKey = startOf(tabs, guestView ? config?.navigation_start?.guest : config?.navigation_start?.member);
   const start: string = startKey ?? (config?.setupPending && allowed.einrichtung ? 'einrichtung' : 'installieren');
   // Tab der Startseite (bei einem Bereich in einem Untermenü das Untermenü): Begrüßung und Hinweise stehen dort.
   const homeTab = tabs.find((t) => t.key === startKey || t.children?.includes(startKey as NavTarget))?.key;
@@ -477,6 +524,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
 
   const [toast, setToast] = useState<string | null>(notice);
   const [online, setOnline] = useState(navigator.onLine);
+  const [stale, setStale] = useState(isStale);
   const showToast = useCallback((msg: string) => setToast(msg), []);
   // Bereiche wurden ein- oder ausgeschaltet: Tabs und Ansichten neu bestimmen.
   const [, setConfigVersion] = useState(0);
@@ -519,21 +567,35 @@ export default function App({ notice = null }: { notice?: string | null }) {
     return () => clearTimeout(t);
   }, [toast]);
 
+  // Offline gespeicherte Änderungen übertragen: beim Start und sobald wieder Netz da ist (offlineSync.ts).
+  useEffect(() => {
+    const sync = () =>
+      void syncOffline().then((messages) => {
+        if (messages.length > 0) showToast(messages.join(' · '));
+      });
+    sync();
+    window.addEventListener('online', sync);
+    return () => window.removeEventListener('online', sync);
+  }, [showToast]);
+
   useEffect(() => {
     const on = () => setOnline(true);
     const off = () => setOnline(false);
+    const connection = () => setStale(isStale());
     window.addEventListener('online', on);
     window.addEventListener('offline', off);
+    window.addEventListener(CONNECTION_CHANGED, connection);
     return () => {
       window.removeEventListener('online', on);
       window.removeEventListener('offline', off);
+      window.removeEventListener(CONNECTION_CHANGED, connection);
     };
   }, []);
 
   if (!config) {
     return (
       <main className="content">
-        <p className="error">Die App muss über ihre Adresse auf der Webseite geöffnet werden.</p>
+        <p className="error">{t('Die App muss über ihre Adresse auf der Webseite geöffnet werden.')}</p>
       </main>
     );
   }
@@ -578,8 +640,8 @@ export default function App({ notice = null }: { notice?: string | null }) {
         <button
           className="btn btn-link topbar-share"
           onClick={() => void shareLink(pageUrl, `${brand.shortName}: ${title}`, showToast)}
-          aria-label="Link zu dieser Seite teilen"
-          title="Link zu dieser Seite teilen"
+          aria-label={t('Link zu dieser Seite teilen')}
+          title={t('Link zu dieser Seite teilen')}
         >
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
             <path
@@ -601,15 +663,16 @@ export default function App({ notice = null }: { notice?: string | null }) {
           });
           navigate(slug ? `hilfe/${slug}` : 'hilfe');
         }}
-        aria-label="Hilfe"
+        aria-label={t('Hilfe')}
         aria-current={tab === 'hilfe' ? 'page' : undefined}
       >
         ?
       </button>
+      <LanguageButton />
       <ThemeButton />
       {!user && tab !== 'anmelden' && (
         <button className="btn btn-link topbar-account" onClick={toLogin}>
-          Login
+          {t('Login')}
         </button>
       )}
     </header>
@@ -634,9 +697,20 @@ export default function App({ notice = null }: { notice?: string | null }) {
           </Suspense>
         </ErrorBoundary>
       )}
+      <UpdateBanner />
+      {user && <OfflineRejectedBanner />}
       {boardReadable() && tab !== 'brett' && <BoardBanner />}
-      {!online && <div className="offline">Offline – angezeigt werden die zuletzt geladenen Daten.</div>}
+      {!online && <div className="offline">{t('Offline – angezeigt werden die zuletzt geladenen Daten.')}</div>}
+      {online && stale && (
+        <div className="offline" role="status">
+          {t('Schlechte Verbindung – angezeigt werden die zuletzt geladenen Daten.')}
+        </div>
+      )}
       {!['installieren', 'anmelden', 'registrieren', 'einstellungen', 'einrichtung'].includes(tab) && <InstallBanner onToast={showToast} />}
+      {/* Gleich nach der Anmeldung, auf jeder Seite (auch nach einem geteilten Link): Benachrichtigungen anbieten */}
+      {user && !config.setupPending && !['anmelden', 'registrieren', 'einrichtung', 'benachrichtigungen', 'installieren'].includes(tab) && (
+        <PushHint onToast={showToast} />
+      )}
 
       <main className="content">
         <ErrorBoundary key={viewKey(path)}>
@@ -644,23 +718,25 @@ export default function App({ notice = null }: { notice?: string | null }) {
             {config.setupPending && tab !== 'einrichtung' && (
               <div className="card setup-hint">
                 <p>
-                  <strong>Willkommen!</strong> Die App ist installiert. Jetzt noch auswählen, welche Bereiche eure Kompanie nutzt, und sie
-                  verbinden – dauert ein paar Minuten.
+                  <strong>{t('Willkommen!')}</strong>{' '}
+                  {t(
+                    'Die App ist installiert. Jetzt noch auswählen, welche Bereiche eure Kompanie nutzt, und sie verbinden – dauert ein paar Minuten.',
+                  )}
                 </p>
                 <button className="btn btn-block" onClick={() => navigate('einrichtung')}>
-                  Einrichtung starten
+                  {t('Einrichtung starten')}
                 </button>
               </div>
             )}
             {loginFirst && (
               <div className="card login-first" role="note">
-                <p>Diese Seite ist erst nach der Anmeldung zu sehen. Danach geht sie direkt auf.</p>
+                <p>{t('Diese Seite ist erst nach der Anmeldung zu sehen. Danach geht sie direkt auf.')}</p>
                 <button className="btn btn-block" onClick={toLogin}>
-                  Anmelden
+                  {t('Anmelden')}
                 </button>
                 {canRegister && (
                   <button className="btn btn-secondary btn-block" onClick={() => navigate('registrieren')}>
-                    Noch keinen Zugang? Zugang beantragen
+                    {t('Noch keinen Zugang? Zugang beantragen')}
                   </button>
                 )}
               </div>
@@ -670,13 +746,12 @@ export default function App({ notice = null }: { notice?: string | null }) {
             {parentMenu && menuStart && <MenuBack to={parentMenu.key} label={parentMenu.label} />}
             {canRegister && !loginFirst && activeTab === homeTab && !path[1] && (
               <p className="registration-hint muted small">
-                Du gehörst dazu und hast noch keinen Zugang?{' '}
+                {t('Du gehörst dazu und hast noch keinen Zugang?')}{' '}
                 <button type="button" className="btn btn-link inline-link" onClick={() => navigate('registrieren')}>
-                  Zugang beantragen
+                  {t('Zugang beantragen')}
                 </button>
               </p>
             )}
-            {user && !config.setupPending && activeTab === homeTab && !path[1] && <PushHint onToast={showToast} />}
             {tab === 'termine' &&
               (path[1] === 'verwalten' && features?.events && can('manage_events') ? (
                 <TermineVerwalten onToast={showToast} />
@@ -688,24 +763,32 @@ export default function App({ notice = null }: { notice?: string | null }) {
             {tab === 'news' && <News id={newsId} onToast={showToast} />}
             {tab === 'galerie' &&
               (path[1] === 'einreichen' && can('submit_gallery') ? (
-                <GalerieEinreichungen mode="einreichen" onToast={showToast} />
-              ) : path[1] === 'pruefen' && can('review_gallery') ? (
+                <GalerieEinreichungen
+                  mode="einreichen"
+                  albumId={/^\d+$/.test(path[2] ?? '') ? Number(path[2]) : undefined}
+                  onToast={showToast}
+                />
+              ) : path[1] === 'pruefen' && can('view_submissions') ? (
                 <GalerieEinreichungen mode="pruefen" onToast={showToast} />
               ) : path[1] === 'verwalten' && canManageGallery() ? (
                 <div>
                   <button className="btn btn-link back" onClick={() => navigate('galerie')}>
-                    ‹ Alle Alben
+                    ‹ {t('Alle Alben')}
                   </button>
                   <GalleryAlbums onToast={showToast} />
                 </div>
               ) : (
-                <Galerie albumId={albumId} onToast={showToast} />
+                <Galerie albumId={albumId} photoId={photoFromPath(path)} onToast={showToast} />
               ))}
             {tab === 'kompanien' && <Kompanien id={companyId} />}
             {tab === 'sponsoren' && <Sponsoren />}
             {tab === 'seiten' && <Seiten id={/^\d+$/.test(route[1] ?? '') ? Number(route[1]) : null} />}
             {openMenu?.children && (
-              <InternMenu label={openMenu.label} tabs={openMenu.children.map((v) => ({ id: v, label: targetLabels()[v] ?? v }))} />
+              <InternMenu
+                page={openMenu.key}
+                label={openMenu.label}
+                tabs={openMenu.children.map((v) => ({ id: v, label: targetLabels()[v] ?? v }))}
+              />
             )}
             {tab === 'dokumente' &&
               (path[1] === 'verwalten' && can('manage_documents') ? (
@@ -740,7 +823,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
       )}
 
       {tabs.length > 1 && (
-        <nav className={tabbarClass(tabs.length, config?.navigation_labels !== false)} aria-label="Hauptnavigation">
+        <nav className={tabbarClass(tabs.length, config?.navigation_labels !== false)} aria-label={t('Hauptnavigation')}>
           {tabs.map((t) => (
             <button
               key={t.key}

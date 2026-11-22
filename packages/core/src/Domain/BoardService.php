@@ -10,6 +10,7 @@ use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Domain\Blocks\Blocks;
 use KompanieApp\Core\Domain\Blocks\TextBlock;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Storage\BoardRepository;
 
 /**
@@ -40,6 +41,11 @@ use KompanieApp\Core\Storage\BoardRepository;
  * - Beim Schreiben bekommen alle Empfänger auf Wunsch eine Benachrichtigung (PushTriggers::boardPosted) und eine Mail
  *   (BoardMailService), beim Ändern nicht. Bei öffentlichen Nachrichten kommen zur Benachrichtigung die Geräte ohne
  *   Brett dazu (Gäste und Konten ohne view_board, Art board_public); die Mail geht weiter nur an die Empfänger.
+ * - Inhalte je Sprache (Plan „Mehrsprachigkeit“, PR 9c, ContentTranslations): je weitere eingeschaltete Sprache ein
+ *   eigener Titel und eigene Texte der Blöcke (Art KIND), beim Schreiben und Ändern über translations. Leser bekommen
+ *   die Fassung ihrer Sprache (fehlt etwas: Deutsch und untranslated), Benachrichtigung und Mail gehen in der Sprache
+ *   der Empfänger. Wer ans Brett schreibt, bekommt dazu source (deutsch, wenn die App in einer anderen Sprache läuft)
+ *   und translations zum Bearbeiten. Änderungen der Fassungen stehen im Verlauf (REV_TRANSLATION).
  * - Die Liste besteht aus Einträgen mit kind: „message“ und für Mitglieder „poll“ (laufende Umfragen, Issue #4,
  *   PollService::boardItems); Clients überspringen unbekannte Arten.
  *
@@ -71,6 +77,11 @@ final class BoardService
     public const REV_MAILED = 'mailed';
     public const REV_ATTACHMENTS = 'attachments';
     public const REV_AUDIENCE = 'audience';
+    public const REV_TRANSLATION = 'translation';
+    /** Art in translations */
+    public const KIND = 'board';
+    /** Titel einer Fassung (der deutsche hat keine Grenze; die Tabelle translations schon) */
+    public const TRANSLATION_TITLE_MAX = 1000;
 
     private ?BoardRepository $repo = null;
     /** @var array<int, list<int>> Konto => Kompanien (für canRead, je Anfrage einmal gelesen) */
@@ -103,7 +114,7 @@ final class BoardService
      */
     public function canRead(?User $viewer, array $message): bool
     {
-        if ($message['audience'] === self::AUDIENCE_PUBLIC || ($viewer !== null && $viewer->can(Capability::PostBoard))) {
+        if ($message['audience'] === self::AUDIENCE_PUBLIC || self::seesAll($viewer)) {
             return true;
         }
         if (!self::isRecipient($viewer)) {
@@ -115,6 +126,15 @@ final class BoardService
             self::AUDIENCE_COMPANY => array_intersect($message['audience_ids'], $this->companiesOf[$viewer->id] ??= $this->app->companies()->repository()->companyIdsOf($viewer->id)) !== [],
             default => true,
         };
+    }
+
+    /**
+     * Alle Nachrichten sehen, mit letzter Änderung, Stand des Mailversands und Verlauf (view_board_history; post_board
+     * setzt es voraus, Capability::READ_OF).
+     */
+    public static function seesAll(?User $viewer): bool
+    {
+        return $viewer !== null && $viewer->can(Capability::ViewBoardHistory);
     }
 
     /**
@@ -167,22 +187,24 @@ final class BoardService
 
     /**
      * Gültige Nachrichten, die $viewer lesen darf (canRead; ohne Anmeldung nur öffentliche), neueste zuerst; danach für Mitglieder die laufenden Umfragen (Issue #4, kind „poll“, mit
-     * has_voted), sofern der Bereich Umfragen an ist. Mit post_board zusätzlich, wer zuletzt geändert hat, und der Stand
-     * des Mailversands.
+     * has_voted), sofern der Bereich Umfragen an ist. Mit view_board_history zusätzlich, wer zuletzt geändert hat, und der
+     * Stand des Mailversands.
      *
      * @return array{items: list<array<string, mixed>>}
      */
     public function list(?User $viewer = null): array
     {
         $active = array_values(array_filter($this->repository()->active($this->app->time()->nowUtc()), fn (array $m): bool => $this->canRead($viewer, $m)));
-        $editor = $viewer !== null && $viewer->can(Capability::PostBoard);
+        $all = self::seesAll($viewer);
         $ids = array_column($active, 'id');
-        $edits = $editor ? $this->repository()->lastEdits($ids) : [];
-        $mails = $editor ? $this->app->boardMail()->summaries($ids) : [];
+        $edits = $all ? $this->repository()->lastEdits($ids) : [];
+        $mails = $all ? $this->app->boardMail()->summaries($ids) : [];
         $names = (new UserNames($this->app->users))->prime([...array_column($active, 'author_id'), ...array_column($edits, 'user_id')]);
         $files = $this->app->attachments()->many(AttachmentService::OWNER_BOARD, $ids);
         $targets = $this->targetNames($active, $names);
-        $messages = array_map(fn (array $m): array => $this->format($m, $names, $editor, $edits[$m['id']] ?? null, $mails[$m['id']] ?? null, $files[$m['id']] ?? [], $targets, $viewer), $active);
+        $content = $this->app->contentTranslations();
+        $tr = $content->locales() === [] ? [] : $content->ofMany(self::KIND, $ids);
+        $messages = array_map(fn (array $m): array => $this->format($m, $names, $all, $edits[$m['id']] ?? null, $mails[$m['id']] ?? null, $files[$m['id']] ?? [], $targets, $viewer, $tr[$m['id']] ?? []), $active);
         return ['items' => [...$messages, ...$this->app->polls()->boardItems($viewer)]];
     }
 
@@ -191,11 +213,13 @@ final class BoardService
      *
      * @param array<string, mixed> $in title, blocks (Inhalt aus Blöcken, Domain\Blocks\Blocks) oder text (formatierter
      *                                 Inhalt, ältere App), expires_at (optional, ISO 8601), audience (members Standard,
-     *                                 public, company oder person), audience_ids (bei company und person)
+     *                                 public, company oder person), audience_ids (bei company und person),
+     *                                 translations (Sprache => title, blocks: Kennung => Feld => Text; optional)
      * @return BoardItem
      */
     public function create(User $author, array $in): array
     {
+        $given = $this->app->contentTranslations()->input($in['translations'] ?? null);
         $title = self::validTitle($in['title'] ?? null);
         $blocks = $this->validContent($in);
         $audience = self::validAudience($in['audience'] ?? self::AUDIENCE_MEMBERS);
@@ -206,7 +230,7 @@ final class BoardService
             ? $this->validExpires($in['expires_at'])
             : gmdate('Y-m-d H:i:s', $nowTs + self::LIFETIME);
         $files = $this->app->attachments()->resolve($author, $in['attachments'] ?? null, AttachmentService::OWNER_BOARD);
-        $id = $this->app->db->transaction(function () use ($author, $title, $blocks, $now, $expires, $files, $audience, $audienceIds): int {
+        $id = $this->app->db->transaction(function () use ($author, $title, $blocks, $now, $expires, $files, $audience, $audienceIds, $given): int {
             $id = $this->repository()->insert($title, Blocks::publicBody($blocks), $author->id, $now, $expires, $audience, $audienceIds);
             $columns = $this->app->blocks()->columns($blocks, $author, RichImageService::OWNER_BOARD, $id, false);
             $this->repository()->update($id, $columns);
@@ -219,6 +243,7 @@ final class BoardService
                 $snapshot['attachments'] = array_map(static fn (array $f): string => (string) $f['name'], $files);
             }
             $this->repository()->addRevision($id, $author->id, $now, self::REV_CREATED, null, self::json($snapshot));
+            $this->saveTranslations($id, $given, $blocks, $author, $now);
             return $id;
         });
         return $this->one($id, $author);
@@ -232,12 +257,14 @@ final class BoardService
      * gibt es beim Ändern nie, auch nicht, wenn eine Nachricht öffentlich wird.
      *
      * @param array<string, mixed> $in title, blocks oder text, expires_at, audience, audience_ids (bei company und person; ohne
-     *                                 audience für die bisherige), attachments (alle Anhänge danach: Kennungen)
+     *                                 audience für die bisherige), attachments (alle Anhänge danach: Kennungen),
+     *                                 translations (wie bei create; nur die genannten Sprachen und Felder)
      * @return BoardItem
      */
     public function update(User $actor, int $id, array $in): array
     {
         $message = $this->active($id);
+        $given = $this->app->contentTranslations()->input($in['translations'] ?? null);
         $values = [];
         $audienceIds = $message['audience_ids'];
         if (array_key_exists('title', $in)) {
@@ -248,6 +275,7 @@ final class BoardService
         }
         $content = array_key_exists('blocks', $in) || array_key_exists('text', $in);
         $contentBefore = null;
+        $german = Blocks::decode($message['blocks'], $message['body']);
         if ($content) {
             // Bilder nicht mehr verwendeter Fassungen bleiben (Verlauf), bis die Nachricht gelöscht wird (cleanup).
             $columns = $this->app->blocks()->columns($this->validContent($in), $actor, RichImageService::OWNER_BOARD, $id, false);
@@ -255,6 +283,7 @@ final class BoardService
                 $values['body'] = $columns['body'];
                 $values['blocks'] = $columns['blocks'];
                 $contentBefore = self::contentValue($message);
+                $german = Blocks::decode($columns['blocks'], $columns['body']);
             }
         }
         if (array_key_exists('expires_at', $in)) {
@@ -273,8 +302,8 @@ final class BoardService
                 $audienceIds = $ids;
             }
         }
-        if (!array_key_exists('title', $in) && !$content && !array_key_exists('expires_at', $in) && !array_key_exists('attachments', $in) && !array_key_exists('audience', $in) && !array_key_exists('audience_ids', $in)) {
-            throw ApiError::invalid('Bitte Titel, Inhalt, Anhänge, Enddatum oder Sichtbarkeit angeben.');
+        if (!array_key_exists('title', $in) && !$content && !array_key_exists('expires_at', $in) && !array_key_exists('attachments', $in) && !array_key_exists('audience', $in) && !array_key_exists('audience_ids', $in) && $given === []) {
+            throw ApiError::invalid(I18n::t('Bitte Titel, Inhalt, Anhänge, Enddatum oder Sichtbarkeit angeben.'));
         }
         // Anhänge: die genannten Kennungen sind danach genau die Anhänge (neue Entwürfe kommen dazu, fehlende gehen).
         $files = null;
@@ -287,18 +316,19 @@ final class BoardService
                 $files = null;
             }
         }
-        if ($values === [] && $files === null) {
+        $translated = $given !== [] && $this->translationsChange($id, $given, $german, $actor);
+        if ($values === [] && $files === null && !$translated) {
             return $this->one($id, $actor);
         }
         $now = $this->app->time()->nowUtc();
-        if (isset($values['title']) || isset($values['body']) || $files !== null) {
+        if (isset($values['title']) || isset($values['body']) || $files !== null || $translated) {
             $updated = $now;
             if ($updated <= $message['updated_at']) {
                 $updated = gmdate('Y-m-d H:i:s', (int) strtotime($message['updated_at'] . ' UTC') + 1);
             }
             $values['updated_at'] = $updated;
         }
-        $this->app->db->transaction(function () use ($id, $values, $message, $actor, $now, $files, $before, $audienceIds, $contentBefore): void {
+        $this->app->db->transaction(function () use ($id, $values, $message, $actor, $now, $files, $before, $audienceIds, $contentBefore, $given, $german): void {
             if ($values !== []) {
                 $this->repository()->update($id, $values);
             }
@@ -320,6 +350,7 @@ final class BoardService
                 $after = ['audience' => (string) $values['audience'], 'audience_ids' => $audienceIds];
                 $this->repository()->addRevision($id, $actor->id, $now, self::REV_AUDIENCE, self::audienceValue($message), self::audienceValue($after));
             }
+            $this->saveTranslations($id, $given, $german, $actor, $now);
         });
         return $this->one($id, $actor);
     }
@@ -343,13 +374,13 @@ final class BoardService
     }
 
     /**
-     * Verlauf einer Nachricht (auch abgelaufen oder gelöscht, solange aufbewahrt). Nur für post_board (Route).
+     * Verlauf einer Nachricht (auch abgelaufen oder gelöscht, solange aufbewahrt). Nur für view_board_history (Route).
      *
      * @return array{message: array<string, mixed>, revisions: list<array<string, mixed>>, mail: array<string, mixed>|null}
      */
     public function history(int $id, ?User $viewer = null): array
     {
-        $message = $this->repository()->find($id) ?? throw ApiError::notFound('Diese Nachricht gibt es nicht mehr.');
+        $message = $this->repository()->find($id) ?? throw ApiError::notFound(I18n::t('Diese Nachricht gibt es nicht mehr.'));
         $revisions = $this->repository()->revisions([$id])[$id] ?? [];
         $names = (new UserNames($this->app->users))->prime([$message['author_id'], $message['deleted_by'], ...array_column($revisions, 'user_id')]);
         // Namen auch für die Sichtbarkeiten im Verlauf
@@ -376,7 +407,7 @@ final class BoardService
 
     /**
      * Abgelaufene und gelöschte Nachrichten der letzten HISTORY_KEEP_DAYS Tage (Bereich „Verlauf“ auf der Seite des
-     * Bretts), zuletzt beendete zuerst. Nur für post_board (Route).
+     * Bretts), zuletzt beendete zuerst. Nur für view_board_history (Route).
      *
      * @return array{items: list<array<string, mixed>>, keep_days: int}
      */
@@ -392,14 +423,14 @@ final class BoardService
 
     /**
      * Bild oder Anhang einer Nachricht ansehen (RichImageService::canView, AttachmentService::canView): solange sie gilt
-     * wie die Nachricht selbst (öffentliche auch ohne Anmeldung, $viewer null), danach (im Verlauf) nur mit post_board.
+     * wie die Nachricht selbst (öffentliche auch ohne Anmeldung, $viewer null), danach (im Verlauf) nur mit view_board_history.
      */
     public function canSeeImage(?User $viewer, int $messageId, ?string $uid = null): bool
     {
         if (!$this->app->features()->enabled('board')) {
             return false;
         }
-        if ($viewer !== null && $viewer->can(Capability::PostBoard)) {
+        if (self::seesAll($viewer)) {
             return $this->repository()->find($messageId) !== null;
         }
         $message = $this->repository()->findActive($messageId, $this->app->time()->nowUtc());
@@ -407,7 +438,7 @@ final class BoardService
             return false;
         }
         // Bilder in Blöcken nur für Mitglieder: auch bei öffentlichen Nachrichten nur für Empfänger
-        return $uid === null || self::isRecipient($viewer) || !Blocks::imageOnlyForMembers(Blocks::decode($message['blocks'], $message['body']), $uid);
+        return $uid === null || self::isRecipient($viewer) || !Blocks::imageOnlyForMembers($this->app->contentTranslations()->allBlocks(self::KIND, $messageId, Blocks::decode($message['blocks'], $message['body'])), $uid);
     }
 
     /**
@@ -419,6 +450,30 @@ final class BoardService
     public function mailHtml(array $message, ?User $recipient = null): string
     {
         return $this->app->blocks()->html(Blocks::decode($message['blocks'], $message['body']), true, $recipient);
+    }
+
+    /**
+     * Titel und Inhalt für die Mail in der Sprache der Anfrage (I18n::in mit der Sprache des Empfängers): die Fassung
+     * dieser Sprache, fehlende Teile deutsch.
+     *
+     * @param BoardMessage $message
+     * @param array<string, array<string, string>>|null $tr Fassungen (ContentTranslations::of), ohne Angabe gelesen
+     * @return array{0: string, 1: string} Titel, formatierter Inhalt (Bilder als data-image)
+     */
+    public function mailParts(array $message, ?User $recipient = null, ?array $tr = null): array
+    {
+        [$title, $blocks] = $this->localized($message, $tr);
+        return [$title, $this->app->blocks()->html($blocks, true, $recipient)];
+    }
+
+    /** Titel einer Nachricht in $locale (für die Benachrichtigung); fehlt die Fassung, der deutsche. */
+    public function titleIn(int $id, string $title, string $locale): string
+    {
+        if ($locale === I18n::base()) {
+            return $title;
+        }
+        $own = $this->app->contentTranslations()->of(self::KIND, $id)[$locale]['title'] ?? '';
+        return $own !== '' ? $own : $title;
     }
 
     /**
@@ -446,6 +501,9 @@ final class BoardService
         $ids = $this->repository()->endedBefore($before);
         $orphans = $this->repository()->deleteOrphanRevisions($before);
         $deleted = $this->repository()->deleteMany($ids);
+        foreach (array_unique([...$ids, ...$orphans]) as $gone) {
+            $this->app->contentTranslations()->delete(self::KIND, (int) $gone);
+        }
         $this->app->richImages()->repository()->deleteOwners(RichImageService::OWNER_BOARD, array_values(array_unique([...$ids, ...$orphans])));
         $this->app->attachments()->deleteOwners(AttachmentService::OWNER_BOARD, array_values(array_unique([...$ids, ...$orphans])));
         $this->app->richImages()->cleanupDrafts();
@@ -457,18 +515,104 @@ final class BoardService
     public function active(int $id): array
     {
         return $this->repository()->findActive($id, $this->app->time()->nowUtc())
-            ?? throw ApiError::notFound('Diese Nachricht gibt es nicht mehr (abgelaufen oder gelöscht).');
+            ?? throw ApiError::notFound(I18n::t('Diese Nachricht gibt es nicht mehr (abgelaufen oder gelöscht).'));
     }
 
     /** @return BoardItem */
     public function one(int $id, ?User $viewer = null): array
     {
-        $editor = $viewer !== null && $viewer->can(Capability::PostBoard);
-        $edit = $editor ? ($this->repository()->lastEdits([$id])[$id] ?? null) : null;
-        $mail = $editor ? ($this->app->boardMail()->summaries([$id])[$id] ?? null) : null;
+        $all = self::seesAll($viewer);
+        $edit = $all ? ($this->repository()->lastEdits([$id])[$id] ?? null) : null;
+        $mail = $all ? ($this->app->boardMail()->summaries([$id])[$id] ?? null) : null;
         $message = $this->active($id);
         $names = new UserNames($this->app->users);
-        return $this->format($message, $names, $editor, $edit, $mail, $this->app->attachments()->of(AttachmentService::OWNER_BOARD, $id), $this->targetNames([$message], $names), $viewer);
+        $tr = $this->app->contentTranslations()->locales() === [] ? [] : $this->app->contentTranslations()->of(self::KIND, $id);
+        return $this->format($message, $names, $all, $edit, $mail, $this->app->attachments()->of(AttachmentService::OWNER_BOARD, $id), $this->targetNames([$message], $names), $viewer, $tr);
+    }
+
+    /**
+     * Titel und Blöcke in der Sprache der Anfrage (ContentTranslations::current), dazu übersetzbare und übersetzte
+     * Felder; auf Deutsch (oder ohne weitere Sprache) die deutsche Fassung mit 0, 0.
+     *
+     * @param BoardMessage $m
+     * @param array<string, array<string, string>>|null $tr Fassungen (Sprache => Feld => Text), ohne Angabe gelesen
+     * @return array{0: string, 1: list<array<string, mixed>>, 2: int, 3: int}
+     */
+    private function localized(array $m, ?array $tr = null): array
+    {
+        $german = Blocks::decode($m['blocks'], $m['body']);
+        $current = $this->app->contentTranslations()->current();
+        if ($current === null) {
+            return [$m['title'], $german, 0, 0];
+        }
+        $tr ??= $this->app->contentTranslations()->of(self::KIND, $m['id']);
+        return ContentTranslations::blocksIn($m['title'], $german, $tr[$current] ?? []);
+    }
+
+    /**
+     * Ändern die gesendeten Fassungen etwas? Prüft sie dabei (wirft bei Fehlern), ohne Bilder zu übernehmen.
+     *
+     * @param array<string, array<string, mixed>> $given Sprache => title, blocks (ContentTranslations::input)
+     * @param list<array<string, mixed>> $german
+     */
+    private function translationsChange(int $id, array $given, array $german, User $actor): bool
+    {
+        $stored = $this->app->contentTranslations()->of(self::KIND, $id);
+        $blocks = $this->app->blocks();
+        foreach ($given as $locale => $fields) {
+            if (array_key_exists('title', $fields)) {
+                $title = Text::line(is_string($fields['title']) ? $fields['title'] : '', self::TRANSLATION_TITLE_MAX + 1);
+                if ($title !== ($stored[$locale]['title'] ?? '')) {
+                    return true;
+                }
+            }
+            if (array_key_exists('blocks', $fields)) {
+                $tr = $blocks->validateTranslation($german, $fields['blocks'], self::BODY_MAX);
+                if ($tr !== Blocks::decodeTranslation($stored[$locale]['blocks'] ?? null)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Fassungen speichern (Bilder darin gehören danach der Nachricht) und je Sprache mit vorher und nachher im Verlauf
+     * vermerken, wenn sich etwas ändert.
+     *
+     * @param array<string, array<string, mixed>> $given Sprache => title, blocks (ContentTranslations::input)
+     * @param list<array<string, mixed>> $german die deutschen Blöcke nach dieser Änderung
+     */
+    private function saveTranslations(int $id, array $given, array $german, User $actor, string $now): void
+    {
+        if ($given === []) {
+            return;
+        }
+        $content = $this->app->contentTranslations();
+        $stored = $content->of(self::KIND, $id);
+        foreach ($given as $locale => $fields) {
+            $save = $content->blocksInput($fields, $german, $actor, RichImageService::OWNER_BOARD, $id, self::TRANSLATION_TITLE_MAX, self::BODY_MAX);
+            $before = $stored[$locale] ?? [];
+            $after = array_filter(array_merge($before, $save), static fn (string $v): bool => $v !== '');
+            if ($after == $before) {
+                continue;
+            }
+            $content->save(self::KIND, $id, $locale, $save, $actor->id);
+            $this->repository()->addRevision($id, $actor->id, $now, self::REV_TRANSLATION, $before === [] ? null : $this->translationValue($locale, $german, $before), $after === [] ? null : $this->translationValue($locale, $german, $after));
+        }
+    }
+
+    /**
+     * Fassung für den Verlauf: Sprache, Titel (leer: keiner) und Inhalt wie contentValue (fehlende Texte deutsch).
+     *
+     * @param list<array<string, mixed>> $german
+     * @param array<string, string> $fields
+     */
+    private function translationValue(string $locale, array $german, array $fields): string
+    {
+        [, $blocks] = ContentTranslations::blocksIn('', $german, $fields);
+        $body = Blocks::publicBody($blocks);
+        return self::json(['locale' => $locale, 'title' => $fields['title'] ?? '', 'body' => self::contentValue(['body' => $body, 'blocks' => Blocks::encode($blocks, $body)])]);
     }
 
     /**
@@ -477,19 +621,21 @@ final class BoardService
      * @param array<string, mixed>|null $mail
      * @param list<array<string, mixed>> $files Anhänge
      * @param array{companies: array<int, string>} $targets Namen der Kompanien (targetNames)
+     * @param array<string, array<string, string>> $tr Fassungen der Nachricht (Sprache => Feld => Text)
      * @return BoardItem
      */
-    private function format(array $m, UserNames $names, bool $editor = false, ?array $edit = null, ?array $mail = null, array $files = [], array $targets = ['companies' => []], ?User $viewer = null): array
+    private function format(array $m, UserNames $names, bool $all = false, ?array $edit = null, ?array $mail = null, array $files = [], array $targets = ['companies' => []], ?User $viewer = null, array $tr = []): array
     {
-        $member = $editor || self::isRecipient($viewer);
-        $blocks = Blocks::decode($m['blocks'], $m['body']);
+        $member = $all || self::isRecipient($viewer);
+        [$title, $blocks, $total, $done] = $this->localized($m, $tr);
+        $untranslated = ContentTranslations::untranslated($total, $done);
         $out = [
             'kind' => self::KIND_MESSAGE,
             'id' => $m['id'],
-            'title' => $m['title'],
+            'title' => $title,
             // text: Textblöcke für alle (ältere App); blocks: alle Blöcke, die $viewer sieht
-            'text' => $this->app->richImages()->render($m['body']),
-            'blocks' => $this->app->blocks()->forViewer($blocks, $viewer, $member, $editor),
+            'text' => $this->app->richImages()->render($total > 0 ? Blocks::publicBody($blocks) : $m['body']),
+            'blocks' => $this->app->blocks()->forViewer($blocks, $viewer, $member, $all),
             'excerpt' => $this->app->blocks()->plain($blocks, $member, $viewer),
             'author_name' => $names->name($m['author_id']),
             'created_at' => Time::utcToIso($m['created_at']),
@@ -498,17 +644,29 @@ final class BoardService
             'audience' => $m['audience'],
             'attachments' => array_map(fn (array $f): array => $this->app->attachments()->format($f), $files),
         ];
-        // Für wen: Kompanien sehen alle, die die Nachricht lesen; ausgewählte Personen nur post_board (Empfänger sehen nur,
+        if ($untranslated !== null) {
+            $out['untranslated'] = $untranslated;
+        }
+        // Für wen: Kompanien sehen alle, die die Nachricht lesen; ausgewählte Personen nur view_board_history (Empfänger sehen nur,
         // dass sie für sie bestimmt ist).
-        if ($m['audience'] === self::AUDIENCE_COMPANY || ($editor && $m['audience'] === self::AUDIENCE_PERSON)) {
+        if ($m['audience'] === self::AUDIENCE_COMPANY || ($all && $m['audience'] === self::AUDIENCE_PERSON)) {
             $out['audience_names'] = $this->namesOf($m, $names, $targets);
         }
-        if ($editor && in_array($m['audience'], self::TARGETED, true)) {
+        if ($all && in_array($m['audience'], self::TARGETED, true)) {
             $out['audience_ids'] = $m['audience_ids'];
         }
-        if ($editor) {
+        if ($all) {
             $out['last_edit'] = $edit === null ? null : ['name' => $names->name($edit['user_id']), 'at' => Time::utcToIso($edit['created_at'])];
             $out['mail'] = $mail;
+            $content = $this->app->contentTranslations();
+            if ($content->locales() !== []) {
+                // Zum Bearbeiten: die deutsche Fassung (läuft die App in einer anderen Sprache) und alle Fassungen
+                if ($content->current() !== null) {
+                    $german = Blocks::decode($m['blocks'], $m['body']);
+                    $out['source'] = ['title' => $m['title'], 'blocks' => $this->app->blocks()->forViewer($german, $viewer, true, true)];
+                }
+                $out['translations'] = $content->blocksSourceOf($tr);
+            }
         }
         return $out;
     }
@@ -539,7 +697,7 @@ final class BoardService
             'audience' => $m['audience'],
             'attachments' => array_map(fn (array $f): array => $this->app->attachments()->format($f), $files),
         ];
-        // Nur für post_board (Verlauf)
+        // Nur für view_board_history (Verlauf)
         if (in_array($m['audience'], self::TARGETED, true)) {
             $out['audience_ids'] = $m['audience_ids'];
             $out['audience_names'] = $this->namesOf($m, $names, $targets);
@@ -693,7 +851,7 @@ final class BoardService
     {
         $title = is_string($title) ? Text::line($title) : '';
         if ($title === '') {
-            throw ApiError::invalid('Bitte einen Titel eingeben.');
+            throw ApiError::invalid(I18n::t('Bitte einen Titel eingeben.'));
         }
         return $title;
     }
@@ -716,7 +874,7 @@ final class BoardService
                 return $blocks;
             }
         }
-        throw ApiError::invalid('Bitte einen Text eingeben oder einen Block einfügen.');
+        throw ApiError::invalid(I18n::t('Bitte einen Text eingeben oder einen Block einfügen.'));
     }
 
     /**
@@ -741,11 +899,11 @@ final class BoardService
     private static function validBody(mixed $text): string
     {
         if (!is_string($text)) {
-            throw ApiError::invalid('Bitte einen Text eingeben.');
+            throw ApiError::invalid(I18n::t('Bitte einen Text eingeben.'));
         }
         $body = RichText::sanitize($text);
         if (RichText::isEmpty($body)) {
-            throw ApiError::invalid('Bitte einen Text eingeben.');
+            throw ApiError::invalid(I18n::t('Bitte einen Text eingeben.'));
         }
         return $body;
     }
@@ -753,7 +911,7 @@ final class BoardService
     private static function validAudience(mixed $audience): string
     {
         if (!is_string($audience) || !in_array($audience, self::AUDIENCES, true)) {
-            throw ApiError::invalid('Sichtbarkeit muss „members“ (intern), „public“ (öffentlich), „company“ (Kompanie) oder „person“ (einzeln) sein.');
+            throw ApiError::invalid(I18n::t('Sichtbarkeit muss „members“ (intern), „public“ (öffentlich), „company“ (Kompanie) oder „person“ (einzeln) sein.'));
         }
         return $audience;
     }
@@ -770,14 +928,13 @@ final class BoardService
             return [];
         }
         $company = $audience === self::AUDIENCE_COMPANY;
-        $what = $company ? 'mindestens eine Kompanie' : 'mindestens eine Person';
         if (!is_array($ids) || $ids === []) {
-            throw ApiError::invalid('Bitte ' . $what . ' auswählen.');
+            throw ApiError::invalid($company ? I18n::t('Bitte mindestens eine Kompanie auswählen.') : I18n::t('Bitte mindestens eine Person auswählen.'));
         }
         $out = [];
         foreach ($ids as $id) {
             if (!is_int($id) || $id <= 0) {
-                throw ApiError::invalid('audience_ids muss eine Liste von IDs sein.');
+                throw ApiError::invalid(I18n::t('audience_ids muss eine Liste von IDs sein.'));
             }
             $out[$id] = $id;
         }
@@ -785,17 +942,17 @@ final class BoardService
         sort($out);
         if ($company) {
             if (!$this->app->features()->enabled(CompanyService::FEATURE)) {
-                throw ApiError::invalid(sprintf('Der Bereich %s ist ausgeschaltet.', $this->app->config->sectionLabel('companies', 'Kompanien')));
+                throw ApiError::invalid(I18n::t('Der Bereich {section} ist ausgeschaltet.', ['section' => $this->app->config->sectionLabel('companies', I18n::t('Kompanien'))]));
             }
             $known = array_column($this->app->companies()->repository()->all(), 'id');
             if (array_diff($out, $known) !== []) {
-                throw ApiError::invalid('Diese Kompanie gibt es nicht.');
+                throw ApiError::invalid(I18n::t('Diese Kompanie gibt es nicht.'));
             }
         } else {
             $users = $this->app->users->findMany($out);
             foreach ($out as $id) {
                 if (!self::isRecipient($users[$id] ?? null)) {
-                    throw ApiError::invalid('Nachrichten am Brett lassen sich nur Personen freigeben, die das Brett lesen.');
+                    throw ApiError::invalid(I18n::t('Nachrichten am Brett lassen sich nur Personen freigeben, die das Brett lesen.'));
                 }
             }
         }
@@ -807,10 +964,10 @@ final class BoardService
     {
         $utc = $this->app->time()->parseToUtc($value);
         if ($utc === null) {
-            throw ApiError::invalid('Ungültiges Enddatum (Datum und Uhrzeit erwartet).');
+            throw ApiError::invalid(I18n::t('Ungültiges Enddatum (Datum und Uhrzeit erwartet).'));
         }
         if ($utc <= $this->app->time()->nowUtc()) {
-            throw ApiError::invalid('Das Enddatum muss in der Zukunft liegen.');
+            throw ApiError::invalid(I18n::t('Das Enddatum muss in der Zukunft liegen.'));
         }
         return $utc;
     }

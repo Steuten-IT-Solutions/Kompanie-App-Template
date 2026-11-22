@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\Settings;
 
 /**
@@ -18,6 +19,10 @@ use KompanieApp\Core\Port\Settings;
  * Gespeichert wird {items, hidden}: items sind Kennungen von Bereichen (z. B. "termine") oder Untermenüs
  * {label, icon, items}; hidden sind Bereiche, die nicht in der Navigation stehen. Bereiche, die in keiner der beiden
  * Listen vorkommen (z. B. mit einer neuen Version dazugekommen), hängt die App hinten an die Tab-Leiste an.
+ *
+ * Eine zweite Leiste für Gäste (GUEST, gleiche Form): Sie gilt ohne Anmeldung und für Angemeldete mit der Grundrolle Gast
+ * (z. B. ehemalige Mitglieder), auch in der Vorschau. Ohne sie (null) sehen Gäste dieselbe Leiste wie die Angemeldeten.
+ * Beide Leisten sind unabhängig: Jede kann eigen sein oder (bei den Angemeldeten) die Standardnavigation.
  *
  * Dazu (Issue #362), je in einer eigenen Einstellung, damit sie auch in der Standardnavigation gelten:
  * - eigene Namen und Symbole je Bereich, eigene Seite und „Intern“ (NAMES): Der Name gilt überall, wo die App den Bereich
@@ -33,6 +38,8 @@ use KompanieApp\Core\Port\Settings;
 final class NavigationService
 {
     public const SETTING = 'navigation';
+    /** Eigene Leiste für Gäste; fehlt = dieselbe wie für Angemeldete. */
+    public const GUEST = 'navigation_guest';
     public const NAMES = 'navigation_names';
     public const START = 'navigation_start';
     public const LABELS = 'navigation_labels';
@@ -43,11 +50,11 @@ final class NavigationService
 
     /** Kacheln der Startseite der Verwaltung (wie adminTabs() in der App), „einrichtungen“ ist der Sammelknopf. */
     public const ADMIN_START = [
-        'mitglieder', 'ehemalige', 'anfragen', 'meldungen', 'aenderungen', 'punkte', 'strafe', 'befoerderungen', 'anwesenheit', 'brett', 'umfragen',
+        'mitglieder', 'ehemalige', 'passive', 'anfragen', 'meldungen', 'aenderungen', 'bericht', 'punkte', 'strafe', 'befoerderungen', 'aufnahmen', 'anwesenheit', 'brett', 'umfragen',
         'inventar', 'listen', 'mail', 'einrichtungen', 'einstellungen',
     ];
     /** Kacheln unter „Einrichtungen“ in der Verwaltung. */
-    public const ADMIN_SETUP = ['katalog', 'dienstgrade', 'titel', 'aemter', 'kompanien', 'sponsoren', 'seiten'];
+    public const ADMIN_SETUP = ['katalog', 'dienstgrade', 'titel', 'aemter', 'kompanien', 'sponsoren', 'seiten', 'webseite'];
 
     /** Abschnitt (KompanieConfig::sectionLabel) je Bereich der Navigation; „mitglieder“ wählt sectionOverrides. */
     private const SECTIONS = [
@@ -77,7 +84,7 @@ final class NavigationService
     public const MAX_MENU_ITEMS = 12;
     public const LABEL_MAX = 24;
 
-    public function __construct(private readonly Settings $settings)
+    public function __construct(private readonly Settings $settings, private readonly ?TranslationService $translations = null)
     {
     }
 
@@ -103,7 +110,15 @@ final class NavigationService
         if (in_array($id, $start, true)) {
             $this->saveStart(array_filter($start, static fn (string $t): bool => $t !== $id));
         }
-        $nav = $this->get();
+        foreach ([self::SETTING, self::GUEST] as $key) {
+            $this->removeFrom($key, $id);
+        }
+    }
+
+    /** Eine eigene Seite aus einer der beiden gespeicherten Navigationen nehmen. */
+    private function removeFrom(string $key, string $id): void
+    {
+        $nav = $this->read($key);
         if ($nav === null) {
             return;
         }
@@ -122,7 +137,7 @@ final class NavigationService
         }
         $hidden = array_values(array_filter($nav['hidden'], static fn (string $t): bool => $t !== $id));
         if ($items !== $nav['items'] || $hidden !== $nav['hidden']) {
-            $this->settings->set(self::SETTING, ['items' => $items, 'hidden' => $hidden]);
+            $this->settings->set($key, ['items' => $items, 'hidden' => $hidden]);
         }
     }
 
@@ -133,7 +148,25 @@ final class NavigationService
      */
     public function get(): ?array
     {
-        $raw = $this->settings->get(self::SETTING);
+        return $this->read(self::SETTING);
+    }
+
+    /**
+     * Gespeicherte Leiste für Gäste; null = dieselbe wie für Angemeldete.
+     *
+     * @return array{items: list<string|array{label: string, icon: string, items: list<string>}>, hidden: list<string>}|null
+     */
+    public function guest(): ?array
+    {
+        return $this->read(self::GUEST);
+    }
+
+    /**
+     * @return array{items: list<string|array{label: string, icon: string, items: list<string>}>, hidden: list<string>}|null
+     */
+    private function read(string $key): ?array
+    {
+        $raw = $this->settings->get($key);
         if (!is_array($raw) || !is_array($raw['items'] ?? null)) {
             return null;
         }
@@ -157,12 +190,13 @@ final class NavigationService
     }
 
     /**
-     * @return array{navigation: array<string, mixed>|null, names: array<string, array{label?: string, icon?: string}>|\stdClass, start: array{guest?: string, member?: string}|\stdClass, show_labels: bool, intern_order: list<string>, admin_order: array{start?: list<string>, setup?: list<string>}|\stdClass, targets: list<string>, icons: list<string>, max_menu_items: int, label_max: int}
+     * @return array{navigation: array<string, mixed>|null, guest_navigation: array<string, mixed>|null, names: array<string, array{label?: string, icon?: string}>|\stdClass, start: array{guest?: string, member?: string}|\stdClass, show_labels: bool, intern_order: list<string>, admin_order: array{start?: list<string>, setup?: list<string>}|\stdClass, targets: list<string>, icons: list<string>, max_menu_items: int, label_max: int}
      */
     public function describe(): array
     {
         return [
             'navigation' => $this->get(),
+            'guest_navigation' => $this->guest(),
             // Leer als Objekt ({}), wie in api/openapi.yaml
             'names' => $this->names() === [] ? new \stdClass() : $this->names(),
             'start' => $this->start() === [] ? new \stdClass() : $this->start(),
@@ -207,19 +241,27 @@ final class NavigationService
      * Eigene Namen als Abschnitte für KompanieConfig::sectionLabel (z. B. "gallery" => "Fotos"). „mitglieder“ heißt wie
      * der Abschnitt, den der Tab gerade zeigt: Mitgliederliste, oder nur die Ämter, wenn es keine Liste gibt (Issue #112).
      *
+     * In einer weiteren Sprache ($locale) gilt der Name, den der Admin für sie eingetragen hat (TranslationService, Art
+     * „nav“), sonst der deutsche.
+     *
      * @return array<string, string>
      */
-    public function sectionOverrides(bool $directory, bool $offices): array
+    public function sectionOverrides(bool $directory, bool $offices, ?string $locale = null): array
     {
+        $locale ??= I18n::base();
         $out = [];
-        foreach ($this->names() as $key => $entry) {
-            if (!isset($entry['label'])) {
+        $names = $this->names();
+        // Auch Bereiche ohne eigenen deutschen Namen, die in dieser Sprache einen haben
+        $foreign = $locale !== I18n::base() ? array_keys($this->translations?->all()[$locale]['nav'] ?? []) : [];
+        foreach (array_unique(array_merge(array_keys($names), $foreign)) as $key) {
+            $label = $this->translations?->text('nav', (string) $key, 'label', $locale) ?? $names[$key]['label'] ?? null;
+            if ($label === null) {
                 continue;
             }
             if ($key === 'mitglieder') {
-                $out[$directory || !$offices ? 'directory' : 'offices'] = $entry['label'];
+                $out[$directory || !$offices ? 'directory' : 'offices'] = $label;
             } elseif (isset(self::SECTIONS[$key])) {
-                $out[self::SECTIONS[$key]] = $entry['label'];
+                $out[self::SECTIONS[$key]] = $label;
             }
         }
         return $out;
@@ -288,21 +330,29 @@ final class NavigationService
     }
 
     /**
-     * Speichert Einstellungen → Navigation (Issue #362): die Navigation (null = Standard) und, falls angegeben, eigene
-     * Namen und Symbole, Startseiten und die Namen in der Leiste. Startseiten prüft das gegen die neue Navigation.
+     * Speichert Einstellungen → Navigation (Issue #362): die Navigation (null = Standard) und, falls angegeben, die Leiste
+     * für Gäste (null = wie für Angemeldete), eigene Namen und Symbole, Startseiten und die Namen in der Leiste.
+     * Startseiten prüft das gegen die neuen Leisten. Ist etwas ungültig, bleibt alles, wie es war.
      *
-     * @param array<mixed> $body navigation (Pflicht), names?, start?, show_labels?, intern_order?, admin_order?
+     * @param array<mixed> $body navigation (Pflicht), guest_navigation?, names?, start?, show_labels?, intern_order?, admin_order?
      * @return array<string, mixed> wie describe()
      */
     public function save(array $body): array
     {
         if (!array_key_exists('navigation', $body)) {
-            throw ApiError::invalid('Bitte die Navigation angeben (null für die Standardnavigation).');
+            throw ApiError::invalid(I18n::t('Bitte die Navigation angeben (null für die Standardnavigation).'));
         }
         $names = array_key_exists('names', $body) ? $this->validNames($body['names']) : null;
         $internOrder = array_key_exists('intern_order', $body) ? self::validInternOrder($body['intern_order']) : null;
         $adminOrder = array_key_exists('admin_order', $body) ? self::validAdminOrder($body['admin_order']) : null;
-        $this->set($body['navigation']);
+        $navigation = self::validNavigation($body['navigation']);
+        $guest = array_key_exists('guest_navigation', $body) ? self::validNavigation($body['guest_navigation']) : $this->guest();
+        $start = array_key_exists('start', $body) ? self::validStart($body['start'], $navigation, $guest) : null;
+        if (array_key_exists('show_labels', $body) && !is_bool($body['show_labels'])) {
+            throw ApiError::invalid(I18n::t('show_labels muss true oder false sein.'));
+        }
+        $this->store(self::SETTING, $navigation);
+        $this->store(self::GUEST, $guest);
         if ($internOrder !== null) {
             $this->saveInternOrder($internOrder);
         }
@@ -312,13 +362,10 @@ final class NavigationService
         if ($names !== null) {
             $this->saveNames($names);
         }
-        if (array_key_exists('start', $body)) {
-            $this->saveStart($this->validStart($body['start']));
+        if ($start !== null) {
+            $this->saveStart($start);
         }
         if (array_key_exists('show_labels', $body)) {
-            if (!is_bool($body['show_labels'])) {
-                throw ApiError::invalid('show_labels muss true oder false sein.');
-            }
             $body['show_labels'] ? $this->settings->delete(self::LABELS) : $this->settings->set(self::LABELS, self::LABELS_OFF);
         }
         return $this->describe();
@@ -331,15 +378,15 @@ final class NavigationService
             return [];
         }
         if (!is_array($order) || !array_is_list($order)) {
-            throw ApiError::invalid('Die Reihenfolge von „Intern“ muss eine Liste sein.');
+            throw ApiError::invalid(I18n::t('Die Reihenfolge von „Intern“ muss eine Liste sein.'));
         }
         foreach ($order as $t) {
             if (!self::isTarget($t)) {
-                throw ApiError::invalid('Unbekannter Bereich in der Reihenfolge von „Intern“.');
+                throw ApiError::invalid(I18n::t('Unbekannter Bereich in der Reihenfolge von „Intern“.'));
             }
         }
         if (count(array_unique($order)) !== count($order)) {
-            throw ApiError::invalid('Jeder Bereich darf in der Reihenfolge von „Intern“ nur einmal stehen.');
+            throw ApiError::invalid(I18n::t('Jeder Bereich darf in der Reihenfolge von „Intern“ nur einmal stehen.'));
         }
         return $order;
     }
@@ -351,28 +398,28 @@ final class NavigationService
             return [];
         }
         if (!is_array($order) || ($order !== [] && array_is_list($order))) {
-            throw ApiError::invalid('Die Reihenfolge der Verwaltung muss ein Objekt sein (start, setup).');
+            throw ApiError::invalid(I18n::t('Die Reihenfolge der Verwaltung muss ein Objekt sein (start, setup).'));
         }
         $out = [];
         foreach ($order as $group => $list) {
             $known = match ($group) {
                 'start' => self::ADMIN_START,
                 'setup' => self::ADMIN_SETUP,
-                default => throw ApiError::invalid('Die Reihenfolge der Verwaltung kennt nur start und setup.'),
+                default => throw ApiError::invalid(I18n::t('Die Reihenfolge der Verwaltung kennt nur start und setup.')),
             };
             if ($list === null || $list === []) {
                 continue;
             }
             if (!is_array($list) || !array_is_list($list)) {
-                throw ApiError::invalid('Die Reihenfolge einer Gruppe der Verwaltung muss eine Liste sein.');
+                throw ApiError::invalid(I18n::t('Die Reihenfolge einer Gruppe der Verwaltung muss eine Liste sein.'));
             }
             foreach ($list as $id) {
                 if (!is_string($id) || !in_array($id, $known, true)) {
-                    throw ApiError::invalid('Unbekannte Kachel in der Reihenfolge der Verwaltung.');
+                    throw ApiError::invalid(I18n::t('Unbekannte Kachel in der Reihenfolge der Verwaltung.'));
                 }
             }
             if (count(array_unique($list)) !== count($list)) {
-                throw ApiError::invalid('Jede Kachel darf in der Reihenfolge der Verwaltung nur einmal stehen.');
+                throw ApiError::invalid(I18n::t('Jede Kachel darf in der Reihenfolge der Verwaltung nur einmal stehen.'));
             }
             $out[$group] = $list;
         }
@@ -392,20 +439,20 @@ final class NavigationService
             return [];
         }
         if (!is_array($names) || ($names !== [] && array_is_list($names))) {
-            throw ApiError::invalid('Die Namen der Bereiche müssen ein Objekt sein (Bereich → Name und Symbol).');
+            throw ApiError::invalid(I18n::t('Die Namen der Bereiche müssen ein Objekt sein (Bereich → Name und Symbol).'));
         }
         $out = [];
         foreach ($names as $key => $entry) {
             if (!is_string($key) || !self::isNamed($key)) {
-                throw ApiError::invalid('Unbekannter Bereich bei den Namen.');
+                throw ApiError::invalid(I18n::t('Unbekannter Bereich bei den Namen.'));
             }
             if (!is_array($entry)) {
-                throw ApiError::invalid('Name und Symbol eines Bereichs müssen ein Objekt sein.');
+                throw ApiError::invalid(I18n::t('Name und Symbol eines Bereichs müssen ein Objekt sein.'));
             }
             $one = [];
             $label = Text::line(is_string($entry['label'] ?? null) ? $entry['label'] : '');
             if (mb_strlen($label) > self::LABEL_MAX) {
-                throw ApiError::invalid(sprintf('Ein Name darf höchstens %d Zeichen lang sein („%s“).', self::LABEL_MAX, $label));
+                throw ApiError::invalid(I18n::t('Ein Name darf höchstens {max} Zeichen lang sein („{name}“).', ['max' => self::LABEL_MAX, 'name' => $label]));
             }
             if ($label !== '') {
                 $one['label'] = $label;
@@ -413,7 +460,7 @@ final class NavigationService
             $icon = $entry['icon'] ?? null;
             if ($icon !== null && $icon !== '') {
                 if (!is_string($icon) || !in_array($icon, self::ICONS, true)) {
-                    throw ApiError::invalid('Unbekanntes Symbol.');
+                    throw ApiError::invalid(I18n::t('Unbekanntes Symbol.'));
                 }
                 $one['icon'] = $icon;
             }
@@ -425,37 +472,39 @@ final class NavigationService
     }
 
     /**
-     * Startseiten müssen in der (eben gespeicherten) Navigation stehen: nicht ausgeblendet, ein vorhandenes Untermenü,
-     * „Intern“ nur in der Standardnavigation, „Meins“ nur für Angemeldete.
+     * Startseiten müssen in der Leiste ihrer Gruppe stehen (Gäste: ihre eigene, sonst die der Angemeldeten): nicht
+     * ausgeblendet, ein vorhandenes Untermenü, „Intern“ nur in der Standardnavigation, „Meins“ nur für Angemeldete.
      *
+     * @param array<string, mixed>|null $navigation Leiste der Angemeldeten (null = Standard)
+     * @param array<string, mixed>|null $guestNav Leiste der Gäste (null = wie Angemeldete)
      * @return array{guest?: string, member?: string}
      */
-    private function validStart(mixed $start): array
+    private static function validStart(mixed $start, ?array $navigation, ?array $guestNav): array
     {
         if ($start === null) {
             return [];
         }
         if (!is_array($start)) {
-            throw ApiError::invalid('Die Startseite muss ein Objekt sein (guest, member).');
+            throw ApiError::invalid(I18n::t('Die Startseite muss ein Objekt sein (guest, member).'));
         }
-        $nav = $this->get();
-        $menus = $nav === null ? 0 : count(array_filter($nav['items'], 'is_array'));
         $out = [];
         foreach (['guest', 'member'] as $who) {
             $t = $start[$who] ?? null;
             if ($t === null || $t === '') {
                 continue;
             }
+            $nav = $who === 'guest' ? ($guestNav ?? $navigation) : $navigation;
+            $menus = $nav === null ? 0 : count(array_filter($nav['items'], 'is_array'));
             $ok = is_string($t) && self::isStart($t, $who === 'member');
             if ($ok && $t === self::INTERN) {
                 $ok = $nav === null;
             } elseif ($ok && str_starts_with($t, 'menue/')) {
                 $ok = (int) substr($t, 6) <= $menus;
             } elseif ($ok && $nav !== null) {
-                $ok = !in_array($t, $nav['hidden'], true);
+                $ok = !in_array($t, is_array($nav['hidden'] ?? null) ? $nav['hidden'] : [], true);
             }
             if (!$ok) {
-                throw ApiError::invalid('Als Startseite geht nur ein Punkt, der in der Navigation steht.');
+                throw ApiError::invalid(I18n::t('Als Startseite geht nur ein Punkt, der in der Navigation steht.'));
             }
             $out[$who] = $t;
         }
@@ -481,20 +530,36 @@ final class NavigationService
      */
     public function set(mixed $navigation): array
     {
+        $this->store(self::SETTING, self::validNavigation($navigation));
+        return $this->describe();
+    }
+
+    /** @param array<string, mixed>|null $navigation geprüft (validNavigation); null löscht die Einstellung */
+    private function store(string $key, ?array $navigation): void
+    {
+        $navigation === null ? $this->settings->delete($key) : $this->settings->set($key, $navigation);
+    }
+
+    /**
+     * Prüft eine Navigation (für Angemeldete oder Gäste); null bleibt null.
+     *
+     * @return array{items: list<string|array{label: string, icon: string, items: list<string>}>, hidden: list<string>}|null
+     */
+    private static function validNavigation(mixed $navigation): ?array
+    {
         if ($navigation === null) {
-            $this->settings->delete(self::SETTING);
-            return $this->describe();
+            return null;
         }
         if (!is_array($navigation) || !is_array($navigation['items'] ?? null) || !array_is_list($navigation['items'])) {
-            throw ApiError::invalid('Die Navigation braucht eine Liste der Hauptpunkte.');
+            throw ApiError::invalid(I18n::t('Die Navigation braucht eine Liste der Hauptpunkte.'));
         }
         $seen = [];
         $target = function (mixed $id) use (&$seen): string {
             if (!self::isTarget($id)) {
-                throw ApiError::invalid('Unbekannter Bereich in der Navigation.');
+                throw ApiError::invalid(I18n::t('Unbekannter Bereich in der Navigation.'));
             }
             if (isset($seen[$id])) {
-                throw ApiError::invalid('Jeder Bereich darf nur einmal in der Navigation stehen.');
+                throw ApiError::invalid(I18n::t('Jeder Bereich darf nur einmal in der Navigation stehen.'));
             }
             $seen[$id] = true;
             return $id;
@@ -507,30 +572,29 @@ final class NavigationService
             }
             $label = Text::line($entry['label'] ?? '');
             if ($label === '') {
-                throw ApiError::invalid('Jedes Untermenü braucht einen Namen.');
+                throw ApiError::invalid(I18n::t('Jedes Untermenü braucht einen Namen.'));
             }
             if (mb_strlen($label) > self::LABEL_MAX) {
-                throw ApiError::invalid(sprintf('Der Name eines Untermenüs darf höchstens %d Zeichen lang sein.', self::LABEL_MAX));
+                throw ApiError::invalid(I18n::t('Der Name eines Untermenüs darf höchstens {max} Zeichen lang sein.', ['max' => self::LABEL_MAX]));
             }
             $icon = $entry['icon'] ?? self::ICONS[0];
             if (!is_string($icon) || !in_array($icon, self::ICONS, true)) {
-                throw ApiError::invalid('Unbekanntes Symbol für ein Untermenü.');
+                throw ApiError::invalid(I18n::t('Unbekanntes Symbol für ein Untermenü.'));
             }
             $sub = $entry['items'] ?? null;
             if (!is_array($sub) || !array_is_list($sub) || $sub === []) {
-                throw ApiError::invalid(sprintf('Das Untermenü „%s“ braucht mindestens einen Bereich.', $label));
+                throw ApiError::invalid(I18n::t('Das Untermenü „{name}“ braucht mindestens einen Bereich.', ['name' => $label]));
             }
             if (count($sub) > self::MAX_MENU_ITEMS) {
-                throw ApiError::invalid(sprintf('Ein Untermenü hat höchstens %d Bereiche.', self::MAX_MENU_ITEMS));
+                throw ApiError::invalid(I18n::t('Ein Untermenü hat höchstens {max} Bereiche.', ['max' => self::MAX_MENU_ITEMS]));
             }
             // Eine Ebene: In einem Untermenü stehen nur Bereiche.
             $items[] = ['label' => $label, 'icon' => $icon, 'items' => array_map($target, $sub)];
         }
         $hidden = $navigation['hidden'] ?? [];
         if (!is_array($hidden) || !array_is_list($hidden)) {
-            throw ApiError::invalid('Die ausgeblendeten Bereiche müssen eine Liste sein.');
+            throw ApiError::invalid(I18n::t('Die ausgeblendeten Bereiche müssen eine Liste sein.'));
         }
-        $this->settings->set(self::SETTING, ['items' => $items, 'hidden' => array_map($target, $hidden)]);
-        return $this->describe();
+        return ['items' => $items, 'hidden' => array_map($target, $hidden)];
     }
 }

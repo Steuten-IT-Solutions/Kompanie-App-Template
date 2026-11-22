@@ -43,10 +43,10 @@ final class CustomRolesTest extends TestCase
     {
         // Feste Rollen und die Standardrollen der eingeschalteten Bereiche (TestApp schaltet alle ein).
         $roles = $this->call('GET', '/admin/roles')->data;
-        $this->assertSame([Roles::GUEST, Roles::MEMBER, 'events', 'gallery', 'points', 'penalties', 'ranks', 'titles', 'attendance', 'documents', 'board', 'polls', 'inventory', 'offices', 'lists', 'mail', 'companies', 'sponsors', 'pages', Roles::ADMIN], array_column($roles, 'key'));
-        $this->assertSame(['Gast', 'Kamerad', 'Termine verwalten', 'Galerie verwalten', 'Punkte verwalten', 'Strafen verwalten', 'Dienstgrade verwalten', 'Titel verwalten', 'Anwesenheit verwalten', 'Dokumente verwalten', 'Schwarzes Brett verwalten', 'Umfragen verwalten', 'Inventar verwalten', 'Ämter verwalten', 'Listen verwalten', 'E-Mails verwalten', 'Kompanien verwalten', 'Sponsoren verwalten', 'Seiten verwalten', 'Admin'], array_column($roles, 'label'));
-        $this->assertSame(1, $roles[19]['users'], 'ein Admin');
-        $this->assertTrue($roles[0]['system'] && $roles[1]['system'] && $roles[19]['system']);
+        $this->assertSame([Roles::GUEST, Roles::MEMBER, 'events', 'gallery', 'points', 'penalties', 'ranks', 'titles', 'attendance', 'documents', 'board', 'polls', 'inventory', 'offices', 'lists', 'mail', 'companies', 'sponsors', 'pages', 'passive', Roles::ADMIN], array_column($roles, 'key'));
+        $this->assertSame(['Gast', 'Kamerad', 'Termine verwalten', 'Galerie verwalten', 'Punkte verwalten', 'Strafen verwalten', 'Dienstgrade verwalten', 'Titel verwalten', 'Anwesenheit verwalten', 'Dokumente verwalten', 'Schwarzes Brett verwalten', 'Umfragen verwalten', 'Inventar verwalten', 'Ämter verwalten', 'Listen verwalten', 'E-Mails verwalten', 'Kompanien verwalten', 'Sponsoren verwalten', 'Seiten verwalten', 'Passive verwalten', 'Admin'], array_column($roles, 'label'));
+        $this->assertSame(1, $roles[20]['users'], 'ein Admin');
+        $this->assertTrue($roles[0]['system'] && $roles[1]['system'] && $roles[20]['system']);
         $this->assertFalse($roles[1]['deletable'], 'Mitglied ist die Rolle neuer Konten');
         $this->assertSame(TestApp::caps(['member']), $roles[1]['capabilities'], 'Mitglied sieht anfangs, was der frühere Mitgliederbereich einschloss');
         $this->assertTrue($roles[3]['deletable']);
@@ -59,11 +59,11 @@ final class CustomRolesTest extends TestCase
 
     public function testCreateAssignAndRightsApplyImmediately(): void
     {
-        $res = $this->call('POST', '/admin/roles', ['label' => 'Kassenwart', 'capabilities' => TestApp::caps(['member', 'manage_points', 'manage_penalties'])]);
+        $res = $this->call('POST', '/admin/roles', ['label' => 'Kassenwart', 'capabilities' => TestApp::caps(['member', 'view_points', 'manage_points', 'view_penalties', 'manage_penalties'])]);
         $this->assertSame(201, $res->status);
         $role = $this->byLabel()['Kassenwart'];
         $this->assertSame('r1', $role['key']);
-        $this->assertSame(TestApp::caps(['member', 'manage_points', 'manage_penalties']), $role['capabilities']);
+        $this->assertSame(TestApp::caps(['member', 'view_points', 'manage_points', 'view_penalties', 'manage_penalties']), $role['capabilities']);
 
         $kasse = $this->users->add('kasse', Roles::MEMBER);
         $this->assertSame(200, $this->call('PATCH', "/members/$kasse/role", ['level' => 'r1'])->status);
@@ -84,7 +84,7 @@ final class CustomRolesTest extends TestCase
         $this->assertSame(400, $this->call('POST', '/admin/roles', ['label' => ''])->status, 'ohne Namen');
         $this->assertSame(400, $this->call('POST', '/admin/roles', ['label' => 'kamerad'])->status, 'Name schon vergeben (Groß- und Kleinschreibung egal)');
         $this->assertSame(400, $this->call('POST', '/admin/roles', ['label' => 'X', 'capabilities' => ['manage_settings']])->status, 'Einstellungen nur für Admins');
-        $this->assertSame(400, $this->call('POST', '/admin/roles', ['label' => 'X', 'capabilities' => ['manage_points']])->status, 'Verwalten ohne Mitgliederbereich');
+        $this->assertSame(400, $this->call('POST', '/admin/roles', ['label' => 'X', 'capabilities' => ['view_points', 'manage_points']])->status, 'Verwalten ohne Mitgliederbereich');
         $this->assertSame(400, $this->call('POST', '/admin/roles', ['label' => 'X', 'capabilities' => ['member', 'manage']])->status, 'früheres Recht manage nicht mehr vergebbar');
         $this->assertSame(400, $this->call('POST', '/admin/roles', ['label' => 'X', 'points_factor' => 'halb'])->status);
         $this->assertSame(400, $this->call('POST', '/admin/roles', ['label' => 'X', 'points_factor' => 11])->status);

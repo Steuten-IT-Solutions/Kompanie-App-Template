@@ -3,6 +3,8 @@
  * Ohne Abhängigkeit von api.ts, damit die Tests es ohne Browser laden.
  */
 
+import { t } from './i18n';
+
 const KEY = 'kompanie-after-login';
 
 /**
@@ -12,6 +14,18 @@ const KEY = 'kompanie-after-login';
 export function shareUrl(appUrl: string, tab: string, requested: string | undefined, path: string[]): string {
   const parts = tab === requested ? [tab, ...path.slice(1)] : [tab];
   return appUrl.split('#')[0] + '#/' + parts.join('/');
+}
+
+/** Adresse eines Bildes oder Videos der Galerie: öffnet das Album mit diesem in der Großansicht (#/galerie/<Album>/bild/<Bild>). */
+export function photoUrl(appUrl: string, albumId: number, photoId: number): string {
+  return appUrl.split('#')[0] + `#/galerie/${albumId}/bild/${photoId}`;
+}
+
+/** Bild aus der Adresse galerie/<Album>/bild/<Bild> (path wie in router.ts); sonst undefined. */
+export function photoFromPath(path: string[]): number | undefined {
+  return path[0] === 'galerie' && /^\d+$/.test(path[1] ?? '') && path[2] === 'bild' && /^\d+$/.test(path[3] ?? '')
+    ? Number(path[3])
+    : undefined;
 }
 
 /** Teilen-Menü des Geräts; sonst in die Zwischenablage; sonst zum Abschreiben anzeigen. */
@@ -26,11 +40,11 @@ export async function shareLink(url: string, title: string, onToast: (msg: strin
   }
   try {
     await navigator.clipboard.writeText(url);
-    onToast('Link kopiert');
+    onToast(t('Link kopiert'));
   } catch {
     // Erst hier laden: share.ts bleibt ohne Browser-Abhängigkeiten testbar
     const { promptAsk } = await import('./ask');
-    await promptAsk('Zum Kopieren markieren:', url, { title: 'Link kopieren', okLabel: 'Fertig' });
+    await promptAsk(t('Zum Kopieren markieren:'), url, { title: t('Link kopieren'), okLabel: t('Fertig') });
   }
 }
 

@@ -22,13 +22,19 @@ Tippe unten auf **{bereich.events}** und dann oben auf **Internen Kalender verwa
 2. Trage **Titel** und **Datum** ein. Beides ist Pflicht.
 3. Dauert der Termin mehrere Tage, trage unter **Bis (optional)** den letzten Tag ein.
 4. Trage bei Bedarf **Beginn (optional)** und **Ende (optional)** ein. Ohne Uhrzeit gilt der Termin als ganztägig. Ein Ende braucht auch einen Beginn.
-5. Ergänze **Ort**, **Beschreibung** und einen **Link (optional)**, wenn du magst. Der Link muss mit http:// oder https:// beginnen.
-6. Tippe auf **Speichern**. Es erscheint „Termin angelegt“.
+5. Willst du Zu- und Absagen früher beenden als zum Beginn, trage einen **Anmeldeschluss (optional)** ein. Das Feld gibt es nur, wenn Zu- und Absagen eingeschaltet sind. Zu- und absagen geht dann bis zum Ende dieses Tages. Er darf nicht nach dem Datum des Termins liegen.
+6. Ergänze **Ort**, **Beschreibung** und einen **Link (optional)**, wenn du magst. Der Link muss mit http:// oder https:// beginnen.
+7. Tippe auf **Speichern**. Es erscheint „Termin angelegt“.
 
 ### Einen Termin ändern
 1. Tippe beim Termin auf **Bearbeiten**. Oben öffnet sich das Formular **Termin bearbeiten**.
 2. Ändere die Angaben.
 3. Tippe auf **Speichern**. Mit **Abbrechen** bleibt alles, wie es war.
+
+### Einen Termin auch auf Englisch eintragen
+Hat der Admin unter **Einstellungen → Sprachen** Englisch eingeschaltet, trägt ein Admin Titel, Ort und Beschreibung auf Englisch dort im Abschnitt **Übersetzungen** in der Gruppe **Kommende Termine im internen Kalender** ein. Im Formular steht dazu nur ein Hinweis mit Link dorthin. Die Gruppe zeigt Termine ab heute; vergangene fallen weg.
+
+Wer die App auf Englisch nutzt, sieht den Termin in dieser Fassung, auch in der Benachrichtigung. Was leer bleibt, erscheint auf Deutsch, mit dem Hinweis *Teilweise nur auf Deutsch verfügbar* beim aufgeklappten Termin. Datum, Uhrzeit und Link gelten für alle Sprachen. Hier im Formular bearbeitest du immer die deutsche Fassung, auch wenn du die App selbst auf Englisch benutzt.
 
 ### Einen Termin löschen
 1. Tippe beim Termin auf **Löschen**.
@@ -36,9 +42,11 @@ Tippe unten auf **{bereich.events}** und dann oben auf **Internen Kalender verwa
 
 ## Gut zu wissen
 - Jeder Termin ist ein einzelner Termin. Termine, die sich wiederholen (z. B. jeden ersten Dienstag), legst du einzeln an.
-- Vergangene Termine verschwinden von selbst aus der Liste. Für Anwesenheitslisten stehen die Termine der letzten Wochen weiter zur Auswahl.
+- Vergangene Termine verschwinden von selbst aus der Liste. Für Anwesenheitslisten stehen die Termine der letzten Wochen weiter zur Auswahl, ebenso alle kommenden.
 - Wer Benachrichtigungen für {bereich.events} eingeschaltet hat und den internen Kalender sieht, bekommt bei einem neuen Termin „{bereich.events}: neu“. Änderst du später Datum, Uhrzeit oder Ort, kommt „{bereich.events}: geändert“. Am Vortag erinnert die App an die Termine von morgen, wenn das eingeschaltet ist.
+- Bei jedem Termin können alle mit dem Recht dazu zu- oder absagen. Wer wie geantwortet hat, siehst du unter **{bereich.events}** im aufgeklappten Termin mit **Rückmeldungen ansehen**, siehe [Bei Terminen zu- und absagen](seite:zu-und-absagen).
 - Wählt ein Admin später eine andere Quelle, bleiben die Termine hier gespeichert. Sie erscheinen wieder, sobald die Quelle wieder **In der App pflegen** ist.
 
 ## Siehe auch
 - [{bereich.events} mit Kalender](seite:kalender)
+- [Bei Terminen zu- und absagen](seite:zu-und-absagen)

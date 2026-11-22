@@ -707,6 +707,9 @@ try {
     $c->ok($set['news'] === ['source' => 'rss', 'url' => 'https://example.org/feed', 'sources' => ['none', 'wordpress', 'rss', 'app']], 'Quelle der Neuigkeiten einstellbar');
     $c->ok(json_decode((string) $kernel->db()->scalar("SELECT value FROM {settings} WHERE name = 'calendar_ics_url'")) === 'https://calendar.example.org/geheim/basic.ics', 'webcal:// wird als https:// gespeichert');
     $c->ok($d->request('PATCH', '/admin/settings', ['news_source' => 'none', 'calendar_ics_url' => ''])[1]['calendar']['source'] === 'none', 'Einstellungen lassen sich wieder leeren');
+    [$s, $set] = $d->request('PATCH', '/admin/settings', ['calendar_responses' => '1', 'calendar_response_reminder' => '0']);
+    $c->ok($s === 200 && $set['calendar']['response_reminder'] === false && json_decode((string) $kernel->db()->scalar("SELECT value FROM {settings} WHERE name = 'event_response_reminder'")) === false, 'Erinnerung an Zu- und Absagen bleibt ausgeschaltet (gespeichert)');
+    $c->ok($d->request('PATCH', '/admin/settings', ['calendar_responses' => '0', 'calendar_response_reminder' => '1'])[0] === 200, 'Erinnerung wieder an, Zu- und Absagen wieder aus');
     $c->ok($d->request('POST', '/admin/gallery/sync')[0] === 503, 'Abgleich ohne Galerie → 503 not_configured');
     // Kalender-IDs ohne API-Schlüssel: gelesen über den Google-Zugang der Galerie, wenn er den Kalender lesen darf.
     $store = $kernel->app()->settings;
@@ -922,6 +925,77 @@ try {
     $c->ok($d->request('GET', "/members/$anna/data")[0] === 403, 'Mitglied darf die Daten anderer nicht exportieren');
     $d->actAs(null);
     $c->ok($d->request('GET', '/me/data')[0] === 401, 'Ohne Anmeldung → 401');
+    $d->forgetSessions();
+
+    $c->section('Webseite (Issue #273)');
+    // Seite als Text: Status, Kopfzeilen, Inhalt (send() erwartet JSON).
+    $fetch = static function (string $url): array {
+        $headers = [];
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 30, CURLOPT_HEADERFUNCTION => static function ($ch, string $line) use (&$headers): int {
+            $parts = explode(':', $line, 2);
+            if (count($parts) === 2) {
+                $headers[strtolower(trim($parts[0]))] = trim($parts[1]);
+            }
+            return strlen($line);
+        }]);
+        $body = (string) curl_exec($ch);
+        $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        curl_close($ch);
+        return [$status, $body, $headers];
+    };
+    $c->ok(($kernel->app()->websiteHost?->entryStatus()['state'] ?? '') === 'root', 'App direkt unter der Adresse: kein Platz für die Webseite (root)');
+    // Einstiegsdatei in einem Ordner über einer App unter /verein/app/
+    $site = $data . '-site';
+    mkdir($site . '/app', 0777, true);
+    $siteEnv = new \KompanieApp\Standalone\StandaloneEnvironment(new Config($data, ['base_url' => 'https://example.org/verein/app/'] + Config::load($data)->toArray()), new HttpContext([], [], '/'), '1');
+    $host = new \KompanieApp\Standalone\StandaloneWebsiteHost($site . '/app', $siteEnv);
+    $st = $host->entryStatus();
+    $c->ok($st['state'] === 'missing' && $st['url'] === 'https://example.org/verein/' && $st['folder'] === 'app', 'Einstiegsdatei fehlt, Adresse der Webseite ist der Ordner darüber');
+    $host->installEntry();
+    $c->ok($host->entryStatus()['state'] === 'installed' && str_contains((string) file_get_contents($site . '/index.php'), "require __DIR__ . '/app/index.php';"), 'Einstiegsdatei angelegt, bindet die App ein');
+    file_put_contents($site . '/index.php', str_replace('/app/', '/alt/', (string) file_get_contents($site . '/index.php')));
+    $c->ok($host->entryStatus()['state'] === 'outdated', 'Eigene Einstiegsdatei für einen anderen Ordner: veraltet');
+    unlink($site . '/index.php');
+    file_put_contents($site . '/index.html', '<p>Alte Webseite</p>');
+    $c->ok($host->entryStatus()['state'] === 'occupied' && $host->entryStatus()['file'] === 'index.html', 'Andere Startseite erkannt');
+    try {
+        $host->installEntry();
+        $c->ok(false, 'Andere Startseite nie ersetzen');
+    } catch (\KompanieApp\Core\Http\ApiError $e) {
+        $c->ok($e->status === 409 && (string) file_get_contents($site . '/index.html') === '<p>Alte Webseite</p>' && !is_file($site . '/index.php'), 'Andere Startseite nie ersetzen (409)');
+    }
+    unlink($site . '/index.html');
+    rmdir($site . '/app');
+
+    // Über einen zweiten Server: Ordner mit Einstiegsdatei, die App als Unterordner „app“.
+    $d->actAs($anna);
+    $c->ok($d->request('PUT', '/admin/features', ['pages' => true, 'website' => true])[0] === 200, 'Bereich Webseite einschalten');
+    [, $page] = $d->request('POST', '/pages', ['title' => 'Willkommen', 'audience' => 'public', 'blocks' => [['type' => 'text', 'html' => '<p>Hallo Besucher</p>'], ['type' => 'text', 'audience' => 'members', 'html' => '<p>Nur intern</p>']]]);
+    $c->ok($d->request('PATCH', '/admin/website', ['home_page_id' => $page['id'] ?? 0])[0] === 200, 'Startseite gewählt');
+    symlink($app, $site . '/app');
+    file_put_contents($site . '/index.php', \KompanieApp\Standalone\StandaloneWebsiteHost::content('app'));
+    $sitePort = $port + 100;
+    $siteServer = proc_open([PHP_BINARY, '-S', "127.0.0.1:$sitePort", '-t', $site], [1 => ['file', '/dev/null', 'w'], 2 => ['file', $data . '-server.log', 'a']], $pipes, $site, ['KOMPANIE_DATA_DIR' => $data] + getenv());
+    try {
+        for ($i = 0; $i < 50 && !@fsockopen('127.0.0.1', $sitePort); $i++) {
+            usleep(100000);
+        }
+        [$s, $html, $h] = $fetch("http://127.0.0.1:$sitePort/");
+        $c->ok($s === 200 && str_contains($html, '<h1 class="site-title">Willkommen</h1>') && str_contains($html, 'Hallo Besucher') && !str_contains($html, 'Nur intern'), 'Webseite zeigt die Startseite wie für Gäste' . ($s !== 200 ? " ($s)" : ''));
+        $c->ok(str_contains($h['content-security-policy'] ?? '', "default-src 'none'") && !isset($h['set-cookie']) && !str_contains($html, '<script'), 'Webseite ohne Skripte und ohne Cookies');
+        preg_match('/<link rel="stylesheet" href="([^"]+)"/', $html, $m);
+        [$s, $css, $h] = $fetch(html_entity_decode($m[1] ?? ''));
+        $c->ok($s === 200 && str_starts_with($h['content-type'] ?? '', 'text/css') && str_contains($css, '--site-primary') && str_contains($h['cache-control'] ?? '', 'immutable'), 'Stylesheet der Webseite über die App, mit Version lange im Cache');
+        $d->request('PUT', '/admin/features', ['website' => false]);
+        [$s, , $h] = $fetch("http://127.0.0.1:$sitePort/");
+        $c->ok($s === 302 && ($h['location'] ?? '') === $base, 'Bereich aus: Besucher gehen zur App');
+    } finally {
+        $stopServer($siteServer);
+        @unlink($site . '/app');
+        @unlink($site . '/index.php');
+        @rmdir($site);
+    }
     $d->forgetSessions();
 
     $c->section('Schöne Adressen (URL-Umschreibung)');

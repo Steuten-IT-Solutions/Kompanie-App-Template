@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\App;
+use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Mail\Mail;
 use KompanieApp\Core\Push\PushService;
 
@@ -31,6 +33,11 @@ use KompanieApp\Core\Push\PushService;
  *   Benutzername gelten im Formular als frei, damit sich die Person selbst registrieren kann. Beim Freigeben schlägt die
  *   App passende Mitglieder ohne Zugang vor (MemberService::noAccessMatches); mit user_id verbindet approve() den Antrag mit
  *   diesem Mitglied statt ein zweites Konto anzulegen (MemberService::linkRegistration).
+ * - Bereich Kompanien (CompanyService::FEATURE) an und aktive Kompanien da: Im Formular muss die Person wählen, ihre
+ *   Kompanie(n) aus den aktiven (nur Namen), „Keine Kompanie“ (CHOICE_NONE) oder „Passiv“ (CHOICE_PASSIVE); vorgewählt
+ *   ist nichts. Gespeichert in company_ids: IDs mit Komma oder das Wort none bzw. passive (leer: Antrag von vorher,
+ *   ohne Angabe). Wer freigibt, sieht die Wahl; die Freigabe übernimmt sie als Zuordnung, ändern lässt sie sich
+ *   dabei nur mit „Kompanien verwalten“ (manage_companies). Zugeordnet werden wie sonst nur Mitglieder.
  * - Fristen (Aufgabe registrations, stündlich): unbestätigte Anträge nach CONFIRM_HOURS, unbearbeitete nach PENDING_DAYS,
  *   Ablehnungen nach REJECTED_DAYS gelöscht.
  */
@@ -45,6 +52,11 @@ final class RegistrationService
     public const UNCONFIRMED = 'unconfirmed';
     public const PENDING = 'pending';
     public const REJECTED = 'rejected';
+
+    /** Wahl im Formular (company_choice): Kompanie(n), keine Kompanie oder passiv */
+    public const CHOICE_COMPANY = 'company';
+    public const CHOICE_NONE = 'none';
+    public const CHOICE_PASSIVE = 'passive';
 
     public const MIN_SECONDS = 3;
     public const MAX_FORM_AGE = 6 * 3600;
@@ -100,7 +112,7 @@ final class RegistrationService
     private function requireEnabled(): void
     {
         if (!$this->enabled()) {
-            throw new ApiError(404, 'registration_unavailable', 'In dieser App kann man zurzeit keinen Zugang beantragen.');
+            throw new ApiError(404, 'registration_unavailable', I18n::t('In dieser App kann man zurzeit keinen Zugang beantragen.'));
         }
     }
 
@@ -111,7 +123,9 @@ final class RegistrationService
     /**
      * Zum Öffnen des Formulars: Zeitmarke und was das Formular zeigt.
      *
-     * @return array{token: string, minSeconds: int, email_confirmation: bool, privacy_url: string|null}
+     * companies: aktive Kompanien zum Auswählen (leer, wenn der Bereich Kompanien aus ist).
+     *
+     * @return array{token: string, minSeconds: int, email_confirmation: bool, privacy_url: string|null, companies: list<array{id: int, name: string}>}
      */
     public function form(): array
     {
@@ -122,20 +136,124 @@ final class RegistrationService
             'minSeconds' => self::MIN_SECONDS,
             'email_confirmation' => $this->withMail(),
             'privacy_url' => $privacy !== '' ? $privacy : null,
+            'companies' => array_map(static fn (array $c): array => ['id' => $c['id'], 'name' => $c['name']], $this->choosableCompanies()),
         ];
+    }
+
+    private function companiesOn(): bool
+    {
+        return $this->app->features()->enabled(CompanyService::FEATURE);
+    }
+
+    /**
+     * Kompanien, die sich im Formular wählen lassen: die aktiven, in der Reihenfolge der Liste; keine ohne den Bereich.
+     *
+     * @return list<array{id: int, name: string}>
+     */
+    private function choosableCompanies(): array
+    {
+        if (!$this->companiesOn()) {
+            return [];
+        }
+        $out = [];
+        foreach ($this->app->companies()->repository()->all() as $c) {
+            if ($c['active']) {
+                $out[] = ['id' => $c['id'], 'name' => $c['name']];
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Wahl aus dem Formular prüfen und so zurückgeben, wie sie in company_ids steht: Pflicht, sobald es aktive Kompanien
+     * gibt (company_choice company mit company_ids aus den aktiven, none oder passive); ohne Auswahl im Formular leer.
+     */
+    private function chosenCompanies(mixed $choice, mixed $in): string
+    {
+        $choosable = $this->choosableCompanies();
+        if ($choosable === []) {
+            return '';
+        }
+        if ($choice === self::CHOICE_NONE || $choice === self::CHOICE_PASSIVE) {
+            if ($in !== null && $in !== []) {
+                throw ApiError::invalid(I18n::t('Bitte entweder Kompanien wählen oder „Keine Kompanie“ bzw. „Passiv“.'));
+            }
+            return $choice;
+        }
+        if ($choice !== self::CHOICE_COMPANY || $in === null || $in === []) {
+            throw ApiError::invalid(I18n::t('Bitte wähle deine Kompanie, „Keine Kompanie“ oder „Passiv“.'));
+        }
+        $ids = self::companyIdList($in);
+        if (array_diff($ids, array_column($choosable, 'id')) !== []) {
+            throw ApiError::invalid(I18n::t('Bitte die Kompanie aus der Liste wählen.'));
+        }
+        return implode(',', $ids);
+    }
+
+    /**
+     * Wahl eines Antrags: company, none, passive oder null (Antrag ohne Angabe).
+     *
+     * @param array<string, mixed> $row
+     */
+    private static function choiceOfRow(array $row): ?string
+    {
+        $raw = (string) ($row['company_ids'] ?? '');
+        return match ($raw) {
+            '' => null,
+            self::CHOICE_NONE, self::CHOICE_PASSIVE => $raw,
+            default => self::CHOICE_COMPANY,
+        };
+    }
+
+    /** @return list<int> */
+    private static function companyIdList(mixed $in): array
+    {
+        if (!is_array($in) || !array_is_list($in)) {
+            throw ApiError::invalid(I18n::t('Bitte die Kompanien als Liste angeben.'));
+        }
+        $ids = [];
+        foreach ($in as $v) {
+            $id = Input::integer($v);
+            if ($id === null || $id <= 0) {
+                throw ApiError::invalid(I18n::t('Bitte die Kompanien als Liste angeben.'));
+            }
+            $ids[$id] = $id;
+        }
+        return array_values($ids);
+    }
+
+    /**
+     * Kompanien eines Antrags, die es noch gibt (in der Reihenfolge der Liste).
+     *
+     * @param array<string, mixed> $row
+     * @return list<array{id: int, name: string}>
+     */
+    private function companiesOfRow(array $row): array
+    {
+        if (self::choiceOfRow($row) !== self::CHOICE_COMPANY || !$this->companiesOn()) {
+            return [];
+        }
+        $ids = array_map('intval', explode(',', (string) $row['company_ids']));
+        $out = [];
+        foreach ($this->app->companies()->repository()->all() as $c) {
+            if (in_array($c['id'], $ids, true)) {
+                $out[] = ['id' => $c['id'], 'name' => $c['name']];
+            }
+        }
+        return $out;
     }
 
     /**
      * Antrag annehmen. Mit Mailversand: Status unconfirmed und Mail mit dem Link zum Bestätigen; ohne: gleich pending.
      *
-     * @param array<string, mixed> $in first_name, last_name, email, username, password, message, consent, token, website
+     * @param array<string, mixed> $in first_name, last_name, email, username, password, message, company_choice, company_ids, consent, token, website
      * @return array{status: string}
      */
     public function submit(?User $user, array $in, string $client): array
     {
         $this->requireEnabled();
         if ($user !== null) {
-            throw ApiError::invalid('Du bist schon angemeldet.');
+            throw ApiError::invalid(I18n::t('Du bist schon angemeldet.'));
         }
         $mail = $this->withMail();
         $answer = ['status' => $mail ? 'confirm_email' : self::PENDING];
@@ -147,34 +265,35 @@ final class RegistrationService
         $first = Text::line($in['first_name'] ?? null, PersonName::MAX);
         $last = Text::line($in['last_name'] ?? null, PersonName::MAX);
         if ($first === '' || $last === '') {
-            throw ApiError::invalid('Bitte Vor- und Nachnamen angeben.');
+            throw ApiError::invalid(I18n::t('Bitte Vor- und Nachnamen angeben.'));
         }
         if (mb_strlen(PersonName::join($first, $last)) > PersonName::MAX) {
-            throw ApiError::invalid(sprintf('Vor- und Nachname sind zusammen zu lang (höchstens %d Zeichen).', PersonName::MAX));
+            throw ApiError::invalid(I18n::t('Vor- und Nachname sind zusammen zu lang (höchstens {max} Zeichen).', ['max' => PersonName::MAX]));
         }
         $email = trim(is_string($in['email'] ?? null) ? $in['email'] : '');
         if ($email === '' || filter_var($email, FILTER_VALIDATE_EMAIL) === false || mb_strlen($email) > MemberService::EMAIL_MAX) {
-            throw ApiError::invalid('Bitte eine gültige E-Mail-Adresse angeben.');
+            throw ApiError::invalid(I18n::t('Bitte eine gültige E-Mail-Adresse angeben.'));
         }
         $login = trim(is_string($in['username'] ?? null) ? $in['username'] : '');
         if (!Passwords::validLogin($login)) {
-            throw ApiError::invalid('Der Benutzername darf nur Buchstaben (a–z), Ziffern sowie . _ - @ enthalten.');
+            throw ApiError::invalid(I18n::t('Der Benutzername darf nur Buchstaben (a–z), Ziffern sowie . _ - @ enthalten.'));
         }
         $password = is_string($in['password'] ?? null) ? $in['password'] : '';
         self::checkNewPassword($password);
         $message = Text::multiline($in['message'] ?? null);
         if (mb_strlen($message) > self::MESSAGE_MAX) {
-            throw ApiError::invalid(sprintf('Die Nachricht darf höchstens %d Zeichen lang sein.', self::MESSAGE_MAX));
+            throw ApiError::invalid(I18n::t('Die Nachricht darf höchstens {max} Zeichen lang sein.', ['max' => self::MESSAGE_MAX]));
         }
+        $companyIds = $this->chosenCompanies($in['company_choice'] ?? null, $in['company_ids'] ?? null);
         if (($in['consent'] ?? null) !== true) {
-            throw ApiError::invalid('Bitte bestätige, dass du die Datenschutzerklärung gelesen hast.');
+            throw ApiError::invalid(I18n::t('Bitte bestätige, dass du die Datenschutzerklärung gelesen hast.'));
         }
 
         $this->limit($client);
         $nowUtc = gmdate('Y-m-d H:i:s', $now);
         $free = $this->noAccessContacts();
         if (($this->app->users->loginExists($login) && !isset($free['logins'][mb_strtolower($login)])) || $this->openWithLogin($login, $nowUtc)) {
-            throw ApiError::invalid('Dieser Benutzername ist schon vergeben. Bitte einen anderen wählen.');
+            throw ApiError::invalid(I18n::t('Dieser Benutzername ist schon vergeben. Bitte einen anderen wählen.'));
         }
         $name = PersonName::join($first, $last);
         $emailTaken = $this->app->users->emailExists($email) && !isset($free['emails'][mb_strtolower($email)]);
@@ -184,16 +303,24 @@ final class RegistrationService
         ) > 0;
         if ($mail && ($emailTaken || $pendingSame)) {
             // Nichts verraten: Die Antwort ist dieselbe, die Mail sagt, was los ist.
-            $this->sendOrFail($email, $name, $this->subject('Zugang zur App'), $emailTaken
-                ? ["Hallo {$first},", sprintf('zu dieser E-Mail-Adresse gibt es in der App „%s“ schon ein Konto. Bitte melde dich damit an:', $this->appName()), $this->app->env->appUrl(), 'Wenn du dich nicht anmelden kannst, wende dich bitte an die Admins der App. Hast du keinen Zugang beantragt, kannst du diese Mail einfach ignorieren.']
-                : ["Hallo {$first},", sprintf('für diese E-Mail-Adresse liegt schon eine Anfrage auf einen Zugang zur App „%s“ vor. Sie wartet auf Freigabe; du bekommst eine Mail, sobald sie bearbeitet ist.', $this->appName())]);
+            $this->sendOrFail($email, $name, $this->subject(I18n::t('Zugang zur App')), $emailTaken
+                ? [
+                    I18n::t('Hallo {name},', ['name' => $first]),
+                    I18n::t('zu dieser E-Mail-Adresse gibt es in der App „{app}“ schon ein Konto. Bitte melde dich damit an:', ['app' => $this->appName()]),
+                    $this->app->env->appUrl(),
+                    I18n::t('Wenn du dich nicht anmelden kannst, wende dich bitte an die Admins der App. Hast du keinen Zugang beantragt, kannst du diese Mail einfach ignorieren.'),
+                ]
+                : [
+                    I18n::t('Hallo {name},', ['name' => $first]),
+                    I18n::t('für diese E-Mail-Adresse liegt schon eine Anfrage auf einen Zugang zur App „{app}“ vor. Sie wartet auf Freigabe; du bekommst eine Mail, sobald sie bearbeitet ist.', ['app' => $this->appName()]),
+                ]);
             return $answer;
         }
         if (!$mail && $emailTaken) {
-            throw ApiError::invalid('Zu dieser E-Mail-Adresse gibt es schon ein Konto. Bitte melde dich damit an oder wende dich an die Admins der App.');
+            throw ApiError::invalid(I18n::t('Zu dieser E-Mail-Adresse gibt es schon ein Konto. Bitte melde dich damit an oder wende dich an die Admins der App.'));
         }
         if (!$mail && $this->openWithEmail($email, $nowUtc)) {
-            throw ApiError::invalid('Für diese E-Mail-Adresse gibt es schon eine Anfrage. Sie wartet auf Freigabe.');
+            throw ApiError::invalid(I18n::t('Für diese E-Mail-Adresse gibt es schon eine Anfrage. Sie wartet auf Freigabe.'));
         }
 
         $token = bin2hex(random_bytes(32));
@@ -204,6 +331,7 @@ final class RegistrationService
             'login' => $login,
             'password_hash' => password_hash($password, PASSWORD_DEFAULT),
             'message' => $message !== '' ? $message : null,
+            'company_ids' => $companyIds,
             'status' => $mail ? self::UNCONFIRMED : self::PENDING,
             'token_hash' => $mail ? hash('sha256', $token) : null,
             'reason' => null,
@@ -217,11 +345,11 @@ final class RegistrationService
             return $answer;
         }
         try {
-            $this->sendOrFail($email, $name, $this->subject('E-Mail-Adresse bestätigen'), [
-                "Hallo {$first},",
-                sprintf('bitte bestätige deine E-Mail-Adresse, damit deine Anfrage auf einen Zugang zur App „%s“ bearbeitet werden kann:', $this->appName()),
+            $this->sendOrFail($email, $name, $this->subject(I18n::t('E-Mail-Adresse bestätigen')), [
+                I18n::t('Hallo {name},', ['name' => $first]),
+                I18n::t('bitte bestätige deine E-Mail-Adresse, damit deine Anfrage auf einen Zugang zur App „{app}“ bearbeitet werden kann:', ['app' => $this->appName()]),
                 $this->confirmUrl($token),
-                sprintf('Der Link gilt %d Stunden. Hast du keinen Zugang beantragt, kannst du diese Mail einfach ignorieren.', self::CONFIRM_HOURS),
+                I18n::t('Der Link gilt {hours} Stunden. Hast du keinen Zugang beantragt, kannst du diese Mail einfach ignorieren.', ['hours' => self::CONFIRM_HOURS]),
             ]);
         } catch (ApiError $e) {
             $this->db()->execute('DELETE FROM {registration_requests} WHERE id = ?', [$id]);
@@ -234,14 +362,14 @@ final class RegistrationService
     private static function checkNewPassword(string $password): void
     {
         if (mb_strlen($password) < Passwords::MIN_LENGTH) {
-            throw ApiError::invalid(sprintf('Das Passwort muss mindestens %d Zeichen lang sein.', Passwords::MIN_LENGTH));
+            throw ApiError::invalid(I18n::t('Das Passwort muss mindestens {min} Zeichen lang sein.', ['min' => Passwords::MIN_LENGTH]));
         }
         if ($password !== trim($password)) {
-            throw ApiError::invalid('Das Passwort darf nicht mit Leerzeichen beginnen oder enden.');
+            throw ApiError::invalid(I18n::t('Das Passwort darf nicht mit Leerzeichen beginnen oder enden.'));
         }
         if (strlen($password) > 72) {
             // bcrypt (PASSWORD_DEFAULT) wertet nur die ersten 72 Bytes aus.
-            throw ApiError::invalid('Das Passwort ist zu lang (höchstens 72 Zeichen ohne Umlaute).');
+            throw ApiError::invalid(I18n::t('Das Passwort ist zu lang (höchstens 72 Zeichen ohne Umlaute).'));
         }
     }
 
@@ -259,7 +387,7 @@ final class RegistrationService
             ? $this->db()->selectOne('SELECT * FROM {registration_requests} WHERE token_hash = ? AND expires_at >= ?', [hash('sha256', $token), $nowUtc])
             : null;
         if ($row === null) {
-            throw new ApiError(400, 'link_invalid', 'Der Link ist ungültig oder abgelaufen. Bitte stelle die Anfrage neu.');
+            throw new ApiError(400, 'link_invalid', I18n::t('Der Link ist ungültig oder abgelaufen. Bitte stelle die Anfrage neu.'));
         }
         if ($row['status'] !== self::UNCONFIRMED) {
             return ['status' => self::PENDING];
@@ -284,12 +412,12 @@ final class RegistrationService
     public function status(mixed $login, mixed $password, string $client): array
     {
         if ($this->app->cache->increment('registration_status_' . hash('sha256', PushService::clientKey($client)), 900) > self::STATUS_RATE) {
-            throw new ApiError(429, 'too_many_attempts', 'Zu viele Versuche. Bitte in 15 Minuten erneut versuchen.');
+            throw new ApiError(429, 'too_many_attempts', I18n::t('Zu viele Versuche. Bitte in 15 Minuten erneut versuchen.'));
         }
         $login = trim(is_string($login) ? $login : '');
         $password = is_string($password) ? $password : '';
         if ($login === '' || $password === '') {
-            throw ApiError::invalid('Bitte Benutzername und Passwort eingeben.');
+            throw ApiError::invalid(I18n::t('Bitte Benutzername und Passwort eingeben.'));
         }
         return $this->match($login, $password) ?? ['status' => 'none'];
     }
@@ -305,9 +433,11 @@ final class RegistrationService
         }
         $found = $this->match(trim($login), $password);
         return match ($found['status'] ?? null) {
-            self::PENDING => new ApiError(403, 'registration_pending', 'Deine Anfrage auf einen Zugang wartet noch auf Freigabe. Danach kannst du dich mit diesen Daten anmelden.'),
-            self::UNCONFIRMED => new ApiError(403, 'registration_unconfirmed', 'Bitte bestätige zuerst deine E-Mail-Adresse mit dem Link aus der Mail.'),
-            self::REJECTED => new ApiError(403, 'registration_rejected', 'Deine Anfrage auf einen Zugang wurde abgelehnt.' . (($found['reason'] ?? '') !== '' ? ' Begründung: ' . $found['reason'] : '')),
+            self::PENDING => new ApiError(403, 'registration_pending', I18n::t('Deine Anfrage auf einen Zugang wartet noch auf Freigabe. Danach kannst du dich mit diesen Daten anmelden.')),
+            self::UNCONFIRMED => new ApiError(403, 'registration_unconfirmed', I18n::t('Bitte bestätige zuerst deine E-Mail-Adresse mit dem Link aus der Mail.')),
+            self::REJECTED => new ApiError(403, 'registration_rejected', ($found['reason'] ?? '') !== ''
+                ? I18n::t('Deine Anfrage auf einen Zugang wurde abgelehnt. Begründung: {reason}', ['reason' => $found['reason']])
+                : I18n::t('Deine Anfrage auf einen Zugang wurde abgelehnt.')),
             default => null,
         };
     }
@@ -374,14 +504,14 @@ final class RegistrationService
         $cache = $this->app->cache;
         if ($cache->increment('registration_c_' . hash('sha256', PushService::clientKey($client)), 3600) > self::CLIENT_RATE
             || $cache->increment('registration_day', 86400) > self::DAILY_RATE) {
-            throw new ApiError(429, 'too_many_attempts', 'Zu viele Anfragen in kurzer Zeit. Bitte versuche es später erneut.');
+            throw new ApiError(429, 'too_many_attempts', I18n::t('Zu viele Anfragen in kurzer Zeit. Bitte versuche es später erneut.'));
         }
         $open = (int) $this->db()->scalar(
             'SELECT COUNT(*) FROM {registration_requests} WHERE status IN (?, ?) AND expires_at >= ?',
             [self::UNCONFIRMED, self::PENDING, $this->app->time()->nowUtc()],
         );
         if ($open >= self::MAX_OPEN) {
-            throw new ApiError(503, 'registrations_full', 'Zurzeit können keine weiteren Anfragen angenommen werden. Bitte versuche es später erneut.');
+            throw new ApiError(503, 'registrations_full', I18n::t('Zurzeit können keine weiteren Anfragen angenommen werden. Bitte versuche es später erneut.'));
         }
     }
 
@@ -391,9 +521,10 @@ final class RegistrationService
 
     /**
      * Anträge, die auf Freigabe warten (älteste zuerst), mit der vorgeschlagenen Rolle, je Antrag passenden Mitgliedern
-     * ohne Zugang (matches) und allen Mitgliedern ohne Zugang zum Auswählen (no_access_members).
+     * ohne Zugang (matches) und allen Mitgliedern ohne Zugang zum Auswählen (no_access_members). Mit dem Bereich Kompanien
+     * je Antrag die Wahl (company_choice: company, none, passive, null) und die gewählten Kompanien (companies) und alle Kompanien zum Ändern beim Freigeben (companies).
      *
-     * @return array{requests: list<array<string, mixed>>, default_role: string, email_confirmation: bool, no_access_members: list<array{id: int, name: string}>}
+     * @return array<string, mixed> requests, default_role, email_confirmation, no_access_members, companies (nur mit dem Bereich)
      */
     public function pending(): array
     {
@@ -420,11 +551,15 @@ final class RegistrationService
                 'email_confirmed' => $r['confirmed_at'] !== null,
                 'expires_at' => Time::utcToIso((string) $r['expires_at']),
                 'matches' => $members->noAccessMatches((string) $r['first_name'], (string) $r['last_name'], (string) $r['email']),
-            ], $rows),
+            ] + ($this->companiesOn() ? ['companies' => $this->companiesOfRow($r), 'company_choice' => self::choiceOfRow($r)] : []), $rows),
             'default_role' => $this->defaultRole(),
             'email_confirmation' => $this->withMail(),
             'no_access_members' => array_values(array_map(static fn (User $u): array => ['id' => $u->id, 'name' => $u->name], $members->noAccessMembers())),
-        ];
+        ] + ($this->companiesOn() ? ['companies' => array_map(static fn (array $c): array => [
+            'id' => $c['id'],
+            'name' => $c['name'],
+            'active' => $c['active'],
+        ], $this->app->companies()->repository()->all())] : []);
     }
 
     public function countPending(): int
@@ -439,7 +574,7 @@ final class RegistrationService
     private function pendingRow(int $id): array
     {
         $row = $this->db()->selectOne('SELECT * FROM {registration_requests} WHERE id = ? AND status = ? AND expires_at >= ?', [$id, self::PENDING, $this->app->time()->nowUtc()]);
-        return $row ?? throw ApiError::notFound('Diese Anfrage gibt es nicht (mehr). Vielleicht hat sie schon jemand bearbeitet.');
+        return $row ?? throw ApiError::notFound(I18n::t('Diese Anfrage gibt es nicht (mehr). Vielleicht hat sie schon jemand bearbeitet.'));
     }
 
     /**
@@ -447,22 +582,26 @@ final class RegistrationService
      * Gleiche Prüfungen wie beim Anlegen (MemberService::prepare: Rolle, die $actor vergeben darf, Benutzername und
      * E-Mail-Adresse frei); ein anderer Benutzername (username) geht, wenn der gewünschte inzwischen vergeben ist.
      * Mit user_id: statt ein Konto anzulegen den Antrag mit diesem Mitglied ohne Zugang verbinden (die Rolle bleibt).
+     * Mit dem Bereich Kompanien ordnet die Freigabe die Person den Kompanien aus dem Antrag zu (bei einem verbundenen
+     * Mitglied zusätzlich zu seinen); company_ids ändert die Wahl, nur mit manage_companies. Nur Mitglieder (Recht member)
+     * werden zugeordnet; companies in der Antwort sind die Kompanien der Person danach.
      *
-     * @param array<string, mixed> $in level, username, user_id
-     * @return array{member: array<string, mixed>, mailed: bool, linked: bool}
+     * @param array<string, mixed> $in level, username, user_id, company_ids
+     * @return array{member: array<string, mixed>, mailed: bool, linked: bool, companies?: list<array{id: int, name: string, short_name: string, active: bool}>}
      */
     public function approve(User $actor, int $id, array $in): array
     {
         $row = $this->pendingRow($id);
         $username = is_string($in['username'] ?? null) && trim($in['username']) !== '' ? trim($in['username']) : (string) $row['login'];
+        $companyIds = $this->approvedCompanies($actor, $row, $in);
         $linkTo = Input::integer($in['user_id'] ?? null);
         if ($linkTo !== null && $linkTo > 0) {
-            return $this->approveLinked($actor, $row, $linkTo, $username);
+            return $this->withCompanies($this->approveLinked($actor, $row, $linkTo, $username), $companyIds);
         }
         $level = is_string($in['level'] ?? null) && $in['level'] !== '' ? $in['level'] : $this->defaultRole();
         // Admin nie über eine Anfrage: Wer sich selbst meldet, ist noch niemandem bekannt.
         if ($level === Roles::ADMIN) {
-            throw ApiError::invalid(sprintf('Beim Freigeben lässt sich „%s“ nicht vergeben.', $this->app->roles()->label(Roles::ADMIN)));
+            throw ApiError::invalid(I18n::t('Beim Freigeben lässt sich „{role}“ nicht vergeben.', ['role' => $this->app->roles()->label(Roles::ADMIN)]));
         }
         $taken = [];
         $prepared = $this->app->members()->prepare([
@@ -474,7 +613,7 @@ final class RegistrationService
         ], $taken, $actor);
         // Erst den Antrag beanspruchen (gleichzeitige Freigabe durch zwei Personen), dann das Konto anlegen.
         if ($this->db()->execute('DELETE FROM {registration_requests} WHERE id = ? AND status = ?', [$id, self::PENDING]) !== 1) {
-            throw ApiError::notFound('Diese Anfrage hat gerade schon jemand bearbeitet.');
+            throw ApiError::notFound(I18n::t('Diese Anfrage hat gerade schon jemand bearbeitet.'));
         }
         try {
             $member = $this->app->members()->insertWithPasswordHash($prepared, (string) $row['password_hash']);
@@ -484,7 +623,58 @@ final class RegistrationService
             $this->db()->insert('registration_requests', $row);
             throw $e;
         }
-        return ['member' => $member, 'mailed' => $this->mailApproved($prepared['email'], $prepared['name'], $prepared['first_name'], $prepared['login']), 'linked' => false];
+        return $this->withCompanies(['member' => $member, 'mailed' => $this->mailApproved($member['id'], $prepared['email'], $prepared['name'], $prepared['first_name'], $prepared['login']), 'linked' => false], $companyIds);
+    }
+
+    /**
+     * Kompanien, denen die Freigabe die Person zuordnet: die aus dem Antrag oder, mit manage_companies, company_ids (alle
+     * Kompanien der Liste, auch ehemalige). null: Bereich aus, nichts zuordnen.
+     *
+     * @param array<string, mixed> $row
+     * @param array<string, mixed> $in
+     * @return list<int>|null
+     */
+    private function approvedCompanies(User $actor, array $row, array $in): ?array
+    {
+        if (!$this->companiesOn()) {
+            return null;
+        }
+        $requested = array_column($this->companiesOfRow($row), 'id');
+        if (!array_key_exists('company_ids', $in)) {
+            return $requested;
+        }
+        $ids = self::companyIdList($in['company_ids'] ?? []);
+        $same = array_diff($ids, $requested) === [] && array_diff($requested, $ids) === [];
+        if (!$same && !$actor->can(Capability::ManageCompanies)) {
+            throw ApiError::forbidden(I18n::t('Die Kompanie ändern darf beim Freigeben nur, wer Kompanien verwalten darf.'));
+        }
+        $known = array_column($this->app->companies()->repository()->all(), 'id');
+        if (array_diff($ids, $known) !== []) {
+            throw ApiError::invalid(I18n::t('Unbekannte Kompanie.'));
+        }
+        return $ids;
+    }
+
+    /**
+     * Nach dem Anlegen bzw. Verbinden: Kompanien zuordnen (bestehende Zuordnungen bleiben), nur bei Mitgliedern.
+     *
+     * @param array{member: array<string, mixed>, mailed: bool, linked: bool} $result
+     * @param list<int>|null $companyIds
+     * @return array{member: array<string, mixed>, mailed: bool, linked: bool, companies?: list<array{id: int, name: string, short_name: string, active: bool}>}
+     */
+    private function withCompanies(array $result, ?array $companyIds): array
+    {
+        if ($companyIds === null) {
+            return $result;
+        }
+        $userId = (int) $result['member']['id'];
+        $companies = $this->app->companies();
+        $user = $this->app->users->find($userId);
+        if ($companyIds !== [] && $user !== null && $user->isMember()) {
+            $current = $companies->repository()->companyIdsOf($userId);
+            $companies->repository()->replaceOfUser($userId, array_values(array_unique([...$current, ...$companyIds])), $this->app->time()->nowUtc());
+        }
+        return $result + ['companies' => $companies->of($userId)];
     }
 
     /**
@@ -498,10 +688,10 @@ final class RegistrationService
     {
         $members = $this->app->members();
         if (!$members->hasNoAccess($userId)) {
-            throw ApiError::invalid('Dieses Mitglied hat schon einen Zugang. Verbinden lässt sich nur ein Mitglied ohne Zugang.');
+            throw ApiError::invalid(I18n::t('Dieses Mitglied hat schon einen Zugang. Verbinden lässt sich nur ein Mitglied ohne Zugang.'));
         }
         if ($this->db()->execute('DELETE FROM {registration_requests} WHERE id = ? AND status = ?', [(int) $row['id'], self::PENDING]) !== 1) {
-            throw ApiError::notFound('Diese Anfrage hat gerade schon jemand bearbeitet.');
+            throw ApiError::notFound(I18n::t('Diese Anfrage hat gerade schon jemand bearbeitet.'));
         }
         try {
             $member = $members->linkRegistration($actor, $userId, $username, (string) $row['email'], (string) $row['password_hash']);
@@ -510,22 +700,22 @@ final class RegistrationService
             $this->db()->insert('registration_requests', $row);
             throw $e;
         }
-        return ['member' => $member, 'mailed' => $this->mailApproved($member['email'], $member['name'], $member['first_name'], $member['username']), 'linked' => true];
+        return ['member' => $member, 'mailed' => $this->mailApproved($userId, $member['email'], $member['name'], $member['first_name'], $member['username']), 'linked' => true];
     }
 
-    /** Mail „Dein Zugang ist freigegeben“ (nur mit Mailversand); true, wenn sie raus ist. */
-    private function mailApproved(string $email, string $name, string $first, string $login): bool
+    /** Mail „Dein Zugang ist freigegeben“ (nur mit Mailversand, in der Sprache des Kontos); true, wenn sie raus ist. */
+    private function mailApproved(int $userId, string $email, string $name, string $first, string $login): bool
     {
         if (!$this->withMail() || $email === '') {
             return false;
         }
-        return $this->send($email, $name, $this->subject('Dein Zugang ist freigegeben'), [
-            'Hallo ' . $first . ',',
-            sprintf('dein Zugang zur App „%s“ ist freigegeben. Du kannst dich jetzt mit dem Passwort aus deiner Anfrage anmelden.', $this->appName()),
-            'Benutzername: ' . $login . ' (oder deine E-Mail-Adresse)',
-            'Zur App: ' . $this->app->env->appUrl(),
-            'So holst du die App auf dein Handy: ' . $this->app->env->appUrl() . '#/installieren',
-        ]);
+        return I18n::in($this->app->languages()->forRecipient($userId), fn (): bool => $this->send($email, $name, $this->subject(I18n::t('Dein Zugang ist freigegeben')), [
+            I18n::t('Hallo {name},', ['name' => $first]),
+            I18n::t('dein Zugang zur App „{app}“ ist freigegeben. Du kannst dich jetzt mit dem Passwort aus deiner Anfrage anmelden.', ['app' => $this->appName()]),
+            I18n::t('Benutzername: {login} (oder deine E-Mail-Adresse)', ['login' => $login]),
+            I18n::t('Zur App: {url}', ['url' => $this->app->env->appUrl()]),
+            I18n::t('So holst du die App auf dein Handy: {url}', ['url' => $this->app->env->appUrl() . '#/installieren']),
+        ]));
     }
 
     /**
@@ -539,16 +729,17 @@ final class RegistrationService
         $row = $this->pendingRow($id);
         $reason = Text::multiline($reason);
         if (mb_strlen($reason) > self::REASON_MAX) {
-            throw ApiError::invalid(sprintf('Die Begründung darf höchstens %d Zeichen lang sein.', self::REASON_MAX));
+            throw ApiError::invalid(I18n::t('Die Begründung darf höchstens {max} Zeichen lang sein.', ['max' => self::REASON_MAX]));
         }
         $mailed = false;
         if ($this->withMail() && (string) $row['email'] !== '') {
-            $mailed = $this->send((string) $row['email'], PersonName::join((string) $row['first_name'], (string) $row['last_name']), $this->subject('Deine Anfrage'), array_values(array_filter([
-                'Hallo ' . $row['first_name'] . ',',
-                sprintf('deine Anfrage auf einen Zugang zur App „%s“ wurde leider abgelehnt.', $this->appName()),
-                $reason !== '' ? 'Begründung: ' . $reason : null,
-                'Bei Fragen wende dich bitte an die Admins der App.',
-            ])));
+            // Ohne Konto ist die Sprache der Person unbekannt: Deutsch (wie LanguageService::forRecipient).
+            $mailed = I18n::in(I18n::base(), fn (): bool => $this->send((string) $row['email'], PersonName::join((string) $row['first_name'], (string) $row['last_name']), $this->subject(I18n::t('Deine Anfrage')), array_values(array_filter([
+                I18n::t('Hallo {name},', ['name' => (string) $row['first_name']]),
+                I18n::t('deine Anfrage auf einen Zugang zur App „{app}“ wurde leider abgelehnt.', ['app' => $this->appName()]),
+                $reason !== '' ? I18n::t('Begründung: {reason}', ['reason' => $reason]) : null,
+                I18n::t('Bei Fragen wende dich bitte an die Admins der App.'),
+            ]))));
         }
         if ($mailed) {
             $this->db()->execute('DELETE FROM {registration_requests} WHERE id = ?', [$id]);
@@ -559,6 +750,7 @@ final class RegistrationService
                 'last_name' => '',
                 'email' => '',
                 'message' => null,
+                'company_ids' => '',
                 'token_hash' => null,
                 'reason' => $reason,
                 'expires_at' => gmdate('Y-m-d H:i:s', $this->app->time()->timestamp() + self::REJECTED_DAYS * 86400),
@@ -572,7 +764,7 @@ final class RegistrationService
         try {
             $this->app->push()->notifyAudience(
                 PushService::TYPE_REGISTRATIONS,
-                PushService::message('Zugang beantragt', sprintf('%s möchte einen Zugang zur App.', $name), 'verwaltung/anfragen', 'anfragen'),
+                PushService::message(I18n::t('Zugang beantragt'), I18n::t('{name} möchte einen Zugang zur App.', ['name' => $name]), 'verwaltung/anfragen', 'anfragen'),
                 static fn (int $uid): bool => true,
             );
         } catch (\Throwable $e) {
@@ -607,14 +799,14 @@ final class RegistrationService
         $set = [];
         if (array_key_exists('enabled', $in)) {
             if (!is_bool($in['enabled'])) {
-                throw ApiError::invalid('Bitte an oder aus angeben.');
+                throw ApiError::invalid(I18n::t('Bitte an oder aus angeben.'));
             }
             $set[self::ENABLED_SETTING] = $in['enabled'];
         }
         if (array_key_exists('default_role', $in)) {
             $role = is_string($in['default_role']) ? $this->app->roles()->find($in['default_role']) : null;
             if (!self::newAccountRole($role) || $role['key'] === Roles::ADMIN) {
-                throw ApiError::invalid('Diese Rolle lässt sich für neue Konten nicht wählen.');
+                throw ApiError::invalid(I18n::t('Diese Rolle lässt sich für neue Konten nicht wählen.'));
             }
             $set[self::ROLE_SETTING] = $role['key'];
         }
@@ -644,11 +836,11 @@ final class RegistrationService
             );
             foreach ($expired as $row) {
                 if ((string) $row['email'] !== '') {
-                    $this->send((string) $row['email'], PersonName::join((string) $row['first_name'], (string) $row['last_name']), $this->subject('Deine Anfrage'), [
-                        'Hallo ' . $row['first_name'] . ',',
-                        sprintf('deine Anfrage auf einen Zugang zur App „%s“ wurde in %d Tagen nicht bearbeitet und ist deshalb gelöscht.', $this->appName(), self::PENDING_DAYS),
-                        'Du kannst gerne eine neue Anfrage stellen oder dich direkt an die Admins der App wenden.',
-                    ]);
+                    I18n::in(I18n::base(), fn (): bool => $this->send((string) $row['email'], PersonName::join((string) $row['first_name'], (string) $row['last_name']), $this->subject(I18n::t('Deine Anfrage')), [
+                        I18n::t('Hallo {name},', ['name' => (string) $row['first_name']]),
+                        I18n::t('deine Anfrage auf einen Zugang zur App „{app}“ wurde in {days} Tagen nicht bearbeitet und ist deshalb gelöscht.', ['app' => $this->appName(), 'days' => self::PENDING_DAYS]),
+                        I18n::t('Du kannst gerne eine neue Anfrage stellen oder dich direkt an die Admins der App wenden.'),
+                    ]));
                 }
                 $this->db()->execute('DELETE FROM {registration_requests} WHERE id = ?', [(int) $row['id']]);
             }
@@ -709,7 +901,7 @@ final class RegistrationService
     private function sendOrFail(string $to, string $name, string $subject, array $paragraphs): void
     {
         if (!$this->send($to, $name, $subject, $paragraphs)) {
-            throw new ApiError(503, 'mail_failed', 'Die Mail an deine Adresse konnte gerade nicht gesendet werden. Bitte versuche es später erneut.');
+            throw new ApiError(503, 'mail_failed', I18n::t('Die Mail an deine Adresse konnte gerade nicht gesendet werden. Bitte versuche es später erneut.'));
         }
     }
 

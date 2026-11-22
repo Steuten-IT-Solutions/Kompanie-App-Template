@@ -8,13 +8,14 @@ import { editYearOrDate, formatYearOrDate } from './format';
 import brand from './generated/brand';
 import { Caps, ErrorBox, useAsync } from './ui';
 import { confirmAsk } from './ask';
+import { t } from './i18n';
 
 const sec = brand.labels.sections;
 
 export const PROFILE_OPTIONS: Record<ProfileVisibility, string> = {
-  none: 'Nicht anzeigen',
-  members: 'Mitgliedern anzeigen',
-  public: 'Öffentlich anzeigen',
+  none: t('Nicht anzeigen'),
+  members: t('Mitgliedern anzeigen'),
+  public: t('Öffentlich anzeigen'),
 };
 
 /** Die Seite in der Mitgliederliste gibt es nur mit dem Bereich; wählen kann nur, wer Mitglied ist. */
@@ -32,10 +33,14 @@ export function ProfileSelect({
   onChange: (v: ProfileVisibility) => void;
   disabled?: boolean;
 }) {
+  // Die Bezeichnung der Kompanie mit Caps (ß in Großbuchstaben), der Satz drumherum übersetzt.
+  const [before, after = ''] = t('Auf meiner Seite unter „{directory}“').split('{directory}');
   return (
     <label className="field profile-select">
       <span>
-        Auf meiner Seite unter „<Caps text={sec.directory} />“
+        {before}
+        <Caps text={sec.directory} />
+        {after}
       </span>
       <select value={value} disabled={disabled} onChange={(e) => onChange(e.target.value as ProfileVisibility)}>
         {(Object.keys(PROFILE_OPTIONS) as ProfileVisibility[]).map((k) => (
@@ -51,10 +56,10 @@ export function ProfileSelect({
 /** Hinweis zur gewählten Anzeige; „öffentlich“ heißt: für jeden mit der Adresse der App. */
 export function profileHint(v: ProfileVisibility): string {
   return v === 'public'
-    ? 'Öffentlich: Jeder, der die Adresse der App kennt, sieht es, auch ohne Anmeldung.'
+    ? t('Öffentlich: Jeder, der die Adresse der App kennt, sieht es, auch ohne Anmeldung.')
     : v === 'members'
-      ? 'Nur angemeldete Mitglieder sehen es.'
-      : 'Niemand sieht es auf deiner Seite.';
+      ? t('Nur angemeldete Mitglieder sehen es.')
+      : t('Niemand sieht es auf deiner Seite.');
 }
 
 /** Eintritt eines Eintrags zum Bearbeiten (ältere Server ohne date: das Jahr). */
@@ -66,27 +71,27 @@ export const joinText = (j: JoinYear): string => formatYearOrDate(j.date ?? Stri
 /** Eintritt als Satz: „Eingetreten am 12.03.2005“ bzw. „Eingetreten 2005“. */
 const joinedSentence = (j: JoinYear): string => {
   const text = joinText(j);
-  return text.length === 4 ? `Eingetreten ${text}` : `Eingetreten am ${text}`;
+  return text.length === 4 ? t('Eingetreten {year}', { year: text }) : t('Eingetreten am {date}', { date: text });
 };
 
 /** Grobe Prüfung (der Server prüft genau, auch ob es den Tag gibt): Text = Fehlermeldung, sonst die Eingabe. */
 function readDate(v: string): { date: string } | string {
   const date = v.trim();
-  if (!/^(\d{1,2}\.\d{1,2}\.)?\d{4}$/.test(date)) return 'Bitte den Eintritt als TT.MM.JJJJ oder nur das Jahr angeben.';
-  if (Number(date.slice(-4)) > new Date().getFullYear()) return 'Der Eintritt darf nicht in der Zukunft liegen.';
+  if (!/^(\d{1,2}\.\d{1,2}\.)?\d{4}$/.test(date)) return t('Bitte den Eintritt als TT.MM.JJJJ oder nur das Jahr angeben.');
+  if (Number(date.slice(-4)) > new Date().getFullYear()) return t('Der Eintritt darf nicht in der Zukunft liegen.');
   return { date };
 }
 
 function DateField({ value, onChange, disabled }: { value: string; onChange: (v: string) => void; disabled: boolean }) {
   return (
     <label className="field join-year-field">
-      <span>Datum oder Jahr</span>
+      <span>{t('Datum oder Jahr')}</span>
       <input
         type="text"
         inputMode="decimal"
         autoComplete="off"
         maxLength={10}
-        placeholder="TT.MM.JJJJ oder JJJJ"
+        placeholder={t('TT.MM.JJJJ oder JJJJ')}
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value.replace(/[^\d.]/g, ''))}
@@ -124,7 +129,7 @@ export function OwnJoinYearCard({ onToast }: { onToast: (msg: string) => void })
     setBusy(true);
     try {
       const res = await api.saveMyJoinYear({ date: input.date, profile: p });
-      done(res.join_year, 'Eintritt gespeichert');
+      done(res.join_year, t('Eintritt gespeichert'));
     } catch (err) {
       setFormError((err as Error).message);
     } finally {
@@ -133,11 +138,11 @@ export function OwnJoinYearCard({ onToast }: { onToast: (msg: string) => void })
   }
 
   async function remove() {
-    if (!(await confirmAsk('Deinen Eintritt entfernen?'))) return;
+    if (!(await confirmAsk(t('Deinen Eintritt entfernen?')))) return;
     setBusy(true);
     try {
       await api.deleteMyJoinYear();
-      done(null, 'Eintritt entfernt');
+      done(null, t('Eintritt entfernt'));
     } catch (err) {
       setFormError((err as Error).message);
     } finally {
@@ -147,8 +152,8 @@ export function OwnJoinYearCard({ onToast }: { onToast: (msg: string) => void })
 
   return (
     <form className="form card account-card join-year-card" onSubmit={save}>
-      <h3>Eintritt</h3>
-      <p className="muted small">Wann du eingetreten bist: das Datum oder nur das Jahr. So steht es auch auf deiner Seite.</p>
+      <h3>{t('Eintritt')}</h3>
+      <p className="muted small">{t('Wann du eingetreten bist: das Datum oder nur das Jahr. So steht es auch auf deiner Seite.')}</p>
       <DateField value={v} onChange={setValue} disabled={busy || pending} />
       <ProfileSelect value={p} onChange={setProfile} disabled={busy || pending} />
       <p className="muted small">{profileHint(p)}</p>
@@ -158,11 +163,11 @@ export function OwnJoinYearCard({ onToast }: { onToast: (msg: string) => void })
         </p>
       )}
       <button className="btn btn-block" type="submit" disabled={busy || pending}>
-        {busy ? 'Speichert …' : 'Eintritt speichern'}
+        {busy ? t('Speichert …') : t('Eintritt speichern')}
       </button>
       {current && (
         <button type="button" className="btn btn-secondary btn-block join-year-remove" disabled={busy} onClick={remove}>
-          Entfernen
+          {t('Entfernen')}
         </button>
       )}
     </form>
@@ -206,17 +211,20 @@ export function MemberJoinYear({
     e.preventDefault();
     const input = readDate(value);
     if (typeof input === 'string') return setFormError(input);
-    void run(() => api.setMemberJoinYear(id, input.date), 'Eintritt gespeichert');
+    void run(() => api.setMemberJoinYear(id, input.date), t('Eintritt gespeichert'));
   }
 
   return (
     <form className="member-join-year" onSubmit={save}>
-      <h3 className="section-title">Eintritt</h3>
+      <h3 className="section-title">{t('Eintritt')}</h3>
       <div className="card member-join-year-card">
-        <p className="member-join-year-current">{joinYear ? joinedSentence(joinYear) : 'Nicht eingetragen.'}</p>
+        <p className="member-join-year-current">{joinYear ? joinedSentence(joinYear) : t('Nicht eingetragen.')}</p>
         {joinYear && config?.features.directory && (
           <p className="muted small">
-            Auf der Seite unter „{sec.directory}“: {PROFILE_OPTIONS[joinYear.profile]} (wählt nur die Person selbst)
+            {t('Auf der Seite unter „{directory}“: {choice} (wählt nur die Person selbst)', {
+              directory: sec.directory,
+              choice: PROFILE_OPTIONS[joinYear.profile],
+            })}
           </p>
         )}
         <DateField value={value} onChange={setValue} disabled={busy} />
@@ -227,7 +235,7 @@ export function MemberJoinYear({
         )}
         <div className="button-row">
           <button className="btn" type="submit" disabled={busy}>
-            Eintritt speichern
+            {t('Eintritt speichern')}
           </button>
           {joinYear && (
             <button
@@ -235,14 +243,14 @@ export function MemberJoinYear({
               className="btn btn-secondary"
               disabled={busy}
               onClick={async () =>
-                (await confirmAsk('Eintritt entfernen?')) &&
+                (await confirmAsk(t('Eintritt entfernen?'))) &&
                 run(async () => {
                   await api.deleteMemberJoinYear(id);
                   setValue('');
-                }, 'Eintritt entfernt')
+                }, t('Eintritt entfernt'))
               }
             >
-              Entfernen
+              {t('Entfernen')}
             </button>
           )}
         </div>

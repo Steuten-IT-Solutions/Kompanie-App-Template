@@ -11,10 +11,10 @@ Hier legst du fest, welche Bereiche die App für alle hat, zum Beispiel {bereich
 Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **Bereiche**.
 
 ## Was du hier siehst
-Je Bereich ein Schalter mit seinem Namen und einem Satz, wofür er da ist: {bereich.events}, {bereich.calendar}, {bereich.news}, {bereich.gallery}, {bereich.points}, {bereich.penalties}, {bereich.ranks}, {bereich.titles}, {bereich.attendance}, {bereich.documents}, {bereich.board}, {bereich.polls}, {bereich.birthdays}, {bereich.inventory}, {bereich.directory}, {bereich.offices}, {bereich.lists}, {bereich.mail}, {bereich.companies}, {bereich.sponsors} und {bereich.pages}.
+Je Bereich ein Schalter mit seinem Namen und einem Satz, wofür er da ist: {bereich.events}, {bereich.calendar}, {bereich.news}, {bereich.gallery}, {bereich.points}, {bereich.penalties}, {bereich.ranks}, {bereich.titles}, {bereich.attendance}, {bereich.documents}, {bereich.board}, {bereich.polls}, {bereich.birthdays}, {bereich.inventory}, {bereich.directory}, {bereich.offices}, {bereich.lists}, {bereich.mail}, {bereich.companies}, {bereich.sponsors}, {bereich.pages} und **Passive**, in der eigenständigen Version außerdem **Webseite**.
 
 Unter einem Schalter steht außerdem, falls nötig:
-- **Braucht …**: Der Bereich lässt sich erst einschalten, wenn der genannte an ist. Das betrifft {bereich.polls}; sie brauchen das {bereich.board}.
+- **Braucht …**: Der Bereich lässt sich erst einschalten, wenn der genannte an ist. Das betrifft {bereich.polls}; sie brauchen das {bereich.board}. Die **Webseite** braucht {bereich.pages}.
 - **Noch nicht eingerichtet.** mit **Jetzt einrichten**: Der Bereich ist an, aber noch nicht verbunden (bei {bereich.calendar}, {bereich.gallery} und {bereich.news}; bei {bereich.mail} fehlt der Mailversand unter **E-Mail**). **Jetzt einrichten** öffnet die passende Seite der Einstellungen.
 
 ## So gehst du vor
@@ -29,7 +29,7 @@ Unter einem Schalter steht außerdem, falls nötig:
 ## Gut zu wissen
 - Ausgeschaltete Bereiche behalten ihre Daten. Schaltest du sie wieder ein, ist alles wieder da.
 - {bereich.calendar}, {bereich.gallery}, {bereich.news} und {bereich.mail} erscheinen für die anderen erst, wenn sie auch eingerichtet sind ({bereich.mail}: Mailversand unter **E-Mail**).
-- Bereiche mit eigenen Aufgaben bringen beim Einschalten eine Rolle mit, zum Beispiel „{bereich.points} verwalten“. Gibt es schon eine Rolle mit diesem Namen, legt die App keine zweite an. Schaltest du den Bereich aus und hat niemand die Rolle, verschwindet sie wieder. {bereich.calendar}, {bereich.birthdays} und {bereich.directory} bringen keine eigene Rolle mit, {bereich.news} nur mit der Quelle **In der App schreiben** („{bereich.news} verwalten“, siehe [{bereich.news} einrichten](seite:admin-neuigkeiten)). Mehr unter [Rollen](seite:admin-rollen-und-mitglieder).
+- Bereiche mit eigenen Aufgaben bringen beim Einschalten eine Rolle mit, zum Beispiel „{bereich.points} verwalten“. Gibt es schon eine Rolle mit diesem Namen, legt die App keine zweite an. Schaltest du den Bereich aus und hat niemand die Rolle, verschwindet sie wieder. {bereich.calendar}, {bereich.birthdays} und {bereich.directory} bringen keine eigene Rolle mit, {bereich.news} nur mit der Quelle **In der App schreiben** oder, mit WordPress, **Beiträge dieser WordPress-Seite** („{bereich.news} verwalten“, siehe [{bereich.news} einrichten](seite:admin-neuigkeiten)). Mehr unter [Rollen](seite:admin-rollen-und-mitglieder).
 - Schaltest du einen Bereich mit eigenen Benachrichtigungen ein (z. B. {bereich.board}, {bereich.polls}, {bereich.birthdays} oder {bereich.news}), bekommen Geräte, die schon für Benachrichtigungen angemeldet sind, diese Benachrichtigungen dazu. Wer eine Art selbst abgeschaltet hat, bekommt sie nicht wieder.
 - Mit WordPress kannst du die Bereiche auch im WordPress-Backend auf der Seite der App ein- und ausschalten.
 

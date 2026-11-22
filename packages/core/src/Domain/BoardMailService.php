@@ -7,6 +7,7 @@ namespace KompanieApp\Core\Domain;
 use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Mail\Mail;
 use KompanieApp\Core\Mail\MailResult;
 use KompanieApp\Core\Port\Mailer;
@@ -67,7 +68,7 @@ final class BoardMailService
         return [
             'available' => $available,
             'recipients' => $available ? count($this->recipients($only, $authorId)) : 0,
-            'reason' => $available ? null : ($this->app->mail()->unavailable() ?? 'Der Mailversand ist noch nicht eingerichtet (Einstellungen → E-Mail).'),
+            'reason' => $available ? null : ($this->app->mail()->unavailable() ?? I18n::t('Der Mailversand ist noch nicht eingerichtet (Einstellungen → E-Mail).')),
             'server_max_size' => $this->app->mail()->serverMaxSize(),
         ];
     }
@@ -81,7 +82,7 @@ final class BoardMailService
     public function setWants(int $userId, mixed $on): bool
     {
         if (!is_bool($on)) {
-            throw ApiError::invalid('board muss true oder false sein.');
+            throw ApiError::invalid(I18n::t('board muss true oder false sein.'));
         }
         (new UserSettings($this->app->db))->set($userId, self::SETTING_OPT, $on ? '1' : '0');
         return $on;
@@ -124,13 +125,12 @@ final class BoardMailService
         if ($max === null) {
             return;
         }
-        $mail = $this->compose(0, $title, $body, $author->name, ['name' => 'Empfänger', 'email' => 'empfaenger@example.org'], $this->app->attachments()->forMail($files));
+        $mail = $this->compose(0, $title, $body, $author->name, ['name' => I18n::t('Empfänger'), 'email' => 'empfaenger@example.org'], $this->app->attachments()->forMail($files));
         $size = $this->app->mailer()->measure($mail);
         if ($size > $max) {
-            throw ApiError::invalid(sprintf(
-                'Die Mail ist mit Bildern und Anhängen %s groß, der Mailserver nimmt höchstens %s an. Bilder oder Anhänge verkleinern oder ohne E-Mail senden.',
-                ServerLimits::format($size),
-                ServerLimits::format($max),
+            throw ApiError::invalid(I18n::t(
+                'Die Mail ist mit Bildern und Anhängen {size} groß, der Mailserver nimmt höchstens {max} an. Bilder oder Anhänge verkleinern oder ohne E-Mail senden.',
+                ['size' => ServerLimits::format($size), 'max' => ServerLimits::format($max)],
             ));
         }
     }
@@ -143,7 +143,7 @@ final class BoardMailService
     public function queue(int $messageId, User $author): int
     {
         if (!$this->available()) {
-            throw ApiError::invalid('Der Mailversand ist nicht eingerichtet.');
+            throw ApiError::invalid(I18n::t('Der Mailversand ist nicht eingerichtet.'));
         }
         $recipients = $this->recipients($this->app->board()->readerIdsOf($messageId), $author->id);
         $now = $this->app->time()->nowUtc();
@@ -192,6 +192,7 @@ final class BoardMailService
         $stats = ['sent' => 0, 'failed' => 0, 'processed' => 0];
         $messages = [];
         $files = [];
+        $tr = [];
         $names = new UserNames($this->app->users);
         foreach ($this->due($nowTs, $limit) as $row) {
             if (microtime(true) - $start > MailService::BUDGET) {
@@ -206,7 +207,16 @@ final class BoardMailService
             $user = $this->app->users->find((int) $row['user_id']);
             $recipient = ['name' => (string) ($user?->name ?? ''), 'email' => (string) $row['email']];
             $files[$mid] ??= $this->app->attachments()->forMail($this->app->attachments()->of(AttachmentService::OWNER_BOARD, $mid));
-            $mail = $this->compose($mid, $message['title'], $this->app->board()->mailHtml($message, $user), (string) $names->name($message['author_id']), $recipient, $files[$mid]);
+            // In der Sprache des Empfängers: Fußzeile und Hinweise, Titel und Inhalt aus der Fassung dieser Sprache
+            // (fehlt sie oder ein Teil davon: deutsch, BoardService::mailParts).
+            $tr[$mid] ??= $this->app->contentTranslations()->of(BoardService::KIND, $mid);
+            $mail = I18n::in(
+                $this->app->languages()->forRecipient((int) $row['user_id']),
+                function () use ($mid, $message, $user, $names, $recipient, $files, $tr): Mail {
+                    [$title, $html] = $this->app->board()->mailParts($message, $user, $tr[$mid]);
+                    return $this->compose($mid, $title, $html, (string) $names->name($message['author_id']), $recipient, $files[$mid]);
+                },
+            );
             $result = $mailer->send($mail);
             $attempts = (int) $row['attempts'] + 1;
             $stats['processed']++;
@@ -296,18 +306,20 @@ final class BoardMailService
         $board = $this->app->config->sectionLabel('board', 'Schwarzes Brett');
         $url = $this->app->env->appUrl() . '#/brett' . ($messageId > 0 ? '/' . $messageId : '');
         $esc = static fn (string $s): string => htmlspecialchars($s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-        $footer = sprintf('%s: Nachricht von %s', $board, $authorName === '' ? UserNames::DELETED : $authorName);
-        $optOut = 'Du bekommst diese Mail, weil du in der App „' . $this->app->config->name() . '“ Nachrichten aus dem Bereich „' . $board
-            . '“ per E-Mail erhältst. Abschalten kannst du das in der App unter Konto → Benachrichtigungen.';
-        $document = '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>' . $esc($title) . '</title></head>'
+        $footer = I18n::t('{section}: Nachricht von {name}', ['section' => $board, 'name' => $authorName === '' ? UserNames::DELETED : $authorName]);
+        $optOut = I18n::t(
+            'Du bekommst diese Mail, weil du in der App „{app}“ Nachrichten aus dem Bereich „{section}“ per E-Mail erhältst. Abschalten kannst du das in der App unter Konto → Benachrichtigungen.',
+            ['app' => $this->app->config->name(), 'section' => $board],
+        );
+        $document = '<!DOCTYPE html><html lang="' . $esc(I18n::locale()) . '"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>' . $esc($title) . '</title></head>'
             . '<body style="margin: 0; padding: 16px; font-family: Arial, Helvetica, sans-serif; font-size: 15px; line-height: 1.5; color: #222222; background-color: #ffffff">'
             . '<h1 style="font-size: 20px; line-height: 1.3; margin: 0 0 12px 0">' . $esc($title) . '</h1>'
             . '<div>' . $html . '</div>'
             . '<hr style="border: none; border-top: 1px solid #cccccc; margin: 24px 0 12px 0">'
-            . '<p style="font-size: 13px; color: #555555; margin: 0 0 8px 0">' . $esc($footer) . ' – <a href="' . $esc($url) . '">in der App ansehen</a></p>'
+            . '<p style="font-size: 13px; color: #555555; margin: 0 0 8px 0">' . $esc($footer) . ' – <a href="' . $esc($url) . '">' . $esc(I18n::t('in der App ansehen')) . '</a></p>'
             . '<p style="font-size: 12px; color: #777777; margin: 0">' . $esc($optOut) . '</p>'
             . '</body></html>';
-        $text = $title . "\n\n" . RichText::excerpt($body) . "\n\n-- \n" . $footer . "\nIn der App ansehen: " . $url . "\n\n" . $optOut . "\n";
+        $text = $title . "\n\n" . RichText::excerpt($body) . "\n\n-- \n" . $footer . "\n" . I18n::t('In der App ansehen: {url}', ['url' => $url]) . "\n\n" . $optOut . "\n";
         return new Mail($recipient['email'], $recipient['name'], $title, $document, $text, array_values($images), attachments: $attachments);
     }
 

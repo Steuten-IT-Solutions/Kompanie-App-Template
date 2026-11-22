@@ -1,0 +1,64 @@
+---
+titel: Sprachen
+reihenfolge: 128
+rechte: [manage_settings]
+---
+
+Hier schaltest du ein, in welchen Sprachen die App für eure Kompanie zu haben ist. Die Basissprache eurer Kompanie ist immer an, meist Deutsch. Schaltest du eine weitere Sprache dazu, wählt jede Person ihre Sprache selbst.
+
+![Die Seite Sprachen mit Deutsch und Englisch](bild:admin-sprachen)
+
+## So öffnest du die Seite
+
+Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **Sprachen**.
+
+## Was du hier siehst
+
+- **Deutsch**: immer eingeschaltet, lässt sich nicht ausschalten.
+- **English**: Englisch als weitere Sprache, anfangs aus.
+- **Speichern**: übernimmt die Auswahl.
+
+## So gehst du vor
+
+### Englisch einschalten
+
+1. Schalte **English** ein.
+2. Tippe auf **Speichern**.
+
+Oben in der Kopfzeile erscheint dann eine Flagge. Wer darauf tippt, wählt **Deutsch** oder **English**. Dieselbe Wahl steht für Angemeldete unter **Meins → Konto** in der Karte **Sprache**.
+
+### Eigene Namen auf Englisch eintragen
+Habt ihr Bereiche oder Rollen umbenannt, bleiben diese Namen zunächst auch auf Englisch, wie sie sind. Alle englischen Namen trägst du an einer Stelle ein: im Abschnitt **Übersetzungen** unter der Auswahl der Sprachen. Er erscheint, sobald Englisch eingeschaltet ist.
+
+1. Tippe auf eine Gruppe, um sie aufzuklappen, z. B. **Bereiche der Navigation**, **Rollen**, **{bereich.ranks}**, **{bereich.offices}**, **Gruppen der Ämter**, **Terminarten** oder **Untermenüs**. Neben jeder Gruppe steht, wie viele Namen schon übersetzt sind, z. B. **3 von 5**.
+2. Links steht der deutsche Name, rechts trägst du den englischen ein. Ein leeres Feld zeigt grau, was auf Englisch ohne Eintrag erscheint: meist der deutsche Name, bei Bereichen und Rollen, die ihr nicht umbenannt habt, die englische Vorgabe (z. B. **Events**).
+3. Tippe auf **Speichern**. Auf dem Knopf steht, wie viele Namen du geändert hast.
+
+Mit **Nur fehlende zeigen** siehst du nur Namen, die noch keinen englischen haben; alle Gruppen klappen dann auf. Über das Suchfeld findest du einen Namen auf Deutsch oder Englisch. Oben steht, wie viele Namen insgesamt noch fehlen.
+
+Ein leeres Feld heißt: Auf Englisch gilt der deutsche Name (bzw. die englische Vorgabe). Löschst du einen englischen Namen und speicherst, gilt wieder der deutsche. Die deutschen Namen änderst du weiter dort, wo du sie anlegst, z. B. unter [Navigation](seite:admin-navigation) oder [Rollen](seite:admin-rollen-und-mitglieder). Terminarten und Untermenüs hängen an ihrem deutschen Namen: Benennst du einen auf Deutsch um, trägst du den englischen Namen danach noch einmal ein.
+
+### Inhalte auf Englisch
+Im selben Abschnitt **Übersetzungen** stehen auch einfache Inhalte: **Kommende Termine** (auch die des internen Kalenders), **Laufende Umfragen**, **{bereich.documents}**, **Kategorien der Dokumente** und **Alben der Galerie**. Über den Feldern eines Inhalts steht sein deutscher Titel (bei Terminen mit Datum), links der Name des Felds, z. B. **Titel**, **Ort**, **Frage** oder **Antwort 1**. Felder, die auf Deutsch leer sind, fehlen. Eine Gruppe siehst du nur, wenn du den Bereich auch bearbeiten darfst; vergangene Termine und beendete Umfragen fallen weg. Benachrichtigungen gehen dann in der Sprache der Empfänger.
+
+**{bereich.pages}** und laufende Nachrichten am **{bereich.board}** stehen dort je mit Stand, z. B. **3 von 4 übersetzt**. Mit **Übersetzen** öffnest du den englischen Titel und die Texte der Blöcke; jede Seite und Nachricht speicherst du einzeln. Nachrichten am {bereich.board} und {bereich.polls} können ihre englische Fassung schon beim Schreiben im Formular im Abschnitt **Auf English schreiben (freiwillig)** bekommen, damit Benachrichtigung und Mail gleich auf Englisch rausgehen. {bereich.news}, die in der App geschrieben werden, bekommen ihre englische Fassung beim Bearbeiten: oben **Schreiben auf: English**. Wer die App auf Englisch nutzt und einen Inhalt ohne englische Fassung öffnet, sieht die deutsche mit dem Hinweis *Nur auf Deutsch verfügbar*. Beiträge eurer WordPress-Seite übersetzt ihr mit dem Plugin Polylang (siehe [Neuigkeiten](seite:admin-neuigkeiten)).
+
+### Englisch wieder ausschalten
+
+1. Schalte **English** aus und tippe auf **Speichern**.
+
+Die Flagge verschwindet, und alle sehen die App wieder auf Deutsch.
+
+## Gut zu wissen
+
+- Die Wahl gilt am Gerät, auch für Gäste ohne Anmeldung. Wer angemeldet ist, behält seine Sprache auch auf anderen Geräten, und Mails und Benachrichtigungen an ihn kommen in dieser Sprache.
+- Übersetzt sind die Texte der App selbst, also Knöpfe, Überschriften und Meldungen, und die vorgegebenen Namen der Bereiche und Rollen (aus **Termine** wird **Events**, aus **Mitglied** **Member**). Namen, die ihr selbst vergeben habt, z. B. für Bereiche, Rollen und Dienstgrade, und was ihr eintragt, z. B. Termine oder Neuigkeiten, bleiben so, wie ihr es geschrieben habt, solange ihr keine englische Fassung eintragt (siehe oben).
+- Auch die Hilfe hinter dem **?** erscheint auf Englisch. Seiten, die es noch nicht auf Englisch gibt, zeigt sie deutsch mit dem Hinweis *Nur auf Deutsch verfügbar*.
+- Nach dem Wechsel der Sprache lädt die App einmal neu.
+- Was du unter **Übersetzungen** einträgst, ändert die deutschen Namen nicht.
+- **Basissprache**: In ihr schreibt ihr Namen und Inhalte, alle anderen Sprachen sind Übersetzungen davon. Sie wird beim Anlegen der Kompanie gewählt und lässt sich danach nicht mehr ändern. Diese Seite beschreibt eine Kompanie mit Deutsch als Basissprache. Ist bei euch Englisch die Basissprache, ist es umgekehrt: **English** ist immer an, **Deutsch** schaltest du dazu, und unter **Übersetzungen** trägst du die deutschen Namen und Inhalte ein. Ohne deutsche Fassung erscheint dann der englische Text mit dem Hinweis *Nur auf Englisch verfügbar*.
+
+## Siehe auch
+
+- [Einstellungen](seite:admin-einstellungen)
+- [Konto](seite:anmelden-und-konto)

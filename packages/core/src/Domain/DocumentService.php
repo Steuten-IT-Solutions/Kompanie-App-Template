@@ -9,6 +9,7 @@ use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Http\FileCache;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Storage\DocumentRepository;
 
 /**
@@ -27,6 +28,9 @@ final class DocumentService
 {
     public const MAX_BYTES = 20 * 1024 * 1024;
     public const TITLE_MAX = 191;
+    /** Art in der Tabelle translations (Plan „Mehrsprachigkeit“, PR 9e) */
+    public const KIND = 'document';
+    public const KIND_CATEGORY = 'document_category';
     public const VISIBLE_MEMBERS = 'members';
     public const VISIBLE_MANAGERS = 'managers';
     private const DIR = 'dokumente/';
@@ -67,8 +71,9 @@ final class DocumentService
 
     public static function canSee(?User $user, string $visibility): bool
     {
-        $manager = $user !== null && $user->can(Capability::ManageDocuments);
-        return $user !== null && ($manager || $user->can(Capability::ViewDocuments)) && ($visibility !== self::VISIBLE_MANAGERS || $manager);
+        // Eingeschränkte sieht, wer sie sehen darf (view_restricted_documents; manage_documents setzt das voraus).
+        $all = $user !== null && $user->can(Capability::ViewRestrictedDocuments);
+        return $user !== null && ($all || $user->can(Capability::ViewDocuments)) && ($visibility !== self::VISIBLE_MANAGERS || $all);
     }
 
     /**
@@ -76,13 +81,36 @@ final class DocumentService
      *
      * @return array<string, mixed>
      */
-    public function list(User $viewer): array
+    public function list(User $viewer, bool $source = false): array
     {
         $docs = array_values(array_filter($this->repository()->all(), static fn (array $d): bool => self::canSee($viewer, $d['visibility'])));
+        // Namen je Sprache (Plan „Mehrsprachigkeit“, PR 9e); zum Bearbeiten ($source, nur manage_documents) deutsch samt translations
+        $source = $source && $viewer->can(Capability::ManageDocuments);
+        $content = $this->app->contentTranslations();
+        $multi = $content->locales() !== [];
+        $docTr = $multi ? $content->ofMany(self::KIND, array_map(static fn (array $d): int => $d['id'], $docs)) : [];
+        $categories = $this->repository()->categories();
+        $catTr = $multi ? $content->ofMany(self::KIND_CATEGORY, array_map(static fn (array $c): int => $c['id'], $categories)) : [];
         return [
-            'categories' => $this->repository()->categories(),
-            'documents' => array_map($this->format(...), $docs),
+            'categories' => array_map(fn (array $c): array => $this->categoryOut($c, $catTr[$c['id']] ?? [], $source), $categories),
+            'documents' => array_map(fn (array $d): array => $this->format($d, $docTr[$d['id']] ?? [], $source), $docs),
         ] + ($viewer->can(Capability::ManageDocuments) ? ['max_bytes' => self::maxBytes()] : []);
+    }
+
+    /**
+     * Kategorie für die Antwort: Name in der Sprache der Anfrage, mit $source deutsch samt translations.
+     *
+     * @param array{id: int, title: string, sort: int} $c
+     * @param array<string, array<string, string>> $tr
+     * @return array<string, mixed>
+     */
+    private function categoryOut(array $c, array $tr, bool $source): array
+    {
+        $content = $this->app->contentTranslations();
+        if ($content->locales() === []) {
+            return $c;
+        }
+        return $source ? $c + ['translations' => $content->titlesSource($tr)] : ['title' => $content->titleIn($tr, $c['title'])] + $c;
     }
 
     /**
@@ -97,7 +125,9 @@ final class DocumentService
             return null;
         }
         $doc = $this->repository()->find($id);
-        return $doc !== null && self::canSee($viewer ?? $this->app->anonymous(), $doc['visibility']) ? $this->format($doc) : null;
+        return $doc !== null && self::canSee($viewer ?? $this->app->anonymous(), $doc['visibility'])
+            ? $this->format($doc, $this->app->contentTranslations()->of(self::KIND, $id))
+            : null;
     }
 
     /**
@@ -119,7 +149,7 @@ final class DocumentService
         }
         // Ohne Anmeldung mit den Rechten von Gast (App::anonymous).
         $viewer = $user ?? $this->app->anonymous();
-        if (!$viewer->can(Capability::ViewDocuments) && !$viewer->can(Capability::ManageDocuments)) {
+        if (!$viewer->can(Capability::ViewDocuments) && !$viewer->can(Capability::ViewRestrictedDocuments)) {
             return ['status' => $user === null ? 401 : 403];
         }
         $user = $viewer;
@@ -158,6 +188,7 @@ final class DocumentService
     public function create(array $in, int $by): array
     {
         $meta = $this->validMeta($in, true);
+        $translations = $this->app->contentTranslations()->titlesInput($in['translations'] ?? null, self::TITLE_MAX);
         $stored = $this->store($in['file'] ?? null);
         $now = $this->app->time()->nowUtc();
         try {
@@ -166,21 +197,34 @@ final class DocumentService
             $this->app->files->delete(self::DIR . $stored['file'], false);
             throw $e;
         }
-        return $this->format((array) $this->repository()->find($id));
+        $this->app->contentTranslations()->saveAll(self::KIND, $id, $translations, $by);
+        return $this->editable($id);
+    }
+
+    /**
+     * Dokument zum Bearbeiten: deutsch, mit translations, wenn weitere Sprachen an sind.
+     *
+     * @return array<string, mixed>
+     */
+    private function editable(int $id): array
+    {
+        return $this->format((array) $this->repository()->find($id), $this->app->contentTranslations()->of(self::KIND, $id), true);
     }
 
     /**
      * @param array<string, mixed> $in title, category_id, date, visibility
      * @return array<string, mixed>
      */
-    public function update(int $id, array $in): array
+    public function update(int $id, array $in, int $by = 0): array
     {
-        $this->repository()->find($id) ?? throw ApiError::notFound('Dokument nicht gefunden.');
+        $this->repository()->find($id) ?? throw ApiError::notFound(I18n::t('Dokument nicht gefunden.'));
         $meta = $this->validMeta($in, false);
+        $translations = $this->app->contentTranslations()->titlesInput($in['translations'] ?? null, self::TITLE_MAX);
         if ($meta !== []) {
             $this->repository()->update($id, $meta + ['updated_at' => $this->app->time()->nowUtc()]);
         }
-        return $this->format((array) $this->repository()->find($id));
+        $this->app->contentTranslations()->saveAll(self::KIND, $id, $translations, $by);
+        return $this->editable($id);
     }
 
     /**
@@ -190,7 +234,7 @@ final class DocumentService
      */
     public function replaceFile(int $id, mixed $file, int $by): array
     {
-        $doc = $this->repository()->find($id) ?? throw ApiError::notFound('Dokument nicht gefunden.');
+        $doc = $this->repository()->find($id) ?? throw ApiError::notFound(I18n::t('Dokument nicht gefunden.'));
         $stored = $this->store($file);
         try {
             $this->repository()->update($id, $stored + ['uploaded_by' => $by, 'updated_at' => $this->app->time()->nowUtc()]);
@@ -199,13 +243,14 @@ final class DocumentService
             throw $e;
         }
         $this->removeFile($doc['file']);
-        return $this->format((array) $this->repository()->find($id));
+        return $this->editable($id);
     }
 
     public function delete(int $id): void
     {
-        $doc = $this->repository()->find($id) ?? throw ApiError::notFound('Dokument nicht gefunden.');
+        $doc = $this->repository()->find($id) ?? throw ApiError::notFound(I18n::t('Dokument nicht gefunden.'));
         $this->repository()->delete($id);
+        $this->app->contentTranslations()->delete(self::KIND, $id);
         $this->removeFile($doc['file']);
     }
 
@@ -220,27 +265,47 @@ final class DocumentService
     /* Kategorien                                                        */
     /* ---------------------------------------------------------------- */
 
-    /** @return array{id: int, title: string, sort: int} */
-    public function createCategory(mixed $title): array
+    /** @return array<string, mixed> id, title, sort (deutsch), mit weiteren Sprachen translations */
+    public function createCategory(mixed $title, mixed $translations = null, int $by = 0): array
     {
         $repo = $this->repository();
-        $id = $repo->insertCategory($this->validCategoryTitle($title, null), $repo->maxCategorySort() + 10);
-        return $repo->category($id) ?? throw ApiError::notFound('Kategorie nicht gefunden.');
+        $valid = $this->validCategoryTitle($title, null);
+        $tr = $this->app->contentTranslations()->titlesInput($translations, self::TITLE_MAX);
+        $id = $repo->insertCategory($valid, $repo->maxCategorySort() + 10);
+        $this->app->contentTranslations()->saveAll(self::KIND_CATEGORY, $id, $tr, $by);
+        return $this->editableCategory($id);
     }
 
-    /** @return array{id: int, title: string, sort: int} */
-    public function renameCategory(int $id, mixed $title): array
+    /**
+     * Umbenennen und/oder Namen je Sprache ändern ($title null: der deutsche bleibt).
+     *
+     * @return array<string, mixed>
+     */
+    public function renameCategory(int $id, mixed $title, mixed $translations = null, int $by = 0): array
     {
         $repo = $this->repository();
-        $repo->category($id) ?? throw ApiError::notFound('Kategorie nicht gefunden.');
-        $repo->updateCategory($id, ['title' => $this->validCategoryTitle($title, $id)]);
-        return $repo->category($id) ?? throw ApiError::notFound('Kategorie nicht gefunden.');
+        $repo->category($id) ?? throw ApiError::notFound(I18n::t('Kategorie nicht gefunden.'));
+        $valid = $title === null && $translations !== null ? null : $this->validCategoryTitle($title, $id);
+        $tr = $this->app->contentTranslations()->titlesInput($translations, self::TITLE_MAX);
+        if ($valid !== null) {
+            $repo->updateCategory($id, ['title' => $valid]);
+        }
+        $this->app->contentTranslations()->saveAll(self::KIND_CATEGORY, $id, $tr, $by);
+        return $this->editableCategory($id);
+    }
+
+    /** @return array<string, mixed> */
+    private function editableCategory(int $id): array
+    {
+        $c = $this->repository()->category($id) ?? throw ApiError::notFound(I18n::t('Kategorie nicht gefunden.'));
+        return $this->categoryOut($c, $this->app->contentTranslations()->of(self::KIND_CATEGORY, $id), true);
     }
 
     public function deleteCategory(int $id): void
     {
-        $this->repository()->category($id) ?? throw ApiError::notFound('Kategorie nicht gefunden.');
+        $this->repository()->category($id) ?? throw ApiError::notFound(I18n::t('Kategorie nicht gefunden.'));
         $this->repository()->deleteCategory($id);
+        $this->app->contentTranslations()->delete(self::KIND_CATEGORY, $id);
     }
 
     /**
@@ -261,7 +326,7 @@ final class DocumentService
         $known = array_keys($current);
         sort($known);
         if ($given !== $known) {
-            throw ApiError::invalid('Bitte die Reihenfolge aller Kategorien angeben.');
+            throw ApiError::invalid(I18n::t('Bitte die Reihenfolge aller Kategorien angeben.'));
         }
         foreach ($order as $i => $id) {
             if ($current[(int) $id]['sort'] !== ($i + 1) * 10) {
@@ -312,14 +377,18 @@ final class DocumentService
 
     /**
      * @param Document $d
+     * @param array<string, array<string, string>> $tr Fassungen (Titel je Sprache)
+     * @param bool $source zum Bearbeiten: deutscher Titel und translations
      * @return array<string, mixed>
      */
-    private function format(array $d): array
+    private function format(array $d, array $tr = [], bool $source = false): array
     {
         [$mime, , $kind] = self::TYPES[$d['ext']] ?? ['application/octet-stream', '', 'file'];
-        return [
+        $content = $this->app->contentTranslations();
+        $extra = $source && $content->locales() !== [] ? ['translations' => $content->titlesSource($tr)] : [];
+        return $extra + [
             'id' => $d['id'],
-            'title' => $d['title'],
+            'title' => $source ? $d['title'] : $content->titleIn($tr, $d['title']),
             'category_id' => $d['category_id'],
             'date' => $d['doc_date'],
             'visibility' => $d['visibility'],
@@ -343,30 +412,30 @@ final class DocumentService
         if ($creating || array_key_exists('title', $in)) {
             $title = Text::line($in['title'] ?? '', self::TITLE_MAX + 1);
             if ($title === '') {
-                throw ApiError::invalid('Bitte einen Titel angeben.');
+                throw ApiError::invalid(I18n::t('Bitte einen Titel angeben.'));
             }
             if (mb_strlen($title) > self::TITLE_MAX) {
-                throw ApiError::invalid(sprintf('Der Titel darf höchstens %d Zeichen lang sein.', self::TITLE_MAX));
+                throw ApiError::invalid(I18n::t('Der Titel darf höchstens {max} Zeichen lang sein.', ['max' => self::TITLE_MAX]));
             }
             $out['title'] = $title;
         }
         if ($creating || array_key_exists('category_id', $in)) {
             $cat = Input::integer($in['category_id'] ?? null) ?: null;
             if ($cat !== null && $this->repository()->category($cat) === null) {
-                throw ApiError::invalid('Kategorie nicht gefunden.');
+                throw ApiError::invalid(I18n::t('Kategorie nicht gefunden.'));
             }
             $out['category_id'] = $cat;
         }
         if ($creating || array_key_exists('date', $in)) {
             if (!Input::isDate($in['date'] ?? null)) {
-                throw ApiError::invalid('Bitte einen gültigen Stand angeben.');
+                throw ApiError::invalid(I18n::t('Bitte einen gültigen Stand angeben.'));
             }
             $out['doc_date'] = (string) $in['date'];
         }
         if ($creating || array_key_exists('visibility', $in)) {
             $vis = ($in['visibility'] ?? '') === '' ? self::VISIBLE_MEMBERS : $in['visibility'];
             if (!in_array($vis, [self::VISIBLE_MEMBERS, self::VISIBLE_MANAGERS], true)) {
-                throw ApiError::invalid('Ungültige Sichtbarkeit.');
+                throw ApiError::invalid(I18n::t('Ungültige Sichtbarkeit.'));
             }
             $out['visibility'] = $vis;
         }
@@ -388,28 +457,28 @@ final class DocumentService
         }
         $bytes = $data === '' ? '' : base64_decode($data, true);
         if ($bytes === false || $bytes === '') {
-            throw ApiError::invalid(sprintf(
-                'Es ist keine Datei angekommen. Ist sie größer als das, was der Server annimmt (%s)?',
-                self::formatBytes(self::maxBytes()),
+            throw ApiError::invalid(I18n::t(
+                'Es ist keine Datei angekommen. Ist sie größer als das, was der Server annimmt ({max})?',
+                ['max' => self::formatBytes(self::maxBytes())],
             ));
         }
         // Nicht maxBytes(): Hier liegt die Anfrage schon im Speicher; was angekommen ist, ließ sich auch dekodieren.
         $max = self::requestLimit();
         if (strlen($bytes) > $max) {
-            throw ApiError::invalid(sprintf('Die Datei darf höchstens %s groß sein.', self::formatBytes($max)));
+            throw ApiError::invalid(I18n::t('Die Datei darf höchstens {max} groß sein.', ['max' => self::formatBytes($max)]));
         }
         $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
         if (!isset(self::TYPES[$ext])) {
-            throw ApiError::invalid('Erlaubt sind PDF, Word, Excel, PowerPoint, OpenDocument sowie JPG- und PNG-Bilder.');
+            throw ApiError::invalid(I18n::t('Erlaubt sind PDF, Word, Excel, PowerPoint, OpenDocument sowie JPG- und PNG-Bilder.'));
         }
         $signature = self::TYPES[$ext][1];
         if (strncmp($bytes, $signature, strlen($signature)) !== 0) {
-            throw ApiError::invalid(sprintf('Die Datei ist keine gültige .%s-Datei.', $ext));
+            throw ApiError::invalid(I18n::t('Die Datei ist keine gültige .{ext}-Datei.', ['ext' => $ext]));
         }
         $stored = 'dok-' . bin2hex(random_bytes(12)) . '.' . $ext;
         $path = $this->app->files->path(self::DIR . $stored, false);
         if (@file_put_contents($path, $bytes) === false) {
-            throw new ApiError(500, 'storage_failed', 'Die Datei konnte nicht gespeichert werden.');
+            throw new ApiError(500, 'storage_failed', I18n::t('Die Datei konnte nicht gespeichert werden.'));
         }
         return ['file' => $stored, 'ext' => $ext, 'size' => strlen($bytes), 'version' => substr(hash('sha256', $bytes), 0, 16)];
     }
@@ -418,14 +487,14 @@ final class DocumentService
     {
         $title = Text::line($raw ?? '', self::TITLE_MAX + 1);
         if ($title === '') {
-            throw ApiError::invalid('Bitte einen Namen für die Kategorie angeben.');
+            throw ApiError::invalid(I18n::t('Bitte einen Namen für die Kategorie angeben.'));
         }
         if (mb_strlen($title) > self::TITLE_MAX) {
-            throw ApiError::invalid(sprintf('Der Name darf höchstens %d Zeichen lang sein.', self::TITLE_MAX));
+            throw ApiError::invalid(I18n::t('Der Name darf höchstens {max} Zeichen lang sein.', ['max' => self::TITLE_MAX]));
         }
         foreach ($this->repository()->categories() as $c) {
             if ($c['id'] !== $id && mb_strtolower($c['title']) === mb_strtolower($title)) {
-                throw ApiError::invalid('Diese Kategorie gibt es schon.');
+                throw ApiError::invalid(I18n::t('Diese Kategorie gibt es schon.'));
             }
         }
         return $title;

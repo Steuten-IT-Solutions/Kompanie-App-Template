@@ -6,6 +6,7 @@ namespace KompanieApp\Core\Domain\Blocks;
 
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 
 /** Zahlen/Fakten: kurze Kennzahlen nebeneinander, je Wert (z. B. „1848“, „250+“) und Bezeichnung („gegründet“). */
 final class FactsBlock implements BlockType
@@ -25,24 +26,24 @@ final class FactsBlock implements BlockType
     {
         $items = $in['items'] ?? null;
         if (!is_array($items) || !array_is_list($items) || $items === []) {
-            throw ApiError::invalid('Bitte mindestens eine Zahl eintragen.');
+            throw ApiError::invalid(I18n::t('Bitte mindestens eine Zahl eintragen.'));
         }
         if (count($items) > self::MAX) {
-            throw ApiError::invalid(sprintf('Höchstens %d Zahlen je Block.', self::MAX));
+            throw ApiError::invalid(I18n::t('Höchstens {max} Zahlen je Block.', ['max' => self::MAX]));
         }
         $out = [];
         foreach ($items as $item) {
             if (!is_array($item)) {
-                throw ApiError::invalid('Ungültige Zahl.');
+                throw ApiError::invalid(I18n::t('Ungültige Zahl.'));
             }
-            $value = Field::line($item['value'] ?? '', self::VALUE_MAX, 'Ein Wert');
-            $label = Field::line($item['label'] ?? '', self::LABEL_MAX, 'Eine Bezeichnung');
+            $value = Field::line($item['value'] ?? '', self::VALUE_MAX, I18n::t('Ein Wert'));
+            $label = Field::line($item['label'] ?? '', self::LABEL_MAX, I18n::t('Eine Bezeichnung'));
             if ($value === '' || $label === '') {
-                throw ApiError::invalid('Bitte zu jeder Zahl Wert und Bezeichnung eingeben.');
+                throw ApiError::invalid(I18n::t('Bitte zu jeder Zahl Wert und Bezeichnung eingeben.'));
             }
             $out[] = ['value' => $value, 'label' => $label];
         }
-        return ['title' => Field::line($in['title'] ?? '', self::TITLE_MAX, 'Die Überschrift der Zahlen'), 'items' => $out];
+        return ['title' => Field::line($in['title'] ?? '', self::TITLE_MAX, I18n::t('Die Überschrift der Zahlen')), 'items' => $out];
     }
 
     public function render(array $data, ?User $viewer, bool $manager): ?array

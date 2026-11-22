@@ -111,10 +111,42 @@ wieder zuerst in `early`.
 Innerhalb einer Hauptversion (`1.x`) ändern Migrationen nur additiv, damit Zurückrollen ohne Datenverlust geht.
 Veröffentlichte Versionen werden nie ersetzt; neue müssen neuer sein als alle bisherigen.
 
+## Wartungsabo
+
+Neue Versionen bekommen nur Kompanien mit laufender Wartung. Die Liste steht in der **Variable `KOMPANIE_WARTUNG`
+des Kern-Repos** (*Settings → Secrets and variables → Actions → Variables*, nicht in der Environment), eine Kompanie
+je Zeile: Name des Kompanie-Repos, dann das letzte Datum mit Wartung (JJJJ-MM-TT, UTC, einschließlich) oder
+`unbefristet`. Leere Zeilen und Zeilen mit `#` am Anfang zählen nicht.
+
+```text
+# Repo                     Wartung bis
+kompanie-musterstadt       2027-12-31
+kompanie-beispieldorf      unbefristet
+```
+
+- **Wer beachtet die Liste:** „Kompanien abgleichen“ (auch mit einem einzelnen Repo von Hand), „Kernversion
+  freigeben“ und „Versionen steuern“ mit `promote-checked` für alle Kompanien. Die gemeinsame Auswahl ist
+  [`scripts/kompanien.sh`](../scripts/kompanien.sh), die Prüfung [`scripts/wartung.php`](../scripts/wartung.php).
+- **Nicht beachtet:** „Versionen steuern“ für ein einzelnes Repo (`promote`, `withdraw`), damit sich eine fehlerhafte
+  Version auch bei Kompanien ohne Wartung zurückziehen lässt, und „Kompanie veröffentlichen“ von Hand. Die erste
+  Version einer neuen Kompanie (Formular) entsteht ebenfalls ohne Liste; für weitere Versionen gehört sie in die Liste.
+- **Nach dem Ende:** Die Kompanie bekommt keine neue Version mehr, auch keine Sicherheitsupdates. Installationen laufen
+  mit ihrer Version weiter; Zurückrollen auf ältere Versionen und Zurückziehen gehen weiter, weil Update-Liste und
+  Releases bleiben. Wird die Wartung verlängert, bekommt die Kompanie beim nächsten Abgleich die aktuelle Version.
+- **Leere oder fehlende Variable:** Alle Kompanien bekommen Updates wie vor dem Wartungsabo (mit Warnung im Lauf).
+  **Fehler im Aufbau** (fehlendes oder ungültiges Datum, doppelter Name) brechen die Läufe ab, statt still alle oder
+  keine Kompanie zu nehmen.
+- **In der App:** Beim Veröffentlichen kommt „Wartung bis“ der Kompanie in die signierte Update-Liste (Feld
+  `maintenance`, `scripts/updates.php --maintenance`). Admins sehen es unter *Einstellungen → Zustand und Updates*, nach
+  dem Ende mit Hinweis. Weil danach keine neue Liste mehr entsteht, bleibt dort das letzte veröffentlichte Datum stehen;
+  ohne Eintrag in der Variable steht nichts da.
+- Die Läufe nennen übersprungene Kompanien mit Grund in ihrem Protokoll. Weil das Kern-Repo öffentlich ist, sind diese
+  Protokolle öffentlich lesbar.
+
 ## Branches: develop und main
 
 - **develop**: Alle Änderungen kommen per Pull Request nach `develop`. Jeder Merge startet „Kompanien
-  abgleichen“ auf `develop`: Alle Kompanien bekommen eine neue Version mit dem Kern von `develop` im Kanal
+  abgleichen“ auf `develop`: Alle Kompanien mit Wartungsabo (siehe unten) bekommen eine neue Version mit dem Kern von `develop` im Kanal
   `early` (Vorabversion). Installationen mit dem Schalter **Vorabversionen erhalten** (Einstellungen → Zustand und
   Updates) spielen sie ein; dort wird getestet.
 - **main**: Ein Release ist ein Pull Request `develop → main` (als Merge-Commit, nicht zusammengefasst). Jeder
@@ -168,7 +200,7 @@ Eintrag, statt einen neuen anzulegen; in der App sind ältere Versionen eingekla
 ## Was beim Veröffentlichen passiert
 
 [`kompanien-abgleichen.yml`](../.github/workflows/kompanien-abgleichen.yml) findet alle öffentlichen Repos
-der Organisation mit dem Topic `kompanie-app` (nicht archiviert), deren Stand (Commit auf `main` und
+der Organisation mit dem Topic `kompanie-app` (nicht archiviert) und laufendem Wartungsabo, deren Stand (Commit auf `main` und
 `coreCode`) nicht der neuesten Version ihrer Update-Liste entspricht (`scripts/find-pending.sh`; ein Revert
 auf einen früheren Stand ist also ein neuer Stand), und ruft für jedes
 [`publish-kompanie.yml`](../.github/workflows/publish-kompanie.yml) auf (auch einzeln von Hand startbar):

@@ -121,8 +121,8 @@ final class MemberPhotoTest extends TestCase
 
     public function testOnlyAccountManagersChangePhotos(): void
     {
-        $manager = $this->users->add('verwalter', $this->roleWith('Kassierer', ['member', 'manage_points', 'manage_penalties']));
-        $creator = $this->users->add('anleger', $this->roleWith('Anleger', ['member', 'create_users']));
+        $manager = $this->users->add('verwalter', $this->roleWith('Kassierer', ['member', 'view_points', 'manage_points', 'view_penalties', 'manage_penalties']));
+        $creator = $this->users->add('anleger', $this->roleWith('Anleger', ['member', 'view_accounts', 'create_users']));
         $photo = ['file' => self::file('a.jpg', self::image(10, 10))];
 
         // Wer nur Punkte und Strafen verwaltet, sieht Fotos, ändert sie aber nicht (auch nicht das eigene).
@@ -142,13 +142,35 @@ final class MemberPhotoTest extends TestCase
         $this->assertFalse($this->call('GET', "/members/{$this->admin}")->data['photo_editable']);
     }
 
+    /** Wer Ehemalige verwaltet (manage_former), ändert Fotos von Ehemaligen, nicht aber von aktiven Mitgliedern. */
+    public function testFormerManagersChangePhotosOfFormerOnly(): void
+    {
+        $keeper = $this->users->add('chronist', $this->roleWith('Chronist', ['member', 'manage_former']));
+        $former = $this->users->add('alt', Roles::MEMBER);
+        $this->assertSame(200, $this->call('PUT', "/members/$former/former", ['reason' => 'left'])->status);
+        $photo = ['file' => self::file('a.jpg', self::image(10, 10))];
+
+        $this->users->current = $keeper;
+        $this->assertSame(403, $this->call('PUT', "/members/{$this->m}/photo", $photo)->status, 'aktives Mitglied');
+        $this->assertFalse($this->call('GET', "/members/{$this->m}")->data['photo_editable']);
+        $this->assertTrue($this->call('GET', "/members/$former")->data['photo_editable']);
+        $res = $this->call('PUT', "/members/$former/photo", $photo);
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $this->assertSame(200, $this->call('DELETE', "/members/$former/photo")->status);
+        // Beim Anlegen einer ehemaligen Person gleich mit Foto
+        $res = $this->call('POST', '/members/former', ['first_name' => 'Karl', 'last_name' => 'Früher', 'reason' => 'deceased', 'photo' => $photo['file']]);
+        $this->assertSame(201, $res->status, (string) json_encode($res->data));
+        $this->assertArrayNotHasKey('warning', $res->data);
+        $this->assertNotNull($res->data['photo_url']);
+    }
+
     public function testDeliveryChecksViewer(): void
     {
         $this->call('PUT', "/members/{$this->m}/photo", ['file' => self::file('a.jpg', self::image(600, 600))]);
         $info = $this->app->memberPhotos()->repository()->find($this->m);
         $this->assertNotNull($info);
         $other = $this->users->add('anderes', Roles::MEMBER);
-        $manager = $this->users->add('verwalter', $this->roleWith('Kassierer', ['member', 'manage_points', 'manage_penalties']));
+        $manager = $this->users->add('verwalter', $this->roleWith('Kassierer', ['member', 'view_points', 'manage_points', 'view_penalties', 'manage_penalties']));
         $photos = $this->app->memberPhotos();
         $deliver = fn (?int $viewer, mixed $v = null, mixed $s = '480'): array => $photos->forDelivery($viewer === null ? null : $this->users->find($viewer), $this->m, $v ?? $info['version'], $s);
 

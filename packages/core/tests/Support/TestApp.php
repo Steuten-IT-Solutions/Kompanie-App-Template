@@ -38,7 +38,7 @@ final class TestApp
         if ($db->driver() !== 'mysql') {
             return;
         }
-        foreach (['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'push_subscriptions', 'push_queue', 'ranks', 'member_ranks', 'rank_history', 'titles', 'member_titles', 'member_roles', 'attendance_lists', 'attendance_entries', 'doc_categories', 'documents', 'board_messages', 'polls', 'poll_options', 'poll_votes', 'poll_answers', 'birthdays', 'join_years', 'inventory_items', 'inventory_log', 'bug_reports', 'member_photos', 'office_groups', 'offices', 'office_terms', 'office_holders', 'office_group_terms', 'former_members', 'lists', 'list_columns', 'list_rows', 'board_message_revisions', 'rich_images', 'user_signatures', 'user_settings', 'board_mails', 'activity', 'activity_last', 'activity_seen', 'activity_daily', 'member_contacts', 'mailings', 'mailing_recipients', 'attachments', 'sponsors', 'companies', 'member_companies', 'gallery_submissions', 'app_pages', 'app_news', 'registration_requests', 'report_inbox', 'change_log'] as $t) {
+        foreach (['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'push_subscriptions', 'push_queue', 'ranks', 'member_ranks', 'rank_history', 'titles', 'member_titles', 'member_roles', 'attendance_lists', 'attendance_entries', 'doc_categories', 'documents', 'board_messages', 'polls', 'poll_options', 'poll_votes', 'poll_answers', 'birthdays', 'join_years', 'inventory_items', 'inventory_log', 'bug_reports', 'member_photos', 'office_groups', 'offices', 'office_terms', 'office_holders', 'office_group_terms', 'former_members', 'lists', 'list_columns', 'list_rows', 'board_message_revisions', 'rich_images', 'user_signatures', 'user_settings', 'board_mails', 'activity', 'activity_last', 'activity_seen', 'activity_daily', 'member_contacts', 'mailings', 'mailing_recipients', 'attachments', 'sponsors', 'companies', 'member_companies', 'gallery_submissions', 'app_pages', 'app_news', 'registration_requests', 'report_inbox', 'change_log', 'passive_members', 'passive_payments', 'event_kinds', 'candidate_since', 'translations'] as $t) {
             $db->execute('DROP TABLE IF EXISTS ' . $db->table($t));
         }
     }
@@ -61,6 +61,7 @@ final class TestApp
         ?NewsSource $news = null,
         ?BackupProvider $backup = null,
         ?Mailer $mailer = null,
+        ?\KompanieApp\Core\Port\WebsiteHost $websiteHost = null,
     ): App {
         $filesDir ??= sys_get_temp_dir() . '/kompanie-test-' . bin2hex(random_bytes(4));
         $app = new App(
@@ -81,6 +82,7 @@ final class TestApp
             backup: $backup,
             packageConfig: $packageConfig,
             customMailer: $mailer,
+            websiteHost: $websiteHost,
         );
         $users->capabilities = static fn (string $role, int $id): array => $app->roles()->capabilitiesFor($id, $role);
         $app->upgrade();
@@ -101,6 +103,10 @@ final class TestApp
     public static function caps(array $legacy): array
     {
         $all = [...\KompanieApp\Core\Auth\Roles::expandLegacy($legacy), ...\KompanieApp\Core\Auth\Roles::ADDED_VIEW];
+        // Rollen mit dem internen Kalender bekommen beim Update Zu- und Absagen dazu (RoleService::migrateRespondRights).
+        if (in_array('calendar', $all, true)) {
+            $all[] = 'respond_calendar';
+        }
         return array_values(array_filter(
             array_map(static fn (\KompanieApp\Core\Auth\Capability $c): string => $c->value, \KompanieApp\Core\Auth\Roles::GRANTABLE),
             static fn (string $v): bool => in_array($v, $all, true),

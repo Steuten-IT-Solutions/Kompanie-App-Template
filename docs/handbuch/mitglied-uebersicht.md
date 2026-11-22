@@ -2,7 +2,7 @@
 titel: Seite eines Mitglieds
 reihenfolge: 52
 rechte: []
-einrecht: [manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, view_personal, manage_personal, create_users, promote_users]
+einrecht: [view_points, manage_points, view_penalties, manage_penalties, view_promotions, manage_ranks, view_titles, manage_titles, view_attendance, manage_attendance, view_company_members, manage_companies, view_personal, manage_personal, view_accounts, create_users, manage_former, promote_users]
 ---
 Auf der Seite eines Mitglieds steht alles, was du als Verwaltung über diese Person pflegst. Zum Ändern tippst du einfach auf die jeweilige Angabe; dann öffnet sich ein Fenster.
 
@@ -15,14 +15,15 @@ Tippe unten auf **Verwaltung**, dann auf **Mitglieder**, und tippe in der Liste 
 Du siehst nur, wofür du das Recht hast und was die Kompanie nutzt.
 - **‹ Alle Mitglieder**: zurück zur Liste, an dieselbe Stelle.
 - **‹** und **›** oben rechts mit der Position (z. B. „3 / 25“): zum vorherigen bzw. nächsten Mitglied.
-- **Name** und darunter das **Abzeichen** mit dem {begriff.rank}. Wer {bereich.ranks} pflegt, tippt darauf, um zu befördern oder zu degradieren; ohne {begriff.rank} steht dort ein Kreis mit „+“ und **Kein {begriff.rank}**.
+- **Name** und darunter das **Abzeichen** mit dem {begriff.rank}. Wer {bereich.ranks} pflegt, tippt darauf, um zu befördern oder zu degradieren; wer nur **Beförderungen sehen** darf, sieht so den Verlauf; ohne {begriff.rank} steht dort ein Kreis mit „+“ und **Kein {begriff.rank}**.
 - **Foto** daneben: Ein Tipp zeigt es groß und ganz. Ohne Foto stehen dort die Anfangsbuchstaben.
-- **Rolle**: die Rolle der Person (bei Zusatzrollen „Rollen: …“), nur wenn du **Rollen vergeben** darfst. Hat sie Ausnahmen bei den Rechten, steht „mit Ausnahmen bei den Rechten“ dabei. Ohne dieses Recht steht dort nur „Ehemalig“ oder „Ohne Zugang“, wenn das zutrifft.
-- Kacheln **{bereich.points}** und **Offen**: Stand der {bereich.points} und offene {bereich.penalties}. Ein Tipp öffnet die Einträge der Person.
-- Kachel **{bereich.titles}**: ihre {bereich.titles} (oder „Keine“); ein Tipp öffnet die Auswahl.
-- Kachel **{bereich.companies}** (mit dem Recht **{bereich.companies} verwalten**): ihre {bereich.companies} (oder „Keine“); ein Tipp öffnet die Auswahl zum Ankreuzen.
-- **Geburtstag**: nur mit dem Recht **Persönliche Angaben sehen**. **Eintritt** und **Austritt**: nur für alle, die Mitglieder anlegen dürfen. „Nicht eingetragen“ heißt: Es fehlt noch.
+- **Rolle**: die Rolle der Person (bei Zusatzrollen „Rollen: …“), nur wenn du **Konten sehen** darfst. Hat sie Ausnahmen bei den Rechten, steht „mit Ausnahmen bei den Rechten“ dabei. Ohne dieses Recht steht dort nur „Ehemalig“ oder „Ohne Zugang“, wenn das zutrifft.
+- Kacheln **{bereich.points}** und **Offen**: Stand der {bereich.points} und offene {bereich.penalties}. Ein Tipp öffnet die Einträge der Person. Die Kacheln siehst du mit dem Recht, {bereich.points} bzw. {bereich.penalties} aller Mitglieder zu sehen.
+- Kachel **{bereich.titles}**: ihre {bereich.titles} (oder „Keine“); ein Tipp öffnet die Auswahl (mit dem Recht **{bereich.titles} sehen** nur die Liste).
+- Kachel **{bereich.companies}** (mit dem Recht **Zuordnung zu {bereich.companies} sehen**): ihre {bereich.companies} (oder „Keine“). Ein Tipp öffnet mit **{bereich.companies} pflegen** die Auswahl zum Ankreuzen, sonst nur die Liste.
+- **Geburtstag**: nur mit dem Recht **Persönliche Angaben sehen**. **Eintritt**: für alle, die Konten sehen, ändern nur, wer Mitglieder anlegen darf; **Austritt** (und bei Ehemaligen auch ihr Eintritt): für alle, die Ehemalige verwalten dürfen. „Nicht eingetragen“ heißt: Es fehlt noch.
 - **Persönliche Angaben**: E-Mail-Adresse, Handynummer und Adresse der Person, nur mit dem Recht **Persönliche Angaben sehen**. Ein Tipp auf die E-Mail-Adresse oder Handynummer schreibt bzw. ruft an.
+- **{bereich.attendance}** (mit dem Recht **{bereich.attendance} sehen**): wie oft die Person **anwesend** war, wie oft sie **entschuldigt** und wie oft sie **unentschuldigt** gefehlt hat. Rechts daneben wählst du das Jahr oder **Gesamt**; vorgegeben ist das laufende Jahr. Ein Tipp auf die Zahlen öffnet die Termine dazu.
 - **{bereich.offices}**: die Ämter der Person als Zeitstrahl, nur zum Ansehen.
 - **Konto und Rolle** ganz unten: klappt beim Antippen auf (siehe [Konto und Rolle](seite:rollen-vergeben)).
 
@@ -34,7 +35,7 @@ Du siehst nur, wofür du das Recht hast und was die Kompanie nutzt.
 4. Nach dem letzten Mitglied kommt wieder das erste, und vom ersten geht es zurück zum letzten. Wischen geht auch, während eine Seite noch lädt.
 
 ### Das Foto ändern
-Das dürfen alle, die Mitglieder anlegen dürfen.
+Das dürfen alle, die Mitglieder anlegen dürfen, bei Ehemaligen auch alle, die Ehemalige verwalten dürfen.
 1. Tippe auf das Foto (oder auf die Anfangsbuchstaben).
 2. Tippe auf **Foto ersetzen** oder **Foto entfernen**; ohne Foto auf **Foto hochladen**.
 3. Wähle ein Foto aus. Es gilt sofort.
@@ -52,6 +53,13 @@ Das dürfen alle mit dem Recht **Persönliche Angaben pflegen**.
 
 ![Fenster Eintritt](bild:mitglied-uebersicht-eintritt)
 
+### Die {bereich.attendance} einer Person ansehen
+1. Wähle rechts neben **{bereich.attendance}** das Jahr oder **Gesamt**.
+2. Lies die drei Zahlen ab: **anwesend**, **entschuldigt** und **unentschuldigt**.
+3. Tippe auf die Zahlen. Es öffnet sich ein Fenster mit allen Terminen des Zeitraums, die jüngsten zuerst, jeweils mit dem Eintrag.
+
+![Anwesenheit auf der Seite eines Mitglieds](bild:mitglied-uebersicht-anwesenheit)
+
 ### Ein Fenster schließen
 Tippe auf **✕**, neben das Fenster oder auf die Zurück-Taste des Geräts.
 
@@ -63,7 +71,8 @@ Tippe auf **✕**, neben das Fenster oder auf die Zurück-Taste des Geräts.
 - Die E-Mail-Adresse von Admins und von Personen mit mehr Rechten als du ändert nur, wer deren Konto verwalten darf: Über die E-Mail-Adresse lässt sich das Passwort zurücksetzen. Handynummer und Adresse pflegst du mit dem Recht bei allen.
 - Jede Person sieht und ändert ihre eigenen Angaben unter **Meins → Konto**.
 - Der Eintritt geht ab dem Jahr 1800 und nicht in der Zukunft. Ob er auf der Seite der Person unter **{bereich.directory}** steht, wählt nur sie selbst unter **Meins → Konto**; im Fenster siehst du ihre Wahl nur zur Information.
-- Wie du Geburtstag und Austritt einträgst, steht im Handbuch unter **{bereich.birthdays} pflegen** (mit dem Recht **Persönliche Angaben pflegen**) und **Ehemalige Mitglieder** (für alle, die Mitglieder anlegen dürfen). Was die Kacheln für {bereich.points}, {bereich.penalties}, {begriff.rank} und {bereich.titles} öffnen, erklären die Handbuchseiten zu diesen Bereichen.
+- Bei der {bereich.attendance} zählt nur, was in einer Anwesenheitsliste gespeichert ist. Hat die Person für einen kommenden Termin abgesagt, schlägt die Liste „entschuldigt“ nur vor; gezählt wird es erst, wenn jemand die Liste speichert. Gespeicherte Entschuldigungen für kommende Termine zählen mit, die Zeile darunter nennt, wie viele es sind. Termine, bei denen für die Person nichts eingetragen ist, zählen nicht.
+- Wie du Geburtstag und Austritt einträgst, steht im Handbuch unter **{bereich.birthdays} pflegen** (mit dem Recht **Persönliche Angaben pflegen**) und **Ehemalige** (für alle, die Ehemalige verwalten dürfen). Was die Kacheln für {bereich.points}, {bereich.penalties}, {begriff.rank} und {bereich.titles} öffnen, erklären die Handbuchseiten zu diesen Bereichen.
 
 ## Siehe auch
 - [Mitgliederliste](seite:mitgliederliste)

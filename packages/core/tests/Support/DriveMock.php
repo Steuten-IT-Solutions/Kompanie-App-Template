@@ -55,6 +55,15 @@ final class DriveMock
     public array $ranges = [];
     /** @var string[] abgerufene Vorschaubild-Adressen */
     public array $thumbnailRequests = [];
+    /** @var array<int, array{meta: array<string, mixed>, data: string, id: string|null}> fortsetzbares Hochladen */
+    public array $sessions = [];
+    /** @var string[] in den Papierkorb gelegte Datei-IDs */
+    public array $trashed = [];
+    /** @var array<int, array{method: string, url: string}> Schreibende Anfragen (Hochladen, Ordner, Verschieben) */
+    public array $writes = [];
+    /** Schreibende Anfragen scheitern mit diesem Status (z. B. 403 ohne Bearbeitungsrecht am Ordner); 0 = nicht. */
+    public int $writeStatus = 0;
+    private int $nextId = 1;
     public string $privateKey = '';
     private string $publicKey;
 
@@ -85,6 +94,116 @@ final class DriveMock
             'Y2025' => [['id' => 'A3', 'name' => 'Maifest', 'mimeType' => $folder, 'createdTime' => '2025-05-08T00:00:00Z']],
             'A3' => [['id' => 'IMG5', 'name' => 'e.png', 'mimeType' => 'image/png', 'md5Checksum' => 'm5']],
         ];
+    }
+
+    /** Ordner, in dem die Datei liegt, und ihr Eintrag; null, wenn es sie nicht gibt. */
+    public function find(string $id): ?array
+    {
+        foreach ($this->tree as $parent => $files) {
+            foreach ($files as $i => $f) {
+                if ((string) $f['id'] === $id) {
+                    return ['parent' => (string) $parent, 'index' => $i, 'file' => $f];
+                }
+            }
+        }
+        return null;
+    }
+
+    /** Neue Datei- oder Ordner-ID. */
+    private function id(string $prefix): string
+    {
+        return $prefix . $this->nextId++;
+    }
+
+    /** @return array{status: int, headers?: array<string, string>, body: string} */
+    private function write(string $method, string $url, string $body): array
+    {
+        $this->writes[] = ['method' => $method, 'url' => $url];
+        if ($this->writeStatus !== 0) {
+            return ['status' => $this->writeStatus, 'body' => '{"error":{"message":"The user does not have sufficient permissions for this file."}}'];
+        }
+        $meta = (array) json_decode($body, true);
+        if ($method === 'POST') {
+            // Ordner anlegen
+            $id = $this->id('F');
+            $parent = (string) ($meta['parents'][0] ?? 'MYDRIVE');
+            $this->tree[$parent][] = ['id' => $id, 'name' => (string) ($meta['name'] ?? ''), 'mimeType' => (string) ($meta['mimeType'] ?? ''), 'createdTime' => '2026-11-17T12:00:00Z'];
+            $this->tree[$id] = [];
+            return ['status' => 200, 'body' => (string) json_encode(['id' => $id])];
+        }
+        $id = rawurldecode((string) preg_replace('#^.*/files/([^?]+)\\?.*$#', '$1', $url));
+        $at = $this->find($id);
+        if ($at === null) {
+            return ['status' => 404, 'body' => '{"error":{"message":"File not found"}}'];
+        }
+        parse_str((string) parse_url($url, PHP_URL_QUERY), $q);
+        $file = $at['file'];
+        if (isset($meta['name'])) {
+            $file['name'] = (string) $meta['name'];
+        }
+        unset($this->tree[$at['parent']][$at['index']]);
+        $this->tree[$at['parent']] = array_values($this->tree[$at['parent']]);
+        if (($meta['trashed'] ?? false) === true) {
+            $this->trashed[] = $id;
+            return ['status' => 200, 'body' => (string) json_encode(['id' => $id])];
+        }
+        if (isset($q['addParents']) && ($q['removeParents'] ?? '') !== $at['parent']) {
+            return ['status' => 400, 'body' => '{"error":{"message":"removeParents falsch"}}'];
+        }
+        $this->tree[(string) ($q['addParents'] ?? $at['parent'])][] = $file;
+        return ['status' => 200, 'body' => (string) json_encode(['id' => $id])];
+    }
+
+    /**
+     * Fortsetzbares Hochladen wie bei Google: POST beginnt (Adresse in location), PUT sendet Stücke (308 mit Range) oder
+     * fragt den Stand ab (Content-Range bytes * /Größe).
+     *
+     * @param array<string, string> $headers
+     * @return array{status: int, headers?: array<string, string>, body: string}
+     */
+    private function upload(string $method, string $url, array $headers, string $body): array
+    {
+        if ($method === 'POST') {
+            $this->writes[] = ['method' => $method, 'url' => $url];
+            if ($this->writeStatus !== 0) {
+                return ['status' => $this->writeStatus, 'body' => '{"error":{"message":"The user does not have sufficient permissions for this file."}}'];
+            }
+            $n = count($this->sessions) + 1;
+            $this->sessions[$n] = ['meta' => (array) json_decode($body, true) + ['size' => (int) ($headers['X-Upload-Content-Length'] ?? 0)], 'data' => '', 'id' => null];
+            return ['status' => 200, 'headers' => ['location' => DriveClient::UPLOAD_URL . '?uploadType=resumable&upload_id=' . $n], 'body' => ''];
+        }
+        parse_str((string) parse_url($url, PHP_URL_QUERY), $q);
+        $n = (int) ($q['upload_id'] ?? 0);
+        if (!isset($this->sessions[$n])) {
+            return ['status' => 404, 'body' => ''];
+        }
+        $session = &$this->sessions[$n];
+        $range = (string) ($headers['Content-Range'] ?? '');
+        // Wie Google: ein PUT ohne Content-Length gilt als fehlerhaft (411 Length Required)
+        if (str_starts_with($range, 'bytes */') && ($headers['Content-Length'] ?? null) !== '0') {
+            return ['status' => 411, 'body' => ''];
+        }
+        if (!str_starts_with($range, 'bytes */') && $session['id'] === null) {
+            $session['data'] .= $body;
+        }
+        $size = (int) $session['meta']['size'];
+        if ($session['id'] === null && strlen($session['data']) >= $size && ($body !== '' || $size === 0)) {
+            $id = $this->id('UP');
+            $parent = (string) ($session['meta']['parents'][0] ?? 'MYDRIVE');
+            $this->tree[$parent][] = [
+                'id' => $id,
+                'name' => (string) ($session['meta']['name'] ?? ''),
+                'mimeType' => (string) ($session['meta']['mimeType'] ?? ''),
+                'md5Checksum' => md5($session['data']),
+                'size' => (string) strlen($session['data']),
+            ];
+            $this->contents[$id] = $session['data'];
+            $session['id'] = $id;
+        }
+        if ($session['id'] !== null) {
+            return ['status' => 200, 'body' => (string) json_encode(['id' => $session['id']])];
+        }
+        return ['status' => 308, 'headers' => $session['data'] === '' ? [] : ['range' => 'bytes=0-' . (strlen($session['data']) - 1)], 'body' => ''];
     }
 
     public function serviceAccountJson(): string
@@ -169,11 +288,23 @@ final class DriveMock
                     ? ['status' => 200, 'body' => self::jpeg(1600, 1200)]
                     : ['status' => 403, 'body' => ''];
             }
+            if (str_starts_with($url, DriveClient::UPLOAD_URL)) {
+                return $this->upload($method, $url, $headers, (string) $body);
+            }
             if (!str_starts_with($url, DriveClient::FILES_URL)) {
                 return ['status' => 404, 'body' => ''];
             }
             if (($headers['Authorization'] ?? '') !== 'Bearer TOKEN123') {
                 return ['status' => 401, 'body' => '{"error":{"message":"Kein Token"}}'];
+            }
+            if ($method === 'POST' || $method === 'PATCH') {
+                return $this->write($method, $url, (string) $body);
+            }
+            if (str_contains($url, 'fields=id,trashed')) {
+                $fid = rawurldecode((string) preg_replace('#^.*/files/([^?]+)\\?.*$#', '$1', $url));
+                return $this->find($fid) !== null || isset($this->tree[$fid])
+                    ? ['status' => 200, 'body' => (string) json_encode(['id' => $fid, 'trashed' => in_array($fid, $this->trashed, true)])]
+                    : ['status' => 404, 'body' => '{"error":{"message":"File not found"}}'];
             }
             $id = rawurldecode((string) preg_replace('#^.*/files/([^?]+)\\?.*$#', '$1', $url));
             if (str_contains($url, 'alt=media') && preg_match('/^bytes=(\d+)-(\d+)$/', (string) ($headers['Range'] ?? ''), $r)) {

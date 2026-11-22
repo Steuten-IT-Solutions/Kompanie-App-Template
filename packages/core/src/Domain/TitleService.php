@@ -6,6 +6,7 @@ namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\App;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Storage\TitleRepository;
 
 /**
@@ -69,14 +70,14 @@ final class TitleService
     public function update(int $id, array $in): array
     {
         $repo = $this->repository();
-        $repo->find($id) ?? throw ApiError::notFound('Titel nicht gefunden.');
+        $repo->find($id) ?? throw ApiError::notFound(I18n::t('Titel nicht gefunden.'));
         $data = [];
         if (array_key_exists('title', $in)) {
             $data['title'] = $this->validTitle($in['title'], $id);
         }
         if (array_key_exists('active', $in)) {
             if (!is_bool($in['active'])) {
-                throw ApiError::invalid('Ungültiger Wert für „aktiv“.');
+                throw ApiError::invalid(I18n::t('Ungültiger Wert für „aktiv“.'));
             }
             $data['active'] = $in['active'];
         }
@@ -88,13 +89,14 @@ final class TitleService
     public function delete(int $id): void
     {
         $repo = $this->repository();
-        $repo->find($id) ?? throw ApiError::notFound('Titel nicht gefunden.');
+        $repo->find($id) ?? throw ApiError::notFound(I18n::t('Titel nicht gefunden.'));
         $this->forgetUnknownUsers();
         $count = $repo->assignedCount($id);
         if ($count > 0) {
-            throw ApiError::invalid(sprintf(
-                'Der Titel ist noch %s zugewiesen und lässt sich nur umbenennen oder deaktivieren.',
-                $count === 1 ? 'einem Mitglied' : $count . ' Mitgliedern',
+            throw ApiError::invalid(I18n::tn(
+                'Der Titel ist noch einem Mitglied zugewiesen und lässt sich nur umbenennen oder deaktivieren.',
+                'Der Titel ist noch {count} Mitgliedern zugewiesen und lässt sich nur umbenennen oder deaktivieren.',
+                $count,
             ));
         }
         $repo->delete($id);
@@ -119,7 +121,7 @@ final class TitleService
         $known = array_keys($titles);
         sort($known);
         if ($given !== $known) {
-            throw ApiError::invalid('Bitte die Reihenfolge aller Einträge angeben.');
+            throw ApiError::invalid(I18n::t('Bitte die Reihenfolge aller Einträge angeben.'));
         }
         foreach ($order as $i => $id) {
             $sort = ($i + 1) * 10;
@@ -164,9 +166,9 @@ final class TitleService
      */
     public function assign(int $userId, mixed $titleIds): array
     {
-        $user = $this->app->users->find($userId) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
+        $user = $this->app->users->find($userId) ?? throw ApiError::notFound(I18n::t('Mitglied nicht gefunden.'));
         if (!is_array($titleIds)) {
-            throw ApiError::invalid('Bitte die Titel als Liste angeben.');
+            throw ApiError::invalid(I18n::t('Bitte die Titel als Liste angeben.'));
         }
         $repo = $this->repository();
         $titles = [];
@@ -179,23 +181,23 @@ final class TitleService
         foreach ($titleIds as $raw) {
             $id = Input::integer($raw);
             if ($id === null || !isset($titles[$id])) {
-                throw ApiError::invalid('Unbekannter Titel.');
+                throw ApiError::invalid(I18n::t('Unbekannter Titel.'));
             }
             if (isset($linked[$id]) && !in_array($id, $current, true)) {
-                throw ApiError::invalid(self::linkedMessage($titles[$id]['title'], $linked[$id]['title']));
+                throw ApiError::invalid(self::linkedMessage($titles[$id]['title'], $this->app->translations()->name('office', (string) $linked[$id]['id'], $linked[$id]['title'])));
             }
             // Wer kein Mitglied (mehr) ist, z. B. nach einem Rollenwechsel zum Gast, kann Titel nur verlieren.
             if (!$user->isMember() && !in_array($id, $current, true)) {
-                throw ApiError::invalid(sprintf('%s haben nur Mitglieder.', $this->app->config->sectionLabel('titles', 'Titel')));
+                throw ApiError::invalid(I18n::t('{section} haben nur Mitglieder.', ['section' => $this->app->config->sectionLabel('titles', I18n::tc('Bereich', 'Titel'))]));
             }
             if (!$titles[$id]['active'] && !in_array($id, $current, true)) {
-                throw ApiError::invalid(sprintf('Der Titel „%s“ ist deaktiviert und wird nicht mehr vergeben.', $titles[$id]['title']));
+                throw ApiError::invalid(I18n::t('Der Titel „{title}“ ist deaktiviert und wird nicht mehr vergeben.', ['title' => $titles[$id]['title']]));
             }
             $ids[$id] = $id;
         }
         foreach (array_intersect($current, array_keys($linked)) as $id) {
             if (!isset($ids[$id])) {
-                throw ApiError::invalid(self::linkedMessage($titles[$id]['title'], $linked[$id]['title']));
+                throw ApiError::invalid(self::linkedMessage($titles[$id]['title'], $this->app->translations()->name('office', (string) $linked[$id]['id'], $linked[$id]['title'])));
             }
         }
         $ids = array_values($ids);
@@ -245,27 +247,27 @@ final class TitleService
     /** @return array{id: int, title: string, sort: int, active: bool, assigned: int, office: array{id: int, title: string}|null} */
     private function one(int $id): array
     {
-        $t = $this->repository()->find($id) ?? throw ApiError::notFound('Titel nicht gefunden.');
+        $t = $this->repository()->find($id) ?? throw ApiError::notFound(I18n::t('Titel nicht gefunden.'));
         return $t + ['assigned' => $this->repository()->assignedCount($id), 'office' => $this->app->offices()->linkedTitles()[$id] ?? null];
     }
 
     private static function linkedMessage(string $title, string $office): string
     {
-        return sprintf('Den Titel „%s“ vergibt das Amt „%s“ über die Amtszeiten.', $title, $office);
+        return I18n::t('Den Titel „{title}“ vergibt das Amt „{office}“ über die Amtszeiten.', ['title' => $title, 'office' => $office]);
     }
 
     private function validTitle(mixed $raw, ?int $id): string
     {
         $title = Text::line($raw ?? '', self::TITLE_MAX + 1);
         if ($title === '') {
-            throw ApiError::invalid('Bitte eine Bezeichnung angeben.');
+            throw ApiError::invalid(I18n::t('Bitte eine Bezeichnung angeben.'));
         }
         if (mb_strlen($title) > self::TITLE_MAX) {
-            throw ApiError::invalid(sprintf('Die Bezeichnung darf höchstens %d Zeichen lang sein.', self::TITLE_MAX));
+            throw ApiError::invalid(I18n::t('Die Bezeichnung darf höchstens {max} Zeichen lang sein.', ['max' => self::TITLE_MAX]));
         }
         foreach ($this->repository()->all(false) as $t) {
             if ($t['id'] !== $id && mb_strtolower($t['title']) === mb_strtolower($title)) {
-                throw ApiError::invalid(sprintf('Den Titel „%s“ gibt es schon.', $t['title']));
+                throw ApiError::invalid(I18n::t('Den Titel „{title}“ gibt es schon.', ['title' => $t['title']]));
             }
         }
         return $title;

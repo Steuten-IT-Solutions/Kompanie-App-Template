@@ -1,9 +1,10 @@
 import type { BackupUploadStats } from './api';
+import { localeTag, t, tn } from './i18n';
 
 // Wie formatBytes (format.ts); hier ohne Import, damit der Test die Datei direkt laden kann.
 const size = (b: number) =>
-  b < 1024 * 1024 ? `${Math.round(b / 1024)} KB` : `${(b / (1024 * 1024)).toLocaleString('de-DE', { maximumFractionDigits: 1 })} MB`;
-const seconds = (s: number) => `${s.toLocaleString('de-DE', { maximumFractionDigits: s < 10 ? 1 : 0 })} s`;
+  b < 1024 * 1024 ? `${Math.round(b / 1024)} KB` : `${(b / (1024 * 1024)).toLocaleString(localeTag(), { maximumFractionDigits: 1 })} MB`;
+const seconds = (s: number) => `${s.toLocaleString(localeTag(), { maximumFractionDigits: s < 10 ? 1 : 0 })} s`;
 
 /**
  * Messung des letzten Hochladens nach Google Drive in Worten, z. B. „42 MB in 6 Stücken, 33 s (10,8 Mbit/s) …“. Die Rate
@@ -11,14 +12,16 @@ const seconds = (s: number) => `${s.toLocaleString('de-DE', { maximumFractionDig
  * bei Internetanschlüssen.
  */
 export function uploadStatsText(s: BackupUploadStats): string {
-  const chunks = s.chunks === 1 ? '1 Stück' : `${s.chunks} Stücken`;
   const rate = s.send_seconds > 0 ? (s.bytes * 8) / s.send_seconds / 1e6 : 0;
   const parts = [
-    `${size(s.bytes)} in ${chunks}, ${seconds(s.total_seconds)}` +
-      (rate > 0 ? ` (${rate.toLocaleString('de-DE', { maximumFractionDigits: 1 })} Mbit/s)` : ''),
-    `Verbindung zu Google: ${seconds(s.start_seconds)}`,
-    `Lesen von der Platte: ${seconds(s.read_seconds)}`,
+    tn('{size} in {count} Stück, {time}', '{size} in {count} Stücken, {time}', s.chunks, {
+      size: size(s.bytes),
+      time: seconds(s.total_seconds),
+    }) + (rate > 0 ? ` (${rate.toLocaleString(localeTag(), { maximumFractionDigits: 1 })} Mbit/s)` : ''),
+    t('Verbindung zu Google: {time}', { time: seconds(s.start_seconds) }),
+    t('Lesen von der Platte: {time}', { time: seconds(s.read_seconds) }),
   ];
-  if (s.chunks > 1) parts.push(`langsamstes Stück: ${seconds(s.slowest_seconds)}`);
+  if (s.chunks > 1) parts.push(t('langsamstes Stück: {time}', { time: seconds(s.slowest_seconds) }));
+  if (s.retries > 0) parts.push(tn('{count} neuer Versuch nach einem Fehler', '{count} neue Versuche nach Fehlern', s.retries));
   return parts.join(' · ');
 }

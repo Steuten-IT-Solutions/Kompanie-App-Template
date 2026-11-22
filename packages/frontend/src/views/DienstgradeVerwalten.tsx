@@ -1,17 +1,19 @@
 import { Fragment, useEffect, useRef, useState, type FormEvent } from 'react';
-import { api, config, type Promotion, type Rank, type RankHistoryEntry, type RankStatus } from '../api';
+import { api, config, type Promotion, type Rank, type RankHistoryEntry, type RankRef, type RankStatus } from '../api';
 import brand from '../generated/brand';
-import { formatDate } from '../format';
+import { formatDate, todayYmd } from '../format';
 import { navigate } from '../router';
-import { RankBadge, RankLabel } from '../RankBadge';
+import { RankBadge, RankLabel, rankName } from '../RankBadge';
 import { useDragSort, useSaveQueue } from '../dragSort';
-import { Empty, ErrorBox, Loading, useAsync } from '../ui';
+import { Empty, ErrorBox, Loading, rich, useAsync } from '../ui';
 import { RankHistory } from './Dienstgrad';
-import { isDue } from '../promotionCheck';
+import { isDue, isSoon } from '../promotionCheck';
 import { notePromotions } from '../promotionsDue';
 import { sources } from '../viewData';
 import { confirmAsk } from '../ask';
 import { IconButton } from '../icons';
+import { localeTag, t } from '../i18n';
+import { TranslationsHint } from '../language';
 
 const rank = brand.labels.rank;
 const sec = brand.labels.sections;
@@ -66,16 +68,16 @@ async function svgToPng(file: File): Promise<string | null> {
 }
 
 /** Vorschau eines Abzeichens auf heller und dunkler Fläche: Transparente Abzeichen müssen auf beiden wirken. */
-function BadgePreview({ rank: r }: { rank: Rank }) {
+function BadgePreview({ rank: r, title }: { rank: Rank; title: string }) {
   return (
-    <div className="badge-preview" aria-label={`Vorschau des Abzeichens von ${r.title}`}>
+    <div className="badge-preview" aria-label={t('Vorschau des Abzeichens von {title}', { title })}>
       <div className="badge-preview-light">
-        <RankBadge url={r.badge_url} title={r.title} size="medium" />
-        <span>hell</span>
+        <RankBadge url={r.badge_url} title={title} size="medium" />
+        <span>{t('hell')}</span>
       </div>
       <div className="badge-preview-dark">
-        <RankBadge url={r.badge_url} title={r.title} size="medium" />
-        <span>dunkel</span>
+        <RankBadge url={r.badge_url} title={title} size="medium" />
+        <span>{t('dunkel')}</span>
       </div>
     </div>
   );
@@ -84,7 +86,9 @@ function BadgePreview({ rank: r }: { rank: Rank }) {
 /**
  * Verwaltung → Dienstgrade: anlegen, umbenennen, Schwelle (nur mit Punkten), Reihenfolge (Ziehen am Griff), deaktivieren,
  * löschen.
- * Die Liste läuft vom niedrigsten zum höchsten Dienstgrad.
+ * Die Liste läuft vom niedrigsten zum höchsten Dienstgrad. Mit einer weiteren Sprache oben „Einrichten auf“: Auf einer
+ * weiteren Sprache zeigt die Liste deren Namen (sonst den deutschen) und „Ändern“ trägt den Namen dieser Sprache ein;
+ * die deutsche Bezeichnung bleibt. Neue Dienstgrade bekommen immer zuerst die deutsche.
  */
 export function RankList({ onToast }: { onToast: (msg: string) => void }) {
   const { data, error, loading, reload, setData } = useAsync(sources.ranksAll.load, sources.ranksAll.deps, sources.ranksAll.key);
@@ -96,9 +100,13 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
   const badgeInput = useRef<HTMLInputElement>(null);
   // Ref statt State: Der Dateidialog meldet sich erst später, dann zählt der zuletzt gewählte Dienstgrad.
   const badgeFor = useRef<number | null>(null);
+  // Gepflegt wird die Bezeichnung der Basissprache; weitere Sprachen unter Einstellungen → Sprachen
+  const shown = (r: Rank): string => r.title;
   const points = ranksUsePoints();
   // Schwellen immer pflegbar (gespeichert und geprüft auch ohne Punkte); sie wirken nur zusammen mit Punkten.
-  const thresholdLabel = points ? `${sec.points}schwelle` : `${sec.points}schwelle (wirkt nur mit ${sec.points})`;
+  const thresholdLabel = points
+    ? t('{points}schwelle', { points: sec.points })
+    : t('{points}schwelle (wirkt nur mit {points})', { points: sec.points });
 
   async function run(action: () => Promise<unknown>, msg: string) {
     setBusy(true);
@@ -128,19 +136,19 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
     if (!file || id === null) return;
     const ext = file.name.toLowerCase().split('.').pop() ?? '';
     if (!['png', 'jpg', 'jpeg', 'webp', 'svg'].includes(ext)) {
-      setFormError('Erlaubt sind PNG, JPG, WebP und SVG.');
+      setFormError(t('Erlaubt sind PNG, JPG, WebP und SVG.'));
       return;
     }
     if (file.size > BADGE_MAX_BYTES) {
-      setFormError('Das Abzeichen darf höchstens 1 MB groß sein.');
+      setFormError(t('Das Abzeichen darf höchstens 1 MB groß sein.'));
       return;
     }
-    await run(async () => api.uploadRankBadge(id, file, ext === 'svg' ? await svgToPng(file) : null), 'Abzeichen gespeichert');
+    await run(async () => api.uploadRankBadge(id, file, ext === 'svg' ? await svgToPng(file) : null), t('Abzeichen gespeichert'));
   }
 
   async function add(e: FormEvent) {
     e.preventDefault();
-    if (await run(() => api.createRank({ title: title.trim(), min_points: parseThreshold(min) }), `${rank} angelegt`)) {
+    if (await run(() => api.createRank({ title: title.trim(), min_points: parseThreshold(min) }), t('{rank} angelegt', { rank }))) {
       setTitle('');
       setMin('');
     }
@@ -171,9 +179,13 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
 
   return (
     <div className="stack">
+      <TranslationsHint />
       {missing && (
         <p className="small">
-          Noch nicht alle {sec.ranks} haben eine {sec.points}schwelle; für diese gelten keine Regeln zu {sec.points}.
+          {t('Noch nicht alle {ranks} haben eine {points}schwelle; für diese gelten keine Regeln zu {points}.', {
+            ranks: sec.ranks,
+            points: sec.points,
+          })}
         </p>
       )}
       {formError && (
@@ -182,7 +194,7 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
         </p>
       )}
       {list.length === 0 ? (
-        <Empty>Noch keine {sec.ranks}.</Empty>
+        <Empty>{t('Noch keine {ranks}.', { ranks: sec.ranks })}</Empty>
       ) : (
         <ul className="card-list">
           {list.map((r, i) =>
@@ -194,74 +206,79 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
                   busy={busy}
                   onCancel={() => setEditing(null)}
                   onSave={async (data) => {
-                    if (await run(() => api.updateRank(r.id, data), 'Gespeichert')) setEditing(null);
+                    const saved = await run(() => api.updateRank(r.id, data), t('Gespeichert'));
+                    if (saved) setEditing(null);
                   }}
                 />
               </li>
             ) : (
               <li key={r.id} {...sort.itemProps(i, `card row ${r.active ? '' : 'inactive'}`)}>
-                {list.length > 1 && sort.handle(i, r.title)}
+                {list.length > 1 && sort.handle(i, shown(r))}
                 <div className="row-main">
                   <div className="row-title">
-                    <RankLabel url={r.badge_url} title={r.title} />
-                    {!r.active && <span className="badge badge-level-guest">inaktiv</span>}
+                    <RankLabel url={r.badge_url} title={shown(r)} />
+                    {!r.active && <span className="badge badge-level-guest">{t('inaktiv')}</span>}
                   </div>
                   <div className="row-sub">
-                    {r.min_points !== null ? `ab ${r.min_points.toLocaleString('de-DE')} ${sec.points}` : 'ohne Schwelle'}
+                    {r.min_points !== null
+                      ? t('ab {count} {points}', { count: r.min_points.toLocaleString(localeTag()), points: sec.points })
+                      : t('ohne Schwelle')}
                     {' · '}
-                    {r.assigned ? `${r.assigned}× vergeben` : 'nicht vergeben'}
+                    {r.assigned ? t('{count}× vergeben', { count: r.assigned }) : t('nicht vergeben')}
                   </div>
                   <div className="row-actions">
                     <button className="btn btn-small btn-secondary" disabled={busy} onClick={() => setEditing(r.id)}>
-                      Ändern
+                      {t('Ändern')}
                     </button>
                     {(r.assigned || !r.active) && (
                       <button
                         className="btn btn-small btn-secondary"
                         disabled={busy}
-                        onClick={() => run(() => api.updateRank(r.id, { active: !r.active }), r.active ? 'Deaktiviert' : 'Aktiviert')}
+                        onClick={() => run(() => api.updateRank(r.id, { active: !r.active }), r.active ? t('Deaktiviert') : t('Aktiviert'))}
                       >
-                        {r.active ? 'Deaktivieren' : 'Aktivieren'}
+                        {r.active ? t('Deaktivieren') : t('Aktivieren')}
                       </button>
                     )}
                     {!r.assigned && (
                       <IconButton
                         icon="delete"
-                        label="Löschen"
+                        label={t('Löschen')}
                         variant="danger"
                         disabled={busy}
-                        onClick={async () => (await confirmAsk(`„${r.title}“ löschen?`)) && run(() => api.deleteRank(r.id), 'Gelöscht')}
+                        onClick={async () =>
+                          (await confirmAsk(t('„{title}“ löschen?', { title: shown(r) }))) && run(() => api.deleteRank(r.id), t('Gelöscht'))
+                        }
                       />
                     )}
                   </div>
-                  <div className="rank-badge-tools" role="group" aria-label={`Abzeichen von ${r.title}`}>
-                    {r.badge_url && <BadgePreview rank={r} />}
+                  <div className="rank-badge-tools" role="group" aria-label={t('Abzeichen von {title}', { title: shown(r) })}>
+                    {r.badge_url && <BadgePreview rank={r} title={shown(r)} />}
                     <div className="row-actions">
                       {r.badge_url ? (
                         <>
                           <button className="btn btn-small btn-secondary" disabled={busy} onClick={() => chooseBadge(r.id)}>
-                            Ersetzen
+                            {t('Ersetzen')}
                           </button>
                           <button
                             className="btn btn-small btn-danger"
                             disabled={busy}
                             onClick={async () =>
-                              (await confirmAsk(`Abzeichen von „${r.title}“ entfernen?`)) &&
-                              run(() => api.removeRankBadge(r.id), 'Abzeichen entfernt')
+                              (await confirmAsk(t('Abzeichen von „{title}“ entfernen?', { title: shown(r) }))) &&
+                              run(() => api.removeRankBadge(r.id), t('Abzeichen entfernt'))
                             }
                           >
-                            Entfernen
+                            {t('Entfernen')}
                           </button>
                         </>
                       ) : (
                         <button className="btn btn-small btn-secondary" disabled={busy} onClick={() => chooseBadge(r.id)}>
-                          Abzeichen hochladen
+                          {t('Abzeichen hochladen')}
                         </button>
                       )}
                     </div>
                     {r.badge_type === 'svg' && !r.badge_push && (
                       <p className="muted small">
-                        Ohne Bild in Benachrichtigungen (keine PNG-Fassung); zum Nachholen das SVG erneut hochladen.
+                        {t('Ohne Bild in Benachrichtigungen (keine PNG-Fassung); zum Nachholen das SVG erneut hochladen.')}
                       </p>
                     )}
                   </div>
@@ -277,31 +294,35 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
         type="file"
         accept={BADGE_ACCEPT}
         hidden
-        aria-label="Abzeichen-Datei"
+        aria-label={t('Abzeichen-Datei')}
         onChange={(e) => uploadBadge(e.target.files?.[0] ?? null)}
       />
 
       <form className="form card" onSubmit={add}>
-        <h3>Neuer {rank}</h3>
+        <h3>{t('Neuer {rank}', { rank })}</h3>
         <label className="field">
-          <span>Bezeichnung</span>
+          <span>{t('Bezeichnung')}</span>
           <input type="text" maxLength={60} value={title} onChange={(e) => setTitle(e.target.value)} required />
         </label>
         <label className="field">
-          <span>{thresholdLabel} (optional)</span>
+          <span>{t('{label} (optional)', { label: thresholdLabel })}</span>
           <input type="number" inputMode="numeric" min={0} value={min} onChange={(e) => setMin(e.target.value)} />
         </label>
         <button className="btn btn-block" type="submit" disabled={busy}>
-          Anlegen
+          {t('Anlegen')}
         </button>
         <p className="muted small">
-          Neue {sec.ranks} kommen ans Ende der Liste, also als höchster {rank}; den Platz änderst du per Ziehen am Griff.
+          {t('Neue {ranks} kommen ans Ende der Liste, also als höchster {rank}; den Platz änderst du per Ziehen am Griff.', {
+            ranks: sec.ranks,
+            rank,
+          })}
         </p>
       </form>
     </div>
   );
 }
 
+/** Dienstgrad ändern (Bezeichnung in der Basissprache; weitere Sprachen unter Einstellungen → Sprachen). */
 function RankForm({
   rank: r,
   thresholdLabel,
@@ -326,19 +347,19 @@ function RankForm({
       }}
     >
       <label className="field">
-        <span>Bezeichnung</span>
+        <span>{t('Bezeichnung')}</span>
         <input type="text" maxLength={60} value={title} onChange={(e) => setTitle(e.target.value)} required autoFocus />
       </label>
       <label className="field">
-        <span>{thresholdLabel} (leer = ohne)</span>
+        <span>{t('{label} (leer = ohne)', { label: thresholdLabel })}</span>
         <input type="number" inputMode="numeric" min={0} value={min} onChange={(e) => setMin(e.target.value)} />
       </label>
       <div className="button-row">
         <button className="btn" type="submit" disabled={busy}>
-          Speichern
+          {t('Speichern')}
         </button>
         <button className="btn btn-secondary" type="button" onClick={onCancel}>
-          Abbrechen
+          {t('Abbrechen')}
         </button>
       </div>
     </form>
@@ -347,7 +368,7 @@ function RankForm({
 
 /**
  * Verwaltung → Beförderungen (nur mit Punkten): zuerst, wer unter der Schwelle des eigenen Dienstgrads liegt (Kandidaten
- * zum Degradieren, Issue #178), dann erreichte Schwellen, dann nach fehlenden Punkten.
+ * zum Degradieren, Issue #178), dann erreichte Schwellen, bald erreichte, dann nach fehlenden Punkten.
  */
 export function Promotions() {
   const { data, error, loading, reload } = useAsync(sources.promotions.load, sources.promotions.deps, sources.promotions.key);
@@ -359,18 +380,20 @@ export function Promotions() {
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   // Ohne nächsten Dienstgrad (schon ganz oben) gibt es nichts zu befördern; zum Degradieren können sie trotzdem anstehen.
   // Nach Abschnitten gruppiert; innerhalb eines Abschnitts bleibt die Reihenfolge des Servers (sort ist stabil).
-  const list = (data ?? []).filter((p) => p.below_current_threshold || p.next_rank !== null).sort((a, b) => section(a) - section(b));
-  const headings = ['Unter der Schwelle', 'Schwelle erreicht', 'Noch nicht erreicht'];
+  const list = (data ?? [])
+    .filter((p) => p.below_current_threshold || p.next_rank !== null)
+    .sort((a, b) => promotionSection(a) - promotionSection(b));
+  const headings = [t('Unter der Schwelle'), t('Schwelle erreicht'), t('Bald erreicht'), t('Noch nicht erreicht')];
   return (
     <div>
       {list.length === 0 ? (
-        <Empty>Niemand gefunden.</Empty>
+        <Empty>{t('Niemand gefunden.')}</Empty>
       ) : (
         <ul className="card-list promotions">
           {list.map((p, i) => {
             const due = isDue(p);
             // Überschrift vor dem ersten Eintrag jedes Abschnitts.
-            const heading = i === 0 || section(list[i - 1]) !== section(p) ? headings[section(p)] : null;
+            const heading = i === 0 || promotionSection(list[i - 1]) !== promotionSection(p) ? headings[promotionSection(p)] : null;
             return (
               <Fragment key={p.user_id}>
                 {heading && <li className="section-title list-divider">{heading}</li>}
@@ -381,13 +404,14 @@ export function Promotions() {
                   <div className="row-main">
                     <div className="row-title">{p.name}</div>
                     <div className="row-sub">
-                      {p.rank ? <RankLabel url={p.rank.badge_url} title={p.rank.title} /> : `Kein ${rank}`} ·{' '}
-                      {p.points.toLocaleString('de-DE')} {sec.points}
-                      {p.next_rank &&
-                        p.points_to_next !== null &&
-                        (due
-                          ? ` · Schwelle für „${p.next_rank.title}“ erreicht${p.threshold_reached_since ? ` seit ${formatDate(p.threshold_reached_since)}` : ''}`
-                          : ` · noch ${p.points_to_next.toLocaleString('de-DE')} bis „${p.next_rank.title}“`)}
+                      {p.rank ? <RankLabel url={p.rank.badge_url} title={rankName(p.rank.id, p.rank.title)} /> : t('Kein {rank}', { rank })}{' '}
+                      · {t('{count} {points}', { count: p.points.toLocaleString(localeTag()), points: sec.points })}
+                      {p.next_rank && p.points_to_next !== null && (
+                        <>
+                          {' · '}
+                          <NextRankText next={p.next_rank} pointsToNext={p.points_to_next} since={p.threshold_reached_since} />
+                        </>
+                      )}
                     </div>
                   </div>
                   <span className="chevron" aria-hidden="true">
@@ -404,14 +428,34 @@ export function Promotions() {
 }
 
 /**
- * Abschnitt der Beförderungsliste: 0 unter der Schwelle des eigenen Dienstgrads, 1 Schwelle erreicht, 2 noch nicht
- * erreicht. Wer unter der eigenen Schwelle liegt, hat die nächste nicht erreicht; jeder steht in genau einem Abschnitt.
+ * Stand zum nächsten Dienstgrad („Schwelle für „Maat“ erreicht seit …“ bzw. „noch 3 bis „Maat““), mit dem Abzeichen des
+ * nächsten Dienstgrads vor seiner Bezeichnung wie beim aktuellen.
  */
-function section(p: Promotion): number {
-  return p.below_current_threshold ? 0 : isDue(p) ? 1 : 2;
+function NextRankText({ next, pointsToNext, since, unit }: { next: RankRef; pointsToNext: number; since: string | null; unit?: string }) {
+  const label = <RankLabel url={next.badge_url} title={rankName(next.id, next.title)} quoted />;
+  const count = pointsToNext.toLocaleString(localeTag());
+  if (pointsToNext <= 0) {
+    return since
+      ? rich(t('Schwelle für {rank} erreicht seit {date}'), { rank: label, date: formatDate(since) })
+      : rich(t('Schwelle für {rank} erreicht'), { rank: label });
+  }
+  return unit
+    ? rich(t('noch {count} {points} bis {rank}'), { count, points: unit, rank: label })
+    : rich(t('noch {count} bis {rank}'), { count, rank: label });
+}
+
+/**
+ * Abschnitt der Beförderungsliste: 0 unter der Schwelle des eigenen Dienstgrads, 1 Schwelle erreicht, 2 bald erreicht
+ * (höchstens 1 Punkt fehlt), 3 noch nicht erreicht. Wer unter der eigenen Schwelle liegt, hat die nächste
+ * nicht erreicht; jeder steht in genau einem Abschnitt.
+ */
+export function promotionSection(p: Promotion): number {
+  return p.below_current_threshold ? 0 : isDue(p) ? 1 : isSoon(p) ? 2 : 3;
 }
 
 /** Mitgliedsdetails: Dienstgrad, mit Punkten der Stand zur Schwelle, befördern oder degradieren, Verlauf. */
+const noRanks = (): Promise<Rank[]> => Promise.resolve([]);
+
 export function MemberRank({
   id,
   member,
@@ -420,6 +464,7 @@ export function MemberRank({
   onChanged,
   onToast,
   focus = false,
+  readOnly = false,
 }: {
   id: number;
   /** Wer kein Mitglied mehr ist (z. B. Gast), kann den Dienstgrad nur verlieren. */
@@ -430,11 +475,16 @@ export function MemberRank({
   onToast: (msg: string) => void;
   /** Aus „Beförderungen“ geöffnet: zum Abschnitt springen und den nächsten Dienstgrad vorschlagen. */
   focus?: boolean;
+  /** Nur sehen (view_promotions ohne manage_ranks): Stand und Verlauf, ohne Befördern. */
+  readOnly?: boolean;
 }) {
-  // Alle, auch inaktive: Position und Schwelle des aktuellen Dienstgrads zählen auch, wenn er deaktiviert ist.
-  const ranks = useAsync(sources.ranksAll.load, sources.ranksAll.deps, sources.ranksAll.key);
+  // Alle, auch inaktive: Position und Schwelle des aktuellen Dienstgrads zählen auch, wenn er deaktiviert ist. Nur zum
+  // Ändern nötig; wer nur sieht, lädt sie nicht.
+  const ranks = useAsync(readOnly ? noRanks : sources.ranksAll.load, sources.ranksAll.deps, readOnly ? undefined : sources.ranksAll.key);
   const [target, setTarget] = useState('');
   const [reason, setReason] = useState('');
+  // Tag des Wechsels: Vorgabe heute, früher geht (nicht vor dem letzten Wechsel, prüft der Server), Zukunft nicht.
+  const [date, setDate] = useState(todayYmd());
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const points = ranksUsePoints() && status.points !== undefined;
@@ -457,7 +507,7 @@ export function MemberRank({
   useEffect(() => {
     if (suggested === null || suggestedOnce.current) return;
     suggestedOnce.current = true;
-    setTarget((t) => t || String(suggested));
+    setTarget((prev) => prev || String(suggested));
   }, [suggested]);
 
   async function submit(e: FormEvent) {
@@ -465,10 +515,11 @@ export function MemberRank({
     setBusy(true);
     setFormError(null);
     try {
-      await api.setMemberRank(id, target === 'none' ? null : Number(target), reason.trim());
-      onToast(`${rank} geändert`);
+      await api.setMemberRank(id, target === 'none' ? null : Number(target), reason.trim(), date);
+      onToast(t('{rank} geändert', { rank }));
       setTarget('');
       setReason('');
+      setDate(todayYmd());
       onChanged();
     } catch (err) {
       setFormError((err as Error).message);
@@ -481,52 +532,66 @@ export function MemberRank({
     <section className="member-rank" ref={sectionRef}>
       <h3 className="section-title">{rank}</h3>
       <p className="member-rank-current">
-        {status.rank && <RankBadge url={status.rank.badge_url} title={status.rank.title} size="medium" />}
-        <strong>{status.rank?.title ?? `Kein ${rank}`}</strong>
+        {status.rank && <RankBadge url={status.rank.badge_url} title={rankName(status.rank.id, status.rank.title)} size="medium" />}
+        <strong>{status.rank ? rankName(status.rank.id, status.rank.title) : t('Kein {rank}', { rank })}</strong>
         {points && status.next_rank && status.points_to_next !== null && status.points_to_next !== undefined && (
           <span className="muted small">
             {' '}
             ·{' '}
-            {status.points_to_next <= 0
-              ? `Schwelle für „${status.next_rank.title}“ erreicht${status.threshold_reached_since ? ` seit ${formatDate(status.threshold_reached_since)}` : ''}`
-              : `noch ${status.points_to_next.toLocaleString('de-DE')} ${sec.points} bis „${status.next_rank.title}“`}
+            <NextRankText
+              next={status.next_rank}
+              pointsToNext={status.points_to_next}
+              since={status.threshold_reached_since ?? null}
+              unit={sec.points}
+            />
           </span>
         )}
       </p>
       {ranks.error && <ErrorBox message={ranks.error} onRetry={ranks.reload} />}
-      <form className="form rank-change" onSubmit={submit}>
-        <label className="field">
-          <span>Neuer {rank}</span>
-          <select value={target} onChange={(e) => setTarget(e.target.value)} required>
-            <option value="" disabled>
-              Bitte wählen …
-            </option>
-            {options.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.title}
-                {points && r.min_points !== null ? ` (ab ${r.min_points.toLocaleString('de-DE')})` : ''}
+      {!readOnly && (
+        <form className="form rank-change" onSubmit={submit}>
+          <label className="field">
+            <span>{t('Neuer {rank}', { rank })}</span>
+            <select value={target} onChange={(e) => setTarget(e.target.value)} required>
+              <option value="" disabled>
+                {t('Bitte wählen …')}
               </option>
-            ))}
-            {status.rank && <option value="none">Kein {rank}</option>}
-          </select>
-        </label>
-        <label className="field">
-          <span>Begründung (optional)</span>
-          <input type="text" maxLength={255} value={reason} onChange={(e) => setReason(e.target.value)} />
-        </label>
-        {formError && (
-          <p className="form-error" role="alert">
-            {formError}
-          </p>
-        )}
-        <button className="btn btn-block" type="submit" disabled={busy || target === ''}>
-          {rank} ändern
-        </button>
-        {points && ranks.data && options.length === 0 && !status.rank && (
-          <p className="muted small">Zurzeit ist keine Änderung möglich: Befördern erst ab der Schwelle.</p>
-        )}
-      </form>
-      <RankHistory entries={history} />
+              {options.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {rankName(r.id, r.title)}
+                  {points && r.min_points !== null ? ` ${t('(ab {count})', { count: r.min_points.toLocaleString(localeTag()) })}` : ''}
+                </option>
+              ))}
+              {status.rank && <option value="none">{t('Kein {rank}', { rank })}</option>}
+            </select>
+          </label>
+          <label className="field">
+            <span>{t('Datum')}</span>
+            <input type="date" max={todayYmd()} value={date} onChange={(e) => setDate(e.target.value)} required />
+          </label>
+          {points && date !== todayYmd() && (
+            <p className="muted small">
+              {t('Bei einem früheren Datum zählen nur die {points} bis zu diesem Tag.', { points: sec.points })}
+            </p>
+          )}
+          <label className="field">
+            <span>{t('Begründung (optional)')}</span>
+            <input type="text" maxLength={255} value={reason} onChange={(e) => setReason(e.target.value)} />
+          </label>
+          {formError && (
+            <p className="form-error" role="alert">
+              {formError}
+            </p>
+          )}
+          <button className="btn btn-block" type="submit" disabled={busy || target === ''}>
+            {t('{rank} ändern', { rank })}
+          </button>
+          {points && ranks.data && options.length === 0 && !status.rank && (
+            <p className="muted small">{t('Zurzeit ist keine Änderung möglich: Befördern erst ab der Schwelle.')}</p>
+          )}
+        </form>
+      )}
+      <RankHistory entries={history} edit={readOnly ? undefined : { memberId: id, ranks: list, onChanged, onToast }} />
     </section>
   );
 }

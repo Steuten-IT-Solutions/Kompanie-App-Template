@@ -8,6 +8,7 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Storage\OfficeRepository;
 
 /**
@@ -165,7 +166,7 @@ final class OfficeService
      */
     public function updateGroup(int $id, mixed $in): array
     {
-        $group = $this->repository()->findGroup($id) ?? throw ApiError::notFound('Gruppe nicht gefunden.');
+        $group = $this->repository()->findGroup($id) ?? throw ApiError::notFound(I18n::t('Gruppe nicht gefunden.'));
         $in = is_array($in) ? $in : ['title' => $in];
         $data = [];
         if (array_key_exists('title', $in)) {
@@ -176,7 +177,7 @@ final class OfficeService
         }
         if (array_key_exists('joint_terms', $in)) {
             if (!is_bool($in['joint_terms'])) {
-                throw ApiError::invalid('joint_terms muss wahr oder falsch sein.');
+                throw ApiError::invalid(I18n::t('joint_terms muss wahr oder falsch sein.'));
             }
             $data['joint_terms'] = $in['joint_terms'] ? 1 : 0;
         }
@@ -191,16 +192,17 @@ final class OfficeService
     public function deleteGroup(int $id): void
     {
         $repo = $this->repository();
-        $repo->findGroup($id) ?? throw ApiError::notFound('Gruppe nicht gefunden.');
+        $repo->findGroup($id) ?? throw ApiError::notFound(I18n::t('Gruppe nicht gefunden.'));
         $count = $repo->officeCountInGroup($id);
         if ($count > 0) {
-            throw ApiError::invalid(sprintf('In der Gruppe %s. Bitte erst verschieben oder löschen.', $count === 1 ? 'steht noch ein Amt' : 'stehen noch ' . $count . ' Ämter'));
+            throw ApiError::invalid(I18n::tn('In der Gruppe steht noch ein Amt. Bitte erst verschieben oder löschen.', 'In der Gruppe stehen noch {count} Ämter. Bitte erst verschieben oder löschen.', $count));
         }
         $images = $this->app->richImages();
         foreach ($repo->groupTerms($id) as $t) {
             $images->deleteOwner(RichImageService::OWNER_OFFICE_GROUP_TERM, $t['id']);
         }
         $repo->deleteGroup($id);
+        $this->app->translations()->repository()->deleteRef('office_group', (string) $id);
         $this->pruneHolderPhotos();
         $this->app->companies()->repository()->unlinkOfficeGroup($id);
     }
@@ -245,7 +247,7 @@ final class OfficeService
     public function updateOffice(int $id, array $in): array
     {
         $repo = $this->repository();
-        $office = $repo->findOffice($id) ?? throw ApiError::notFound('Amt nicht gefunden.');
+        $office = $repo->findOffice($id) ?? throw ApiError::notFound(I18n::t('Amt nicht gefunden.'));
         $groupId = array_key_exists('group_id', $in) ? $this->validGroupId($in['group_id']) : $office['group_id'];
         $data = [];
         if (array_key_exists('group_id', $in)) {
@@ -276,8 +278,9 @@ final class OfficeService
     public function deleteOffice(int $id): void
     {
         $repo = $this->repository();
-        $office = $repo->findOffice($id) ?? throw ApiError::notFound('Amt nicht gefunden.');
+        $office = $repo->findOffice($id) ?? throw ApiError::notFound(I18n::t('Amt nicht gefunden.'));
         $repo->deleteOffice($id);
+        $this->app->translations()->repository()->deleteRef('office', (string) $id);
         $this->pruneHolderPhotos();
         $this->syncTitles($office['title_id'] !== null ? [$office['title_id']] : []);
     }
@@ -311,7 +314,7 @@ final class OfficeService
      */
     public function linkPreview(int $id, mixed $titleId): array
     {
-        $office = $this->repository()->findOffice($id) ?? throw ApiError::notFound('Amt nicht gefunden.');
+        $office = $this->repository()->findOffice($id) ?? throw ApiError::notFound(I18n::t('Amt nicht gefunden.'));
         $new = $this->validTitleLink($titleId === '' ? null : $titleId, $office['id']);
         return $this->describePlan($this->plan([$new], [$office['id'] => $new]));
     }
@@ -324,7 +327,7 @@ final class OfficeService
      */
     public function createTerm(int $officeId, array $in, ?User $actor = null): array
     {
-        $office = $this->repository()->findOffice($officeId) ?? throw ApiError::notFound('Amt nicht gefunden.');
+        $office = $this->repository()->findOffice($officeId) ?? throw ApiError::notFound(I18n::t('Amt nicht gefunden.'));
         [$term, $holders] = $this->validTerm($in);
         $holders = $this->claimHolderPhotos($holders, $actor);
         $id = $this->repository()->saveTerm(null, $officeId, $term, $holders);
@@ -342,7 +345,7 @@ final class OfficeService
     public function updateTerm(int $id, array $in, ?User $actor = null): array
     {
         $repo = $this->repository();
-        $current = $repo->findTerm($id) ?? throw ApiError::notFound('Amtszeit nicht gefunden.');
+        $current = $repo->findTerm($id) ?? throw ApiError::notFound(I18n::t('Amtszeit nicht gefunden.'));
         $merged = $in + [
             'kind' => $current['kind'],
             'start_year' => $current['start_year'],
@@ -372,7 +375,7 @@ final class OfficeService
     public function deleteTerm(int $id): void
     {
         $repo = $this->repository();
-        $term = $repo->findTerm($id) ?? throw ApiError::notFound('Amtszeit nicht gefunden.');
+        $term = $repo->findTerm($id) ?? throw ApiError::notFound(I18n::t('Amtszeit nicht gefunden.'));
         $repo->deleteTerm($id);
         $this->pruneHolderPhotos();
         $office = $repo->findOffice($term['office_id']);
@@ -391,9 +394,9 @@ final class OfficeService
     public function createGroupTerm(int $groupId, array $in, User $actor): array
     {
         $repo = $this->repository();
-        $group = $repo->findGroup($groupId) ?? throw ApiError::notFound('Gruppe nicht gefunden.');
+        $group = $repo->findGroup($groupId) ?? throw ApiError::notFound(I18n::t('Gruppe nicht gefunden.'));
         if (!$group['joint_terms']) {
-            throw ApiError::invalid('Für diese Gruppe sind gemeinsame Amtszeiten ausgeschaltet.');
+            throw ApiError::invalid(I18n::t('Für diese Gruppe sind gemeinsame Amtszeiten ausgeschaltet.'));
         }
         $term = $this->validYears($in);
         $members = array_map(fn (array $h): array => $this->claimHolderPhotos($h, $actor), $this->validMembers($groupId, $in['offices'] ?? null, $term, true));
@@ -419,7 +422,7 @@ final class OfficeService
     public function updateGroupTerm(int $id, array $in, User $actor): array
     {
         $repo = $this->repository();
-        $current = $repo->findGroupTerm($id) ?? throw ApiError::notFound('Gemeinsame Amtszeit nicht gefunden.');
+        $current = $repo->findGroupTerm($id) ?? throw ApiError::notFound(I18n::t('Gemeinsame Amtszeit nicht gefunden.'));
         $term = $this->validYears($in + ['kind' => $current['kind'], 'start_year' => $current['start_year'], 'end_year' => $current['end_year'], 'note' => $current['note']]);
         $members = array_key_exists('offices', $in) ? array_map(fn (array $h): array => $this->claimHolderPhotos($h, $actor), $this->validMembers($current['group_id'], $in['offices'], $term, false)) : null;
         $linked = [];
@@ -459,7 +462,7 @@ final class OfficeService
     public function deleteGroupTerm(int $id): void
     {
         $repo = $this->repository();
-        $repo->findGroupTerm($id) ?? throw ApiError::notFound('Gemeinsame Amtszeit nicht gefunden.');
+        $repo->findGroupTerm($id) ?? throw ApiError::notFound(I18n::t('Gemeinsame Amtszeit nicht gefunden.'));
         $offices = [];
         foreach ($repo->terms() as $t) {
             if ($t['group_term_id'] === $id) {
@@ -565,7 +568,7 @@ final class OfficeService
             $html = $images->claim($actor ?? $this->app->anonymous(), '<img data-image="' . $uid . '">', RichImageService::OWNER_OFFICE_HOLDER, 0);
             $claimed = RichText::imageUids($html)[0] ?? null;
             if ($claimed === null) {
-                throw ApiError::invalid(sprintf('Das Foto von „%s“ ist nicht mehr da. Bitte noch einmal hochladen.', $h['name']));
+                throw ApiError::invalid(I18n::t('Das Foto von „{name}“ ist nicht mehr da. Bitte noch einmal hochladen.', ['name' => $h['name']]));
             }
             $holders[$i]['image_uid'] = $claimed;
         }
@@ -601,12 +604,12 @@ final class OfficeService
             return;
         }
         if (!is_string($uid) || preg_match(RichText::IMAGE_UID, strtolower($uid)) !== 1) {
-            throw ApiError::invalid('Unbekanntes Bild.');
+            throw ApiError::invalid(I18n::t('Unbekanntes Bild.'));
         }
         $html = $images->claim($actor, '<img data-image="' . strtolower($uid) . '">', RichImageService::OWNER_OFFICE_GROUP_TERM, $id, true);
         $claimed = RichText::imageUids($html)[0] ?? null;
         if ($claimed === null) {
-            throw ApiError::invalid('Unbekanntes Bild. Bitte das Bild noch einmal hochladen.');
+            throw ApiError::invalid(I18n::t('Unbekanntes Bild. Bitte das Bild noch einmal hochladen.'));
         }
         $this->repository()->updateGroupTerm($id, ['image_uid' => $claimed]);
     }
@@ -631,7 +634,7 @@ final class OfficeService
     private function validMembers(int $groupId, mixed $raw, array $term, bool $required): array
     {
         if (!is_array($raw)) {
-            throw ApiError::invalid('Bitte je Amt die Personen angeben.');
+            throw ApiError::invalid(I18n::t('Bitte je Amt die Personen angeben.'));
         }
         $inGroup = [];
         foreach ($this->repository()->offices() as $o) {
@@ -643,16 +646,16 @@ final class OfficeService
         foreach ($raw as $m) {
             $officeId = is_array($m) ? Input::integer($m['office_id'] ?? null) : null;
             if ($officeId === null || !isset($inGroup[$officeId])) {
-                throw ApiError::invalid('Unbekanntes Amt in dieser Gruppe.');
+                throw ApiError::invalid(I18n::t('Unbekanntes Amt in dieser Gruppe.'));
             }
             if (isset($out[$officeId])) {
-                throw ApiError::invalid('Ein Amt steht doppelt in der gemeinsamen Amtszeit.');
+                throw ApiError::invalid(I18n::t('Ein Amt steht doppelt in der gemeinsamen Amtszeit.'));
             }
             $holders = $m['holders'] ?? [];
             $out[$officeId] = is_array($holders) && $holders === [] ? [] : $this->validTerm(['holders' => $holders] + $term)[1];
         }
         if ($required && array_filter($out) === []) {
-            throw ApiError::invalid('Bitte bei mindestens einem Amt eine Person angeben.');
+            throw ApiError::invalid(I18n::t('Bitte bei mindestens einem Amt eine Person angeben.'));
         }
         return $out;
     }
@@ -677,7 +680,7 @@ final class OfficeService
     private function groupTerm(int $id): array
     {
         $repo = $this->repository();
-        $g = $repo->findGroupTerm($id) ?? throw ApiError::notFound('Gemeinsame Amtszeit nicht gefunden.');
+        $g = $repo->findGroupTerm($id) ?? throw ApiError::notFound(I18n::t('Gemeinsame Amtszeit nicht gefunden.'));
         $terms = [];
         foreach ($repo->terms() as $t) {
             if ($t['group_term_id'] === $id) {
@@ -903,10 +906,10 @@ final class OfficeService
     public function import(mixed $csv, bool $link, bool $apply): array
     {
         if (!is_string($csv) || trim($csv) === '') {
-            throw ApiError::invalid('Bitte die Tabelle einfügen oder eine Datei wählen.');
+            throw ApiError::invalid(I18n::t('Bitte die Tabelle einfügen oder eine Datei wählen.'));
         }
         if (strlen($csv) > self::IMPORT_MAX_BYTES) {
-            throw ApiError::invalid('Die Tabelle ist zu groß (höchstens 200 KB).');
+            throw ApiError::invalid(I18n::t('Die Tabelle ist zu groß (höchstens 200 KB).'));
         }
         $csv = (string) preg_replace('/^\xEF\xBB\xBF/', '', $csv);
         $lines = preg_split('/\r\n|\r|\n/', $csv) ?: [];
@@ -945,7 +948,7 @@ final class OfficeService
                 continue; // Kopfzeile
             }
             if (++$count > self::IMPORT_MAX_ROWS) {
-                throw ApiError::invalid(sprintf('Höchstens %d Zeilen auf einmal.', self::IMPORT_MAX_ROWS));
+                throw ApiError::invalid(I18n::t('Höchstens {max} Zeilen auf einmal.', ['max' => self::IMPORT_MAX_ROWS]));
             }
             $row = ['line' => $i + 1];
             try {
@@ -982,11 +985,11 @@ final class OfficeService
             $rows[] = $row;
         }
         if ($rows === []) {
-            throw ApiError::invalid('Die Tabelle enthält keine Zeilen.');
+            throw ApiError::invalid(I18n::t('Die Tabelle enthält keine Zeilen.'));
         }
         $errors = array_values(array_filter($rows, static fn (array $r): bool => isset($r['error'])));
         if ($apply && $errors !== []) {
-            throw ApiError::invalid(sprintf('Zeile %d: %s', $errors[0]['line'], $errors[0]['error']) . (count($errors) > 1 ? sprintf(' (und %d weitere Fehler)', count($errors) - 1) : ''));
+            throw ApiError::invalid(I18n::t('Zeile {line}: {error}', ['line' => $errors[0]['line'], 'error' => $errors[0]['error']]) . (count($errors) > 1 ? ' ' . I18n::tn('(und {count} weiterer Fehler)', '(und {count} weitere Fehler)', count($errors) - 1) : ''));
         }
         $result = ['rows' => $rows, 'groups_new' => count($newGroups), 'offices_new' => count($newOffices), 'terms_new' => count($plannedTerms), 'applied' => false];
         if (!$apply) {
@@ -1148,16 +1151,16 @@ final class OfficeService
         $name = Text::line($name);
         $id = Input::integer($userId);
         if ($name === '' || $id === null) {
-            throw ApiError::invalid('Bitte den freien Namen und die Person angeben.');
+            throw ApiError::invalid(I18n::t('Bitte den freien Namen und die Person angeben.'));
         }
         $user = $this->app->users->find($id);
         $former = $user !== null && $this->app->formerMembers()->previousRole($user) !== null;
         if ($user === null || (!MemberService::inDirectory($user) && !$former)) {
-            throw ApiError::invalid('Verknüpfen lässt sich nur mit Mitgliedern, Personen der Mitgliederliste oder Ehemaligen.');
+            throw ApiError::invalid(I18n::t('Verknüpfen lässt sich nur mit Mitgliedern, Personen der Mitgliederliste oder Ehemaligen.'));
         }
         $linked = $this->linkNames([mb_strtolower($name) => $id], true);
         if ($linked === 0) {
-            throw ApiError::notFound('Diesen freien Namen gibt es in keiner Amtszeit (mehr), oder die Person steht dort schon.');
+            throw ApiError::notFound(I18n::t('Diesen freien Namen gibt es in keiner Amtszeit (mehr), oder die Person steht dort schon.'));
         }
         $this->syncTitles(array_keys($this->linkedTitles()));
         return ['linked' => $linked];
@@ -1188,23 +1191,23 @@ final class OfficeService
         $groupTitle = Text::line($cells[0] ?? '', self::TITLE_MAX + 1);
         $officeTitle = Text::line($cells[1] ?? '', self::TITLE_MAX + 1);
         if ($officeTitle === '') {
-            throw ApiError::invalid('Das Amt fehlt (2. Spalte).');
+            throw ApiError::invalid(I18n::t('Das Amt fehlt (2. Spalte).'));
         }
         if (mb_strlen($groupTitle) > self::TITLE_MAX || mb_strlen($officeTitle) > self::TITLE_MAX) {
-            throw ApiError::invalid(sprintf('Gruppe und Amt dürfen höchstens %d Zeichen lang sein.', self::TITLE_MAX));
+            throw ApiError::invalid(I18n::t('Gruppe und Amt dürfen höchstens {max} Zeichen lang sein.', ['max' => self::TITLE_MAX]));
         }
         $end = mb_strtolower(trim($cells[3] ?? ''));
         $kind = match (mb_strtolower(trim($cells[4] ?? ''))) {
             '' => $end === '' ? self::KIND_POINT : self::KIND_PERIOD,
             'zeitraum' => self::KIND_PERIOD,
             'zeitpunkt' => self::KIND_POINT,
-            default => throw ApiError::invalid('Art „zeitraum“ oder „zeitpunkt“ (oder leer) erwartet.'),
+            default => throw ApiError::invalid(I18n::t('Art „zeitraum“ oder „zeitpunkt“ (oder leer) erwartet.')),
         };
         // Ehrung nur mit der 8. Spalte; ältere Tabellen mit 7 Spalten ergeben keine Ehrungen (auch nicht bei zeitpunkt).
         $honor = match (mb_strtolower(trim($cells[7] ?? ''))) {
             '', 'nein' => false,
             'ja' => true,
-            default => throw ApiError::invalid('Spalte „ehrung“: „ja“, „nein“ oder leer erwartet.'),
+            default => throw ApiError::invalid(I18n::t('Spalte „ehrung“: „ja“, „nein“ oder leer erwartet.')),
         };
         $names = array_values(array_filter(array_map('trim', explode('&', $cells[5] ?? '')), static fn (string $n): bool => $n !== ''));
         $holders = [];
@@ -1240,34 +1243,34 @@ final class OfficeService
     {
         $kind = $in['kind'] ?? self::KIND_PERIOD;
         if (!in_array($kind, [self::KIND_PERIOD, self::KIND_POINT], true)) {
-            throw ApiError::invalid('Ungültige Art der Amtszeit.');
+            throw ApiError::invalid(I18n::t('Ungültige Art der Amtszeit.'));
         }
         $maxYear = (int) $this->app->time()->today()->format('Y') + 10;
         $start = Input::integer($in['start_year'] ?? null);
         if ($start === null || $start < self::YEAR_MIN || $start > $maxYear) {
-            throw ApiError::invalid(sprintf('Bitte ein Jahr zwischen %d und %d als Beginn angeben.', self::YEAR_MIN, $maxYear));
+            throw ApiError::invalid(I18n::t('Bitte ein Jahr zwischen {min} und {max} als Beginn angeben.', ['min' => self::YEAR_MIN, 'max' => $maxYear]));
         }
         $endRaw = $in['end_year'] ?? null;
         $end = $endRaw === null || $endRaw === '' ? null : Input::integer($endRaw);
         if ($endRaw !== null && $endRaw !== '' && $end === null) {
-            throw ApiError::invalid('Ungültiges Jahr als Ende.');
+            throw ApiError::invalid(I18n::t('Ungültiges Jahr als Ende.'));
         }
         if ($kind === self::KIND_POINT && $end !== null) {
-            throw ApiError::invalid('Ein einzelnes Jahr hat kein Ende.');
+            throw ApiError::invalid(I18n::t('Ein einzelnes Jahr hat kein Ende.'));
         }
         if ($end !== null && ($end < $start || $end > $maxYear)) {
-            throw ApiError::invalid(sprintf('Das Ende muss zwischen %d und %d liegen.', $start, $maxYear));
+            throw ApiError::invalid(I18n::t('Das Ende muss zwischen {min} und {max} liegen.', ['min' => $start, 'max' => $maxYear]));
         }
         $note = Text::line($in['note'] ?? '', self::NOTE_MAX + 1);
         if (mb_strlen($note) > self::NOTE_MAX) {
-            throw ApiError::invalid(sprintf('Der Zusatz darf höchstens %d Zeichen lang sein.', self::NOTE_MAX));
+            throw ApiError::invalid(I18n::t('Der Zusatz darf höchstens {max} Zeichen lang sein.', ['max' => self::NOTE_MAX]));
         }
         $raw = $in['holders'] ?? null;
         if (!is_array($raw) || $raw === []) {
-            throw ApiError::invalid('Bitte mindestens eine Person angeben.');
+            throw ApiError::invalid(I18n::t('Bitte mindestens eine Person angeben.'));
         }
         if (count($raw) > self::HOLDERS_MAX) {
-            throw ApiError::invalid(sprintf('Höchstens %d Personen je Amtszeit.', self::HOLDERS_MAX));
+            throw ApiError::invalid(I18n::t('Höchstens {max} Personen je Amtszeit.', ['max' => self::HOLDERS_MAX]));
         }
         // Konten aller Inhaber und Begleitpersonen in einer Abfrage
         $ids = [];
@@ -1285,29 +1288,29 @@ final class OfficeService
         // Jede Person nur einmal je Amtszeit, ob als Inhaber oder als Begleitperson
         $person = function (mixed $h) use ($users, &$seen): array {
             if (!is_array($h)) {
-                throw ApiError::invalid('Ungültige Angabe zu einer Person.');
+                throw ApiError::invalid(I18n::t('Ungültige Angabe zu einer Person.'));
             }
             $id = Input::integer($h['user_id'] ?? null);
             if ($id !== null) {
-                $user = $users[$id] ?? throw ApiError::invalid('Unbekanntes Konto.');
+                $user = $users[$id] ?? throw ApiError::invalid(I18n::t('Unbekanntes Konto.'));
                 $holder = ['user_id' => $id, 'name' => mb_substr($user->name, 0, self::NAME_MAX)];
             } else {
                 $name = Text::line($h['name'] ?? '', self::NAME_MAX + 1);
                 if ($name === '') {
-                    throw ApiError::invalid('Bitte für jede Person einen Namen angeben oder ein Konto wählen.');
+                    throw ApiError::invalid(I18n::t('Bitte für jede Person einen Namen angeben oder ein Konto wählen.'));
                 }
                 if (mb_strlen($name) > self::NAME_MAX) {
-                    throw ApiError::invalid(sprintf('Ein Name darf höchstens %d Zeichen lang sein.', self::NAME_MAX));
+                    throw ApiError::invalid(I18n::t('Ein Name darf höchstens {max} Zeichen lang sein.', ['max' => self::NAME_MAX]));
                 }
                 $uid = $h['image_uid'] ?? null;
                 if ($uid !== null && $uid !== '' && (!is_string($uid) || preg_match(RichText::IMAGE_UID, strtolower($uid)) !== 1)) {
-                    throw ApiError::invalid('Unbekanntes Foto.');
+                    throw ApiError::invalid(I18n::t('Unbekanntes Foto.'));
                 }
                 $holder = ['user_id' => null, 'name' => $name, 'image_uid' => is_string($uid) && $uid !== '' ? strtolower($uid) : null];
             }
             $key = $holder['user_id'] !== null ? 'u' . $holder['user_id'] : 'n' . mb_strtolower($holder['name']);
             if (isset($seen[$key])) {
-                throw ApiError::invalid(sprintf('„%s“ steht doppelt in der Amtszeit.', $holder['name']));
+                throw ApiError::invalid(I18n::t('„{name}“ steht doppelt in der Amtszeit.', ['name' => $holder['name']]));
             }
             $seen[$key] = true;
             return $holder;
@@ -1316,10 +1319,10 @@ final class OfficeService
             $holder = $person($h);
             $companions = $h['companions'] ?? [];
             if (!is_array($companions)) {
-                throw ApiError::invalid('Ungültige Angabe zu den Begleitpersonen.');
+                throw ApiError::invalid(I18n::t('Ungültige Angabe zu den Begleitpersonen.'));
             }
             if (count($companions) > self::COMPANIONS_MAX) {
-                throw ApiError::invalid(sprintf('Höchstens %d Begleitpersonen je Person.', self::COMPANIONS_MAX));
+                throw ApiError::invalid(I18n::t('Höchstens {max} Begleitpersonen je Person.', ['max' => self::COMPANIONS_MAX]));
             }
             if ($companions !== []) {
                 $holder['companions'] = array_map($person, array_values($companions));
@@ -1491,7 +1494,7 @@ final class OfficeService
         sort($given);
         sort($known);
         if ($given !== $known) {
-            throw ApiError::invalid('Bitte die Reihenfolge aller Einträge angeben.');
+            throw ApiError::invalid(I18n::t('Bitte die Reihenfolge aller Einträge angeben.'));
         }
         return array_map('intval', $order);
     }
@@ -1499,13 +1502,13 @@ final class OfficeService
     /** @return array{id: int, title: string, singular: string, joint_terms: bool} */
     private function group(int $id): array
     {
-        return self::groupOut($this->repository()->findGroup($id) ?? throw ApiError::notFound('Gruppe nicht gefunden.'));
+        return self::groupOut($this->repository()->findGroup($id) ?? throw ApiError::notFound(I18n::t('Gruppe nicht gefunden.')));
     }
 
     /** @return array<string, mixed> */
     private function office(int $id): array
     {
-        return $this->officeOut($this->repository()->findOffice($id) ?? throw ApiError::notFound('Amt nicht gefunden.'));
+        return $this->officeOut($this->repository()->findOffice($id) ?? throw ApiError::notFound(I18n::t('Amt nicht gefunden.')));
     }
 
     /**
@@ -1521,17 +1524,17 @@ final class OfficeService
     private function term(int $id): array
     {
         $repo = $this->repository();
-        $t = $repo->findTerm($id) ?? throw ApiError::notFound('Amtszeit nicht gefunden.');
+        $t = $repo->findTerm($id) ?? throw ApiError::notFound(I18n::t('Amtszeit nicht gefunden.'));
         $person = fn (array $h): array => ['name' => $h['name'], 'user_id' => $h['user_id']] + $this->holderPhoto($h, true);
         return self::termOut($t) + ['office_id' => $t['office_id'], 'holders' => array_map(static fn (array $h): array => $person($h) + ($h['companions'] !== [] ? ['companions' => array_map($person, $h['companions'])] : []), $repo->holdersOf($id))];
     }
 
     private function validGroupTitle(mixed $raw, ?int $id): string
     {
-        $title = $this->validName($raw, 'Bitte eine Bezeichnung für die Gruppe angeben.');
+        $title = $this->validName($raw, I18n::t('Bitte eine Bezeichnung für die Gruppe angeben.'));
         foreach ($this->repository()->groups() as $g) {
             if ($g['id'] !== $id && mb_strtolower($g['title']) === mb_strtolower($title)) {
-                throw ApiError::invalid(sprintf('Die Gruppe „%s“ gibt es schon.', $g['title']));
+                throw ApiError::invalid(I18n::t('Die Gruppe „{name}“ gibt es schon.', ['name' => $g['title']]));
             }
         }
         return $title;
@@ -1539,10 +1542,10 @@ final class OfficeService
 
     private function validOfficeTitle(mixed $raw, ?int $groupId, ?int $id): string
     {
-        $title = $this->validName($raw, 'Bitte eine Bezeichnung für das Amt angeben.');
+        $title = $this->validName($raw, I18n::t('Bitte eine Bezeichnung für das Amt angeben.'));
         foreach ($this->repository()->offices() as $o) {
             if ($o['id'] !== $id && $o['group_id'] === $groupId && mb_strtolower($o['title']) === mb_strtolower($title)) {
-                throw ApiError::invalid(sprintf('Das Amt „%s“ gibt es in dieser Gruppe schon.', $o['title']));
+                throw ApiError::invalid(I18n::t('Das Amt „{name}“ gibt es in dieser Gruppe schon.', ['name' => $o['title']]));
             }
         }
         return $title;
@@ -1553,7 +1556,7 @@ final class OfficeService
     {
         $singular = Text::line(is_string($raw) ? $raw : '', self::TITLE_MAX + 1);
         if (mb_strlen($singular) > self::TITLE_MAX) {
-            throw ApiError::invalid(sprintf('Die Einzahl darf höchstens %d Zeichen lang sein.', self::TITLE_MAX));
+            throw ApiError::invalid(I18n::t('Die Einzahl darf höchstens {max} Zeichen lang sein.', ['max' => self::TITLE_MAX]));
         }
         return $singular;
     }
@@ -1565,7 +1568,7 @@ final class OfficeService
             throw ApiError::invalid($missing);
         }
         if (mb_strlen($title) > self::TITLE_MAX) {
-            throw ApiError::invalid(sprintf('Die Bezeichnung darf höchstens %d Zeichen lang sein.', self::TITLE_MAX));
+            throw ApiError::invalid(I18n::t('Die Bezeichnung darf höchstens {max} Zeichen lang sein.', ['max' => self::TITLE_MAX]));
         }
         return $title;
     }
@@ -1577,7 +1580,7 @@ final class OfficeService
         }
         $id = Input::integer($raw);
         if ($id === null || $this->repository()->findGroup($id) === null) {
-            throw ApiError::invalid('Unbekannte Gruppe.');
+            throw ApiError::invalid(I18n::t('Unbekannte Gruppe.'));
         }
         return $id;
     }
@@ -1590,11 +1593,11 @@ final class OfficeService
         }
         $id = Input::integer($raw);
         if ($id === null || $this->app->titles()->repository()->find($id) === null) {
-            throw ApiError::invalid('Unbekannter Titel.');
+            throw ApiError::invalid(I18n::t('Unbekannter Titel.'));
         }
         foreach ($this->repository()->offices() as $o) {
             if ($o['title_id'] === $id && $o['id'] !== $officeId) {
-                throw ApiError::invalid(sprintf('Der Titel ist schon mit dem Amt „%s“ verknüpft.', $o['title']));
+                throw ApiError::invalid(I18n::t('Der Titel ist schon mit dem Amt „{office}“ verknüpft.', ['office' => $o['title']]));
             }
         }
         return $id;

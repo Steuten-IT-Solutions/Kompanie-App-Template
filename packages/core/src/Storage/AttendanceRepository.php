@@ -10,7 +10,7 @@ use KompanieApp\Core\Storage\Sql\Connection;
  * Anwesenheit (Issue #21): Listen je Termin und der Status je Person. Jede Methode kommt mit einer festen Zahl von
  * Abfragen aus, unabhängig von der Zahl der Personen.
  *
- * @phpstan-type AttendanceList array{id: int, source: string, event_key: string, title: string, event_date: string,
+ * @phpstan-type AttendanceList array{id: int, source: string, event_key: string, title: string, event_date: string, kinds: list<string>,
  *     created_by: int, created_at: string, updated_by: int, updated_at: string}
  */
 final class AttendanceRepository
@@ -49,13 +49,15 @@ final class AttendanceRepository
         return $out;
     }
 
-    public function insert(string $source, string $eventKey, string $title, string $date, int $by, string $now): int
+    /** @param list<string> $kinds Terminarten (leer = keine) */
+    public function insert(string $source, string $eventKey, string $title, string $date, int $by, string $now, array $kinds = []): int
     {
         return $this->db->insert('attendance_lists', [
             'source' => $source,
             'event_key' => $eventKey,
             'title' => $title,
             'event_date' => $date,
+        ] + EventKindRepository::columns($kinds) + [
             'created_by' => $by,
             'created_at' => $now,
             'updated_by' => $by,
@@ -63,9 +65,14 @@ final class AttendanceRepository
         ]);
     }
 
-    /** @param array{title?: string, event_date?: string} $data */
+    /** @param array{title?: string, event_date?: string, kinds?: list<string>} $data */
     public function touch(int $id, array $data, int $by, string $now): void
     {
+        if (isset($data['kinds'])) {
+            $kinds = $data['kinds'];
+            unset($data['kinds']);
+            $data += EventKindRepository::columns($kinds);
+        }
         $this->db->update('attendance_lists', $data + ['updated_by' => $by, 'updated_at' => $now], ['id' => $id]);
     }
 
@@ -175,17 +182,18 @@ final class AttendanceRepository
         ));
     }
 
-    /** @return list<array{list_id: int, title: string, event_date: string, status: string, updated_by: int}> neueste zuerst */
+    /** @return list<array{list_id: int, title: string, event_date: string, kinds: list<string>, status: string, updated_by: int}> neueste zuerst */
     public function forUser(int $userId): array
     {
         return array_values(array_map(static fn (array $r): array => [
             'list_id' => (int) $r['list_id'],
             'title' => (string) $r['title'],
             'event_date' => (string) $r['event_date'],
+            'kinds' => EventKindRepository::decode($r['kind'], $r['kinds']),
             'status' => (string) $r['status'],
             'updated_by' => (int) $r['updated_by'],
         ], $this->db->select(
-            'SELECT e.list_id, l.title, l.event_date, e.status, e.updated_by FROM {attendance_entries} e JOIN {attendance_lists} l ON l.id = e.list_id'
+            'SELECT e.list_id, l.title, l.event_date, l.kind, l.kinds, e.status, e.updated_by FROM {attendance_entries} e JOIN {attendance_lists} l ON l.id = e.list_id'
             . ' WHERE e.user_id = ? ORDER BY l.event_date DESC, l.id DESC',
             [$userId],
         )));
@@ -203,6 +211,7 @@ final class AttendanceRepository
             'event_key' => (string) $r['event_key'],
             'title' => (string) $r['title'],
             'event_date' => substr((string) $r['event_date'], 0, 10),
+            'kinds' => EventKindRepository::decode($r['kind'] ?? '', $r['kinds'] ?? ''),
             'created_by' => (int) $r['created_by'],
             'created_at' => (string) $r['created_at'],
             'updated_by' => (int) $r['updated_by'],

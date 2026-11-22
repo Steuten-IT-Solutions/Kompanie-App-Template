@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import type { DocCategory, DocumentInfo } from './api';
 import brand from './generated/brand';
 
@@ -5,10 +6,10 @@ import brand from './generated/brand';
 export type DocSort = 'name-asc' | 'name-desc' | 'date-desc' | 'date-asc';
 
 export const DOC_SORT_LABELS: Record<DocSort, string> = {
-  'name-asc': 'Name A–Z',
-  'name-desc': 'Name Z–A',
-  'date-desc': 'Stand neu → alt',
-  'date-asc': 'Stand alt → neu',
+  'name-asc': t('Name A–Z'),
+  'name-desc': t('Name Z–A'),
+  'date-desc': t('Stand neu → alt'),
+  'date-asc': t('Stand alt → neu'),
 };
 
 export const DEFAULT_DOC_SORT: DocSort = 'date-desc';
@@ -70,7 +71,12 @@ export function groupDocuments(docs: DocumentInfo[], categories: DocCategory[], 
   }
   const known = new Set(categories.map((c) => c.id));
   const rest = sorted.filter((d) => d.category_id === null || !known.has(d.category_id));
-  if (rest.length > 0) groups.push({ id: null, title: groups.length > 0 ? `Weitere ${brand.labels.sections.documents}` : '', docs: rest });
+  if (rest.length > 0)
+    groups.push({
+      id: null,
+      title: groups.length > 0 ? t('Weitere {documents}', { documents: brand.labels.sections.documents }) : '',
+      docs: rest,
+    });
   return groups;
 }
 

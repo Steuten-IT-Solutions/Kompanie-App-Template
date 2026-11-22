@@ -24,6 +24,368 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+## [0.13.0] – 2026-11-22
+
+### Neu
+
+- **Englisch**: Unter [Einstellungen → Sprachen](app:einstellungen/sprachen) schaltest du Englisch als weitere
+  Sprache ein (anfangs nur Deutsch). Dann steht oben eine Flagge, mit der jede Person Deutsch oder Englisch wählt, auch
+  ohne Anmeldung; unter [Meins → Konto](app:meins/konto) gibt es dieselbe Wahl. Angemeldete behalten ihre Sprache auf allen
+  Geräten und bekommen Mails und Benachrichtigungen in dieser Sprache. Übersetzt sind die Texte der App und die vorgegebenen Namen
+  der Bereiche und Rollen (z. B. „Termine“ → „Events“). Eigene Namen und einfache Inhalte trägst du an einer Stelle auf
+  Englisch ein: unter [Einstellungen → Sprachen](app:einstellungen/sprachen) im Abschnitt _Übersetzungen_, je Gruppe
+  (Bereiche der Navigation, Untermenüs, Rollen, Dienstgrade, Ämter und ihre Gruppen, Terminarten, kommende Termine,
+  laufende Umfragen, Dokumente und ihre Kategorien, Alben der Galerie) mit Zähler, Suche und „Nur fehlende zeigen“; ohne
+  Eintrag bleibt der deutsche Text, und Benachrichtigungen gehen in der Sprache der Empfänger. Eigene Seiten und laufende
+  Nachrichten am Brett übersetzt du dort Block für Block, je mit Stand („3 von 4 übersetzt“).
+  [News](app:news), die ihr in der App schreibt, bekommen ihre englische Fassung beim Bearbeiten; Nachrichten am
+  [Schwarzen Brett](app:brett) und [Umfragen](app:umfragen/verwalten) auf Wunsch schon beim Schreiben (_Auf English
+  schreiben_; Benachrichtigung und Mail gehen dann in der Sprache der Empfänger); wer
+  auf Englisch liest und sie nicht hat, sieht die deutsche mit dem Hinweis „Nur auf Deutsch verfügbar“. Mit WordPress
+  zeigen die News aus den Beiträgen der Seite auf Englisch die Übersetzung aus dem Plugin Polylang, wenn es aktiv ist;
+  Beiträge einer anderen Webseite oder aus einem Feed bleiben deutsch (mit dem Hinweis). Was ihr sonst eintragt, bleibt,
+  wie es ist; neue Listen bekommen die vorgegebenen Spalten (Name, Unterschrift) und beim Kopieren „(Kopie)“ in der
+  Sprache dessen, der sie anlegt. Die Hilfe (das Handbuch hinter dem „?“) gibt es vollständig auf Englisch. Eine neue
+  Kompanie kann beim Anlegen Englisch als Basissprache wählen (danach fest): Dann ist es umgekehrt, Englisch ist immer an,
+  Namen und Inhalte stehen auf Englisch, und Deutsch ist die Übersetzung (Hinweis „Nur auf Englisch verfügbar“).
+- **Wartung**: Unter [Einstellungen → Zustand und Updates](app:einstellungen/zustand) steht, bis wann eure App neue
+  Versionen bekommt (Wartung bis …, oder unbefristet). Nach dem Ende läuft die App mit ihrer Version weiter; neue
+  Versionen, auch Sicherheitsupdates, gibt es erst nach einer Verlängerung. Zurückgehen auf ältere Versionen bleibt
+  möglich.
+- **Beförderung mit Datum, korrigieren und löschen**: Beim Ändern des Dienstgrads eines Mitglieds (z. B. aus
+  [Beförderungen](app:verwaltung/befoerderungen)) wählst du jetzt das Datum der Änderung, vorgegeben ist heute. Ein
+  früherer Tag geht, ein Tag in der Zukunft oder vor der letzten Änderung dieser Person nicht. Mit Punkten zählen bei
+  einem früheren Tag nur die Punkte bis zu diesem Tag, für die Schwelle und für den Stand im Verlauf. Das Datum einer
+  schon eingetragenen Änderung korrigierst du nachträglich im Verlauf mit dem Stift (_Datum ändern_), nach denselben
+  Regeln; die Korrektur steht im Änderungsprotokoll.
+  Mit dem Stift (_Eintrag ändern_) im Verlauf änderst du jetzt neben dem
+  Datum auch den neuen Dienstgrad eines eingetragenen Wechsels. Beförderung oder Degradierung ergibt sich neu, mit
+  Punkten gilt die Schwelle mit dem Stand des Eintrags; der Eintrag danach beginnt beim neuen Dienstgrad. Beim neuesten
+  Eintrag ändert sich auch der aktuelle Dienstgrad. Die Korrektur steht im Änderungsprotokoll.
+  Ein falsch eingetragener Wechsel im Verlauf des Dienstgrads eines
+  Mitglieds (z. B. aus [Beförderungen](app:verwaltung/befoerderungen)) lässt sich mit dem Papierkorb nach einer Rückfrage
+  ganz löschen, mit demselben Recht wie das Ändern des Dienstgrads. Beim neuesten Eintrag gilt danach wieder der
+  Dienstgrad davor; ältere Einträge verschwinden nur aus dem Verlauf. Das Löschen steht im Änderungsprotokoll.
+- **Bald fällige Beförderungen**: Am Knopf [Beförderungen](app:verwaltung/befoerderungen) zeigt neben der Zahl im roten
+  Kreis ein Kreis in der Farbe der Kompanie, wie viele Mitglieder bald die Schwelle für ihren nächsten Dienstgrad
+  erreichen (es fehlt höchstens noch ein Punkt); sie stehen in der Übersicht im neuen Abschnitt „Bald erreicht“.
+- **Kacheln selbst anordnen**: Jede Person legt auf der Startseite der [Verwaltung](app:verwaltung), unter
+  Einrichtungen, in den Untermenüs wie [Intern](app:intern) und in den [Einstellungen](app:einstellungen) selbst fest,
+  wo jede Kachel steht und wie breit sie ist (Symbol unten rechts unter den Kacheln: ziehen, am Handy kurz halten; − und +
+  für die Breite; Zurücksetzen auf die Vorgabe). Die Anordnung gilt nur für die Person, wird im Konto gespeichert und
+  gilt je Bildschirmbreite (2 bis 5 Spalten); ohne Anmeldung merkt sie sich das Gerät. Die Reihenfolge unter
+  [Einstellungen → Navigation](app:einstellungen/navigation) bleibt die Vorgabe für alle anderen; fehlt jemandem eine
+  Kachel, wird die schmalste Kachel derselben Zeile (bei gleicher Breite die linke) um deren Breite breiter. Am
+  Computer und auf dem Handy quer haben die Kachel-Seiten dafür jetzt eine feste Spaltenzahl. Am Computer sind
+  Kachel-Seiten breiter als andere Seiten und haben 5 Spalten statt 3 (ab etwa 900 px Fensterbreite).
+  Wer die Einstellungen ändern darf, ordnet eine Kachel-Seite an und tippt beim
+  Anordnen auf _Als Vorgabe für alle_. Plätze und Breiten gelten dann für jede Person ohne eigene Anordnung, auch ohne
+  Anmeldung und in der Vorschau, je Bildschirmbreite; _Vorgabe löschen_ kehrt zur Reihenfolge unter
+  [Einstellungen → Navigation](app:einstellungen/navigation) zurück. Die Änderung steht im Änderungsprotokoll.
+- **Link auf ein Bild der Galerie teilen**: In der Großansicht eines Bildes oder Videos verschickt ein neues
+  Teilen-Symbol einen Link auf genau dieses Bild (Teilen-Menü des Handys, am Computer wird der Link kopiert). Der Link
+  öffnet das Album mit dem Bild in der Großansicht. Interne Bilder sieht nur, wer angemeldet ist und sie sehen darf; alle
+  anderen bekommen einen Hinweis mit „Anmelden“. Das Teilen-Symbol steht oben neben dem Knopf zum Herunterladen; die
+  Knöpfe zum Verwalten (Titelbild, intern, Verschieben, Löschen) stehen jetzt in einer eigenen Zeile unter der Anzahl.
+- **Neustart nach einem Update anbieten**: Holt jemand die App aus dem Hintergrund, sucht sie nach einer neuen Version
+  (höchstens alle 15 Minuten, bei offener App einmal pro Stunde). Ist eine da, lädt die App sie im Hintergrund und
+  zeigt oben _Die App wurde aktualisiert_ mit dem Knopf _Neu starten_. So sieht man Neuerungen sofort, statt erst beim
+  nächsten Öffnen. Neu geladen wird nur auf Knopfdruck; nicht gespeicherte Eingaben fragt die App vorher ab.
+- **Kompanie beim Zugang beantragen**: Ist der Bereich [Kompanien](app:kompanien) an, wählt die Person beim
+  [Zugang beantragen](app:registrieren) ihre Kompanie (nur aktive, auch mehrere) oder „Keine Kompanie“ bzw.
+  „Passiv“. Die Wahl ist Pflicht, vorausgewählt ist nichts. Unter
+  [Verwaltung → Anfragen](app:verwaltung/anfragen) steht die Wahl auf der Karte, und die Freigabe ordnet die Person
+  der Kompanie zu, sofern sie eine Rolle mit dem Recht „Mitglied“ bekommt. Ändern lässt sich die Kompanie beim
+  Freigeben mit dem Recht „Kompanien verwalten“.
+- **News aus der App in WordPress schreiben**: Läuft die App als WordPress-Plugin und kommen die [News](app:news) aus
+  den Beiträgen der Webseite, gibt es dort für alle mit dem Recht _News schreiben_ den Knopf _Neuer Beitrag_ und im
+  geöffneten Beitrag _In WordPress bearbeiten_. Beide öffnen den Editor von WordPress mit allen seinen Möglichkeiten;
+  zurück in der App ist der Beitrag gleich zu sehen. Das Recht gibt in WordPress die Rechte für alle Beiträge
+  (schreiben, ändern, veröffentlichen, löschen, Bilder hochladen), aber keine Seiten; eine Rolle wie Autor oder
+  Redakteur in WordPress braucht es nicht. Die Rolle „News verwalten“ gibt es jetzt auch mit dieser Quelle; vergib sie
+  unter [Einstellungen → Rollen](app:einstellungen/rollen).
+- **Galerie in Google Drive ablegen**: Nutzt die Galerie Google Drive, landen eingereichte und in der App hochgeladene
+  Bilder und Videos jetzt in Drive statt auf dem Server. Offene Einreichungen liegen im Ordner „Einreichungen …“ in der
+  Ablage des verbundenen Google-Kontos, außerhalb des Galerie-Ordners. Bei der Freigabe verschiebt die App sie in den
+  Ordner des Albums (nur für Mitglieder: in dessen Ordner „intern“), beim Ablehnen oder Zurückziehen in den Papierkorb
+  von Drive. Hochgeladene Bilder in Alben aus Drive ziehen nach dem Aufbereiten im Hintergrund in den Ordner des
+  Albums, auch solche, die schon auf dem Server liegen. Dafür braucht die App vollen Zugriff auf Google Drive: Trenne
+  unter [Einstellungen → Google-Zugang](app:einstellungen/google) die Verbindung und verbinde neu, dabei das Häkchen
+  für Google Drive setzen. Bis dahin bleibt alles wie bisher auf dem Server. Wo die Dateien landen und ob noch welche
+  warten, steht unter [Einstellungen → Galerie](app:einstellungen/galerie). Mit Drive als Ablage gibt es in der
+  [Galerie](app:galerie) für Bilder und Alben aus Drive dieselben Knöpfe wie für hochgeladene: Verschieben, Nur für
+  Mitglieder bzw. Öffentlich (über den Ordner „intern“), Löschen (in den Papierkorb von Drive), Alben anlegen (als Ordner
+  im Jahresordner), umbenennen, in ein anderes Jahr setzen und löschen. Alben, die bisher nur in der App lagen, bekommen
+  einmalig einen Ordner im Jahresordner von Drive, ihre Bilder ziehen im Hintergrund dorthin um.
+- **Terminarten**: Unter [Einstellungen → Kalender](app:einstellungen/kalender) richtest du Terminarten ein, z. B.
+  Versammlung oder Arbeitsdienst. Wer Termine pflegen darf, klappt im Termin unter [Termine](app:termine) die
+  Terminarten auf und hakt eine oder mehrere an (z. B. Versammlung und Arbeitsdienst), bei jeder Quelle des Kalenders, auch bei Google
+  Kalender und iCal. Ein Termin mit mehreren Arten zählt für jede, etwa bei den Aufnahmen. Die App speichert die Arten
+  selbst und ändert nichts in Google. Steht der Name einer Art im Titel, schlägt die App sie vor. Anwesenheitslisten
+  übernehmen die Arten ihres Termins; an der Liste stehen sie wie am Termin eingeklappt und lassen sich dort aufklappen und ändern. Je Art legst du mit
+  dem Haken „Als Schild am Termin zeigen“ fest, ob sie neben dem Titel des Termins steht (anfangs an); ohne Schild
+  bleibt sie gespeichert und zählt weiter.
+- **Aufnahmen**: Unter [Verwaltung → Aufnahmen](app:verwaltung/aufnahmen) siehst du wie bei den Beförderungen, welche
+  Anwärter die Voraussetzung für die Aufnahme als Mitglied erfüllen; die Zahl im roten Kreis am Knopf zeigt, wie viele es
+  sind. Daneben zeigt ein Kreis in der Farbe der Kompanie, wie viele kurz vor der Aufnahme stehen (noch höchstens eine
+  Teilnahme je Bedingung, Mindestdauer in höchstens 30 Tagen); sie stehen in der Übersicht unter „Bald erfüllt“. Unter [Einstellungen → Rollen](app:einstellungen/rollen) setzt du an einer Rolle den Haken „Anwärter-Rolle“
+  und legst die Voraussetzung fest: Bedingungen wie Teilnahmen an Terminen einer Terminart (z. B. 6 Versammlungen)
+  und eine Mindestdauer als Anwärter, verknüpft mit „Alle müssen erfüllt sein“ (UND) oder „Eine reicht“ (ODER), auch
+  in Gruppen innerhalb von Gruppen (z. B. 12 Monate und dazu 6 Versammlungen oder 10 Arbeitsdienste). Die Anwärter-Rolle kann die Rolle der Person sein (beim Aufnehmen wird sie zu Mitglied)
+  oder eine Zusatzrolle zu Mitglied (beim Aufnehmen wird sie entfernt). Der Knopf ist da, sobald die Anwesenheit an ist. Auf der Seite eines Anwärters
+  stehen „Anwärter seit“ (bei bisherigen Anwärtern nachtragen) und der Stand; aufnehmen geht dort jederzeit, ohne
+  erfüllte Voraussetzung mit Hinweis. Ohne Eintritt trägt die App den Tag der Aufnahme ein. Nach dem Speichern einer
+  Anwesenheitsliste zeigt die App, wer neu die Voraussetzung erfüllt. Sehen und aufnehmen darf, wer Mitglieder anlegen
+  darf. Anwärter sehen ihren eigenen Stand (was noch fehlt) unter [Meins](app:meins) bzw. unter
+  [Konto](app:meins/konto), den Stand anderer nicht.
+- **Rechte zum Sehen und zum Ändern getrennt**: Unter [Einstellungen → Rollen](app:einstellungen/rollen) gibt es
+  jetzt eigene Rechte, um Punkte, Strafen, Dienstgrade mit Beförderungen, Titel und die Anwesenheit der Mitglieder nur
+  zu sehen, z. B. „Punkte aller Mitglieder sehen“ neben „Punkte vergeben“. Ebenso gibt es eigene Rechte, um das
+  Inventar, die Listen, den Verlauf der E-Mails, die Zu- und Absagen bei Terminen, die Passiven, die Einreichungen der Galerie und die Fehlermeldungen nur zu sehen. Mit „Konten sehen“ siehst du Konto,
+  Rolle, Zusatzrollen und Rechte einer Person, den Eintritt, Anfragen auf einen Zugang und Aufnahmen; dieses Recht
+  geben wie „Mitglieder anlegen“ nur Admins weiter. Eigene Rechte gibt es auch für eingeschränkte Dokumente, für
+  alle Ergebnisse der Umfragen, auch laufender, für alle Nachrichten am Schwarzen Brett mit ihrem Verlauf und für die
+  Zuordnung der Mitglieder zu Kompanien. Im Formular einer Rolle und bei den Rechten einer Person stehen solche Bereiche in
+  einer Zeile mit den Haken „Lesen“ und „Schreiben“. Wer nur sehen darf,
+  sieht die Mitgliederliste bzw. den Bereich und die Angaben, aber keine Knöpfe zum Ändern. Ändern gibt es nur zusammen mit Sehen. Rollen und Personen, die ein
+  Recht zum Ändern hatten, haben nach dem Update auch das Recht zum Sehen; es ändert sich also für niemanden etwas,
+  bis du es umstellst.
+- **Titelbild eines Albums wählen**: Wer die Galerie verwalten darf, öffnet ein Bild in der Großansicht und tippt auf
+  _Als Titelbild des Albums verwenden_. Dieses Bild steht dann in der Galerie-Übersicht für das Album, auch bei Alben aus
+  Google Drive. Noch einmal getippt, wählt die App das Titelbild wieder selbst. Ist das gewählte Bild nur für Mitglieder,
+  sehen Gäste weiter ein öffentliches Bild des Albums; ein internes Bild wird so nie öffentlich.
+- **Direkt im Album einreichen**: In einem Album der [Galerie](app:galerie) gibt es oben den Knopf _Bilder und Videos
+  in dieses Album einreichen_. Das Album ist im Formular dann schon gewählt, und _‹ Zum Album_ führt zurück. Der Knopf
+  erscheint wie in der Übersicht nur mit dem Recht zum Einreichen und mit dem Haken _Einreichen von Bildern und Videos durch Mitglieder erlauben_ unter
+  [Einstellungen → Galerie](app:einstellungen/galerie).
+- **Bericht als PDF**: Unter [Verwaltung → Bericht](app:verwaltung/bericht) erstellst du eine PDF-Datei mit den Daten
+  mehrerer Bereiche für einen Zeitraum, z. B. für die Jahreshauptversammlung. Den Zeitraum wählst du mit _Von_ und _Bis_
+  oder der Schnellwahl (dieses Jahr, letztes Jahr, letzte 12 Monate), die Bereiche mit Haken. Enthalten sind die
+  Mitglieder (Stand heute; E-Mail, Telefon, Adresse und Geburtsdatum nur für alle, die persönliche Angaben sehen dürfen),
+  die Passiven (Stand heute, Kontaktdaten ebenso nur mit diesem Recht), Punkte und Strafen mit Summen je Mitglied und
+  allen Einträgen, die Anwesenheit je Mitglied und je Termin, die öffentlichen Termine, der interne Kalender mit den Zu-
+  und Absagen je Termin und je Mitglied, Wechsel der Dienstgrade, vergebene Titel, die Amtszeiten der Ämter sowie der
+  Bestand und Verlauf des Inventars. Jede
+  Person sieht nur die Bereiche, die sie auch sonst verwalten darf; ein eigenes Recht gibt es nicht. Die Schrift ist im
+  PDF enthalten, damit auch Buchstaben wie „ł“ oder „č“ stimmen. Wer wann einen Bericht erstellt, steht im
+  Änderungsprotokoll (Zeitraum und Bereiche, ohne Inhalt).
+- **Eigene Leiste für Gäste**: Unter [Einstellungen → Navigation](app:einstellungen/navigation) wählst du oben
+  _Für Angemeldete_ oder _Für Gäste_. Mit _Eigene Leiste für Gäste_ bekommen Gäste ihre eigene Reihenfolge, eigene
+  Untermenüs und eigene ausgeblendete Bereiche, z. B. die Mitglieder unten in der Leiste statt unter „Intern“. Die Leiste
+  beginnt als Kopie der Leiste für Angemeldete, in der Mitglieder und Dokumente schon unten stehen. Gäste sind alle ohne
+  Anmeldung und Angemeldete mit der Grundrolle Gast (z. B. ehemalige Mitglieder); für sie gilt auch die Startseite der
+  Gäste, ebenso in der Vorschau als Gast. Ohne eigene Leiste sehen Gäste wie bisher dieselbe Leiste wie Angemeldete.
+  Namen und Symbole gelten für beide Leisten. Was jemand sehen darf, regeln weiter die Rechte.
+- **Passive**: Mit dem neuen Bereich _Passive_ (unter [Einstellungen → Bereiche](app:einstellungen/bereiche)) führt ihr
+  unter [Verwaltung → Passive](app:verwaltung/passive) eine interne Liste eurer passiven Mitglieder mit Vorname,
+  Nachname, Adresse, Telefon, E-Mail-Adresse, Geburtsdatum, Eintritt und Bemerkung, je optional mit einem Mitglied als
+  Betreuer. Eine bisher geführte Liste übernimmst du dort mit „Tabelle importieren“ aus Excel (.xlsx) oder CSV: Die App
+  findet die Kopfzeile auch unter einem Titel, erkennt die Spalten an ihren Namen (änderbar), ordnet Betreuer wie
+  „A. Beispiel“ einem Mitglied zu, übernimmt auf Wunsch den Beitrag eines Jahres (auch aus Spalten je Zahlungsart),
+  zeigt vorher eine Vorschau und überspringt, wer schon eingetragen ist. Die Liste zeigt nur die Namen; Antippen öffnet
+  wie bei den Mitgliedern die Karte des Passiven mit allen Angaben und Beiträgen, dort bearbeitest und löschst du ihn
+  und blätterst (auch per Wischen) zum nächsten. Passive sind
+  keine Konten: Sie bekommen nie einen Zugang zur App, stehen in keiner Mitgliederliste und ihr Geburtstag erscheint nicht
+  bei den Geburtstagen. Die Liste sieht und pflegt, wer das neue Recht _Passive verwalten_ (`manage_passive`) hat; beim
+  Einschalten entsteht die Rolle „Passive verwalten“. Adresse, Telefon, E-Mail und Geburtsdatum sieht davon nur, wer
+  persönliche Angaben sehen darf, und ändert nur, wer sie pflegen darf. Betreuer sehen ihre eigenen Passiven unter
+  [Meins → Meine Passiven](app:meins/passive) mit allen Angaben, nur zum Lesen. Die Passiven sind Teil der
+  Datensicherung.
+  Dort trägst du auch je Passivem und Jahr
+  ein, dass der Beitrag bezahlt ist, mit Betrag, Datum und Zahlungsart. Oben wählst du das Jahr, siehst, wie viele
+  bezahlt haben, und kannst nur die offenen oder nur die bezahlten zeigen. Vor dem Eintrittsjahr (Feld _Eintritt_,
+  z. B. 2027) gilt der Beitrag nicht als offen, sondern als „noch nicht dabei“. Einen Jahresbeitrag stellst du als Vorschlag
+  ein, er steht beim Eintragen schon im Feld; die Zahlungsarten zur Auswahl richtest du dort auch ein (vorgegeben
+  Bar, SEPA und PayPal). Eintragen darf, wer Passive verwaltet. Betreuer sehen unter
+  [Meins → Meine Passiven](app:meins/passive), ob der Beitrag für das laufende Jahr bezahlt ist.
+  Bei _Erinnerung an Geburtstage_ richtest du ein, bei welchen Altern erinnert wird (z. B. 50, 60, 70, 75, 80) und wie viele Tage vorher (Vorgabe 7).
+  Anfangs ist keine Altersliste eingetragen, die Erinnerung also aus. Erinnert werden alle, die Passive verwalten und
+  persönliche Angaben sehen dürfen: per Benachrichtigung (einmal je Geburtstag) und oben in der Liste unter
+  _Anstehende Geburtstage_.
+- **Anwesenheit auf der Seite eines Mitglieds**: Unter [Verwaltung → Mitglieder](app:verwaltung/mitglieder) steht bei
+  jeder Person, wie oft sie anwesend war, wie oft sie entschuldigt und wie oft sie unentschuldigt gefehlt hat. Vorgegeben
+  ist das laufende Jahr; du kannst auf frühere Jahre oder „Gesamt“ umschalten, und ein Tipp öffnet die Termine dazu. Es
+  zählt nur, was in einer Anwesenheitsliste gespeichert ist. Das sehen alle mit dem Recht, Anwesenheitslisten zu führen.
+- **App als Person ansehen**: Neben der Vorschau als Rolle siehst du die App jetzt auch so, wie eine bestimmte Person
+  sie sieht, mit allen ihren Rollen zusammen (Grundrolle, Zusatzrollen und einzeln gegebene oder entzogene Rechte). Du
+  startest sie auf der Seite der Person in der [Verwaltung → Mitglieder](app:verwaltung/mitglieder) unter _Konto und
+  Rolle_ mit _App als … ansehen_; das Banner zeigt ihren Namen und ihre Rollen. Wie die Vorschau als Rolle ist sie nur
+  für Admins und nur zum Ansehen. _Meins_ und andere persönliche Stellen zeigen dabei die Daten der Person (z. B. ihre
+  Punkte, Strafen, Anwesenheit, Zu- und Absagen und ihr Konto), nur ihre Antworten in anonymen Umfragen nicht.
+- **Zu- und Absagen ohne Internet**: Ohne Verbindung merkt sich die App Zusagen, Absagen, Hinweise und das Zurücknehmen
+  auf dem Gerät, zeigt sie gleich an (mit „Noch nicht übertragen“) und sendet sie von selbst, sobald wieder Netz da ist.
+  Wie bei der Anwesenheit fragt die App beim Abmelden nach, wenn noch etwas nicht übertragen ist.
+  Wer vor dem Ende der Frist zu- oder absagt, aber kein
+  Netz hat, dessen Antwort gilt auch dann, wenn die App sie erst nach Beginn des Termins übertragen kann, ohne
+  zeitliche Grenze; maßgeblich ist die Uhrzeit des Handys. Bei den Rückmeldungen und in der
+  [Anwesenheit](app:verwaltung/anwesenheit) steht dann „nachträglich übertragen“.
+- **Punkte und Strafen ohne Internet**: Wer ohne Verbindung Punkte oder Strafen vergibt, verliert die Eingabe nicht mehr:
+  Die App speichert die Buchung auf dem Gerät, zeigt im Formular „noch nicht übertragen“ und bucht sie von selbst, sobald
+  wieder Netz da ist. Jede Buchung hat eine eigene Kennung; ging nur die Antwort unterwegs verloren, bucht der Server
+  beim erneuten Senden nicht doppelt.
+- **Webseite für Besucher (eigenständige Version)**: Mit dem neuen Bereich _Webseite_ (unter
+  [Einstellungen → Bereiche](app:einstellungen/bereiche), braucht _Seiten_) bekommt ihr eine Webseite unter der Adresse
+  eures Webspace, z. B. `eure-webseite.de`, während die App in ihrem Ordner bleibt (z. B. `eure-webseite.de/app/`).
+  Unter [Verwaltung → Einrichtungen → Webseite](app:verwaltung/webseite) legt die App die Einstiegsdatei `index.php` im
+  Ordner über der App an und ihr wählt als Startseite eine eurer Seiten, die für alle sichtbar ist. Die Webseite zeigt
+  sie, wie Gäste sie sehen (Blöcke nur für Mitglieder fehlen), ohne Anmeldung, ohne Cookies und ohne Inhalte fremder
+  Server; im Fuß stehen Impressum und Datenschutzerklärung. Eine vorhandene Startseite im Ordner (z. B. eine bisherige
+  Webseite) ersetzt die App nie. Das neue Recht _Webseite pflegen_ (`manage_website`) vergebt ihr unter
+  [Einstellungen → Rollen](app:einstellungen/rollen); beim Einschalten entsteht die Rolle _Webseite verwalten_. Die
+  Statusseite zeigt, ob die Webseite erreichbar ist. Weitere Seiten, ein Menü und Entwürfe folgen.
+- **Anwesenheit für kommende Termine**: Unter [Verwaltung → Anwesenheit](app:verwaltung/anwesenheit) stehen jetzt auch
+  die kommenden Termine aus dem Kalender (eigener Abschnitt „Kommende Termine“, der nächste oben). Termine von heute
+  stehen ganz oben im Abschnitt „Heute“ statt unter „Vergangene Termine“. So könnt ihr schon vorher eintragen, wer
+  entschuldigt ist. Bis zum Tag des Termins lässt sich nur „entschuldigt“ wählen; „anwesend“ und
+  „fehlt“, „Alle anwesend“ und das Buchen von Punkten und Strafen gehen erst ab dem Tag selbst. Das gilt auch für freie
+  Termine mit einem Datum in der Zukunft.
+- **Anwesenheitsliste zählt Offene**: Der Zähler über der Liste nennt zusätzlich, für wie viele Personen noch nichts
+  gewählt ist, z. B. „3 anwesend · 1 entschuldigt · 0 fehlt · 5 ohne Auswahl“.
+- **Zu- und Absagen bei Terminen**: Erst einschalten unter [Einstellungen → Kalender](app:einstellungen/kalender)
+  (Schalter _Zu- und Absagen bei Terminen_, anfangs aus, auch nach dem Update). Dann stehen unter
+  [Termine](app:termine) bei jedem Termin des internen Kalenders die Knöpfe _Zusagen_ und _Absagen_, bei jeder Quelle (in der App gepflegt, Google Kalender, iCal-Adresse). Mitglieder
+  können einen kurzen Hinweis dazuschreiben und sich bis zum Beginn umentscheiden; bei Terminen aus der App lässt sich
+  ein früherer _Anmeldeschluss_ eintragen. Alle sehen, wie viele zu- und abgesagt haben; wer wie geantwortet hat (mit
+  Hinweis und wer sich noch nicht gemeldet hat), sehen nur Personen mit dem Recht _Kalender pflegen_. Dafür gibt es das
+  neue Recht _Bei Terminen des internen Kalenders zu- und absagen_ unter
+  [Einstellungen → Rollen](app:einstellungen/rollen): Nach dem Update hat es jede Rolle mit dem internen Kalender außer
+  Gast. Wird ein Termin verschoben, bleiben die Rückmeldungen erhalten; etwa drei Monate nach dem Termin löscht die App
+  sie. In der [Anwesenheit](app:verwaltung/anwesenheit) steht bei jeder Person ihre Rückmeldung; wer abgesagt hat,
+  ist dort als _entschuldigt_ vorausgewählt (eingetragen erst mit _Speichern_, auf einmal mit _Absagen übernehmen_).
+  Wer die Anwesenheit erfasst, kann dort auch für andere zu- oder absagen, z. B. nach einem Anruf; das steht im
+  Änderungsprotokoll.
+  Wer noch nicht geantwortet hat, bekommt eine Benachrichtigung (neue Art _Termine: Erinnerung an deine Zu- oder
+  Absage_), einstellbar unter dem Schalter: an oder aus und wie viele Tage vor dem Termin (anfangs an, 3 Tage; bei
+  einem Anmeldeschluss am Tag davor). Die _Erinnerung am Vortag_ nennt keine Termine mehr, bei denen man abgesagt hat.
+  Schaltest du Zu- und Absagen wieder aus, verschwinden Knöpfe, Anmeldeschluss, Erinnerung und der Vorschlag in der
+  Anwesenheit; die bisherigen Rückmeldungen bleiben gespeichert.
+
+### Geändert
+
+- **Abzeichen des nächsten Dienstgrads**: In der Übersicht [Beförderungen](app:verwaltung/befoerderungen) und beim
+  Dienstgrad eines Mitglieds steht jetzt auch vor dem nächsten Dienstgrad („Schwelle für … erreicht“, „noch … bis …“)
+  dessen Abzeichen, nicht nur vor dem aktuellen.
+- **Android: Installation in jedem Browser erklärt**: Die Anleitung unter [App installieren](app:installieren) erkennt
+  den Browser. In Edge, Firefox, Opera, Brave und anderen erklärt ein Hinweis, warum Chrome besser ist (diese Browser
+  legen nur eine Verknüpfung an, keine richtige App), mit _In Chrome öffnen_, _Chrome herunterladen_ (Play Store, falls
+  Chrome fehlt), _Adresse kopieren_ und den Schritten im eigenen Browser. In Chrome erklärt ein Hinweis, warum der Knopf
+  _App installieren_ erst nach etwa 30 Sekunden erscheint (Regel von Chrome), und verweist bis dahin auf die Schritte. Fehlt Chrome, führt auch _In Chrome öffnen_ in
+  den Play Store. Der Hinweis im Samsung-Browser nennt den Grund genauer (Google Play Protect blockiert ab Android 14,
+  Fehler seit April 2026 gemeldet). Im eingebauten Browser anderer Apps (WhatsApp, Facebook …) erklären Anleitung und
+  Benachrichtigungen, dass dort weder Installation noch Benachrichtigungen gehen. Neu ist _Klappt es nicht?_ mit
+  Hinweisen zu schon installierter App, Xiaomi, Huawei ohne Google-Dienste, Akku-Sparen und Android 8/9; bei blockierten
+  Benachrichtigungen steht der Weg in Chrome dabei.
+- **Benachrichtigungen gleich nach der Anmeldung anbieten**: Der Hinweis _Nichts mehr verpassen_ erscheint jetzt als
+  Fenster direkt nach der Anmeldung, auf jeder Seite (auch wenn jemand über einen geteilten Link kommt), statt als Karte
+  nur auf der Startseite. Er kommt weiterhin nur, solange der Browser auf diesem Gerät noch nie nach Benachrichtigungen
+  gefragt hat; _Nicht jetzt_ oder Schließen blendet ihn für 30 Tage aus, nach einer Ablehnung im Browser fragt die App
+  nicht wieder. Die Abfrage des Browsers kommt erst nach dem Tippen auf _Benachrichtigungen einschalten_. Nach diesem
+  Update fragt das Fenster alle Angemeldeten einmal, auch wer früher _Nicht jetzt_ gewählt oder die Benachrichtigungen
+  erlaubt und wieder ausgeschaltet hat; nicht gefragt wird, wer sie auf dem Gerät schon an hat oder im Browser
+  blockiert hat. Auf iPhone und iPad im Browser (Safari) führt das Fenster zu _App installieren_, weil es
+  Benachrichtigungen dort nur in der installierten App gibt.
+- **Installationsanleitung für iPhone und iPad genauer**: Die Anleitung unter [App installieren](app:installieren)
+  sagt jetzt, wo das Teilen-Symbol je nach Gerät und Safari-Darstellung steht (iPhone unten, iPad oben, ab iOS 26 bei
+  „Kompakt“ hinter „•••“) und dass ab iOS 16.4 auch andere Browser wie Chrome, Edge oder Firefox die App zum
+  Home-Bildschirm hinzufügen können, wenn sie den Eintrag anbieten.
+- **Volle Breite am Computer**: Auf Tablet und Computer (Fenster ab 900 px breit) nutzen die Ansichten jetzt die ganze
+  Breite statt einer schmalen Spalte von 640 px. Listen wie Mitglieder, Termine oder Dokumente stehen in Spalten,
+  Formulare zeigen drei oder vier kurze Felder je Zeile, Alben und Bilder der Galerie passen sich der Breite an. Lesetexte
+  wie News-Artikel und das Handbuch bleiben höchstens 760 px breit und mittig, Kachel-Seiten 904 px, Listen zum
+  Ziehen (z. B. [Rollen](app:einstellungen/rollen) oder Punktekatalog) höchstens 960 px. Listen mit Haken wie
+  [Bereiche](app:einstellungen/bereiche), Benachrichtigungen oder die Bereiche im [Bericht](app:verwaltung/bericht)
+  stehen in Spalten, die Auswahl über den [Änderungen](app:verwaltung/aenderungen) in einer Zeile, die Kennzahlen unter
+  [Nutzung](app:einstellungen/nutzung) in einer Reihe. Die eigene [Übersicht](app:meins) und ein Mitglied in der
+  Verwaltung stehen in zwei Spalten. Die Leiste mit den Bereichen steht am Computer wie beim Handy quer senkrecht am
+  linken Rand. Handy hochkant bleibt, wie es ist.
+- **Gemeinsame Amtszeiten einklappbar**: Bei einer Ämtergruppe mit gemeinsamen Amtszeiten (z. B. Königshaus) unter
+  [Ämter](app:mitglieder/aemter) lässt sich jede Amtszeit mit einem Tipp auf ihren Kopf auf- und zuklappen. Die laufende
+  Amtszeit ist aufgeklappt (läuft keine, die neueste), alle anderen sind zu und zeigen nur Jahre und Namen; Bild und Ämter erscheinen erst beim
+  Aufklappen. _Alle aufklappen_ und _Alle zuklappen_ gelten auch für sie.
+- **Vorgemerkte Änderungen gehen nicht mehr verloren**: Zu- und Absagen, Anwesenheit sowie Punkte und Strafen merkt
+  die App jetzt nicht nur ohne Internet auf dem Gerät vor, sondern auch, wenn der Server gestört oder im
+  Wartungsmodus ist, nicht nach 20 Sekunden antwortet oder die Anmeldung abgelaufen ist; sie sendet sie später von
+  selbst. Vorgemerkte Zu- und Absagen kommen auch an, wenn der Termin aus iCal inzwischen verschoben wurde. Lehnt der
+  Server eine vorgemerkte Änderung ab (z. B. Anmeldeschluss vorbei), steht oben in der App „Nicht übertragen“ mit dem
+  Grund, bis die Person den Hinweis wegtippt; bisher verschwand sie nach einer kurzen Meldung.
+- **Anfragen auf einen Zugang übersichtlicher**: Unter [Verwaltung → Anfragen](app:verwaltung/anfragen) steht jetzt wie
+  bei den Passiven nur eine Liste mit Namen, mit Suche und (mit dem Bereich Kompanien) Filter nach der gewählten Kompanie.
+  Antippen öffnet die Karte der Anfrage mit allen Angaben, Verbinden, Kompanie, Benutzername, Rolle, Freigeben und
+  Ablehnen; dort blätterst du (auch per Wischen) zur nächsten Anfrage. _Kompanie zuordnen_ ist eingeklappt und zeigt
+  nur die ausgewählten Kompanien; aufgeklappt änderst du die Auswahl. Nach dem Freigeben oder Ablehnen geht es zurück
+  zur Liste.
+- **Album herunterladen neben Einreichen**: In einem Album der [Galerie](app:galerie) steht der Knopf zum Herunterladen
+  als ZIP jetzt in der Reihe der Knöpfe direkt neben _Bilder und Videos in dieses Album einreichen_ statt rechts neben
+  dem Titel. Der Hinweis „Mit Videos kann das ZIP groß werden; am besten im WLAN laden.“ entfällt.
+- **Navigation nur mit verfügbaren Punkten**: Unter [Einstellungen → Navigation](app:einstellungen/navigation) stehen
+  nur noch Bereiche zur Auswahl, die eingeschaltet sind. In der Leiste _Für Gäste_ stehen außerdem nur Bereiche und
+  eigene Seiten, die Gäste sehen dürfen (Rechte der Rolle Gast, bei eigenen Seiten deren Zielgruppe). Darunter steht,
+  welche Punkte deshalb fehlen. Schon gespeicherte Punkte gehen dabei nicht verloren: Sie behalten ihren Platz und
+  erscheinen wieder, sobald der Bereich an ist bzw. Gäste ihn sehen dürfen. Auch bei der Startseite stehen nur Punkte zur
+  Wahl, die Gäste bzw. Angemeldete sehen können.
+- **Nicht gespeicherte Eingaben**: Wer etwas eingegeben, aber noch nicht gespeichert hat, wird jetzt gefragt, bevor
+  die Seite verlassen wird (auch mit „Zurück“ und beim Neuladen); **Verlassen** verwirft die Eingaben. Kommt eine
+  Änderung ohne Internetverbindung nicht an, sagt die Meldung jetzt ausdrücklich „Keine Verbindung – nicht gespeichert“.
+- **Mehr offline verfügbar**: Die App behält jetzt dreimal so viele zuletzt geladene Seiten für die Nutzung ohne
+  Internet. Mitgliedsfotos, Logos von Sponsoren und Kompanien und Bilder in Texten (z. B. am Schwarzen Brett) sind nach
+  dem ersten Ansehen ebenfalls offline da. Beim Abmelden löscht die App alles wie bisher.
+- **Schlechte Verbindung**: Antwortet das Netz nicht oder nur sehr langsam, zeigt die App nach einigen Sekunden die
+  zuletzt geladenen Daten mit dem Hinweis „Schlechte Verbindung“, statt lange bei „Lädt …“ zu bleiben. Kommt die Antwort
+  doch noch, erscheint der neue Stand von selbst. Gespeicherte Daten einer anderen Person zeigt die App dabei nie.
+- **Block einfügen übersichtlicher**: Beim Bearbeiten von Seiten, News und Nachrichten am Schwarzen Brett öffnet
+  **+ Block einfügen** jetzt ein Fenster statt einer langen Auswahlliste. Jede Blockart steht dort als Kachel mit
+  Symbol, Name und kurzer Erklärung (am Computer in zwei Spalten); Antippen fügt den Block ein, ✕ oder „Zurück“
+  schließen das Fenster ohne Block.
+- **Block „Nächste Termine“**: Der Block, der die nächsten Termine ab heute zeigt, heißt in der Auswahl und beim
+  Bearbeiten jetzt _Nächste Termine_ statt _Nächste Einträge_; das Feld heißt _Wie viele Termine_. Bestehende Blöcke
+  bleiben, wie sie sind.
+- **Eigenes Recht „Ehemalige verwalten“**: Die Kachel [Ehemalige](app:verwaltung/ehemalige) und alles dazu (Ehemalige
+  anlegen und importieren, Mitglieder als ehemalig eintragen, die Angaben ändern und wieder aufnehmen) hängt nicht mehr
+  an _Mitglieder anlegen_, sondern am neuen Recht _Ehemalige verwalten_. Rollen und Personen, die _Mitglieder anlegen_
+  hatten, haben nach dem Update auch dieses Recht; es ändert sich also zunächst nichts. Unter
+  [Einstellungen → Rollen](app:einstellungen/rollen) könnt ihr es jetzt auch anderen Rollen geben, z. B. der Rolle, die
+  Punkte vergibt. Wer es hat, sieht auch die Mitgliederliste in der Verwaltung. Persönliche Angaben Ehemaliger gibt es
+  weiter nur mit _Persönliche Angaben sehen_ bzw. _pflegen_, die Aufbewahrungsfrist stellen weiter nur Admins ein. Wie
+  _Mitglieder anlegen_ und _Rollen vergeben_ geben Nicht-Admins dieses Recht nicht weiter.
+
+### Behoben
+
+- **Bilder und Videos nach Google Drive (WordPress)**: Eingereichte und hochgeladene Dateien einer Galerie mit
+  Google Drive blieben auf dem Server liegen, mit dem Hinweis „Das Hochladen ließ sich nicht fortsetzen: HTTP 411“.
+  Die App hat bei der Nachfrage, wie weit eine Datei angekommen ist, eine Angabe weggelassen, die Google verlangt. Jetzt
+  kommen die wartenden Dateien beim nächsten Lauf im Hintergrund nach Drive. Dasselbe betraf neue Versuche beim
+  Hochladen einer Sicherung nach einer Störung.
+- **Sicherung in Google Drive bei kurzen Störungen**: Meldet Google beim Hochladen einer Sicherung einen
+  vorübergehenden Fehler (z. B. „HTTP 502“) oder bricht die Verbindung ab, versucht die App es nach kurzer Pause bis zu
+  viermal erneut und macht dort weiter, wo die Datei angekommen ist. Vorher scheiterte die Sicherung sofort, und ein
+  Update wurde deshalb nicht eingespielt. Wie oft es nötig war, steht unter
+  [Einstellungen → Datensicherung](app:einstellungen/datensicherung) bei der Messung des letzten Hochladens.
+- **Gründungsjahr einer Kompanie**: Unter [Verwaltung → Kompanien](app:verwaltung/kompanien) darf das Gründungsjahr
+  jetzt auch vor 1800 liegen. Es muss nur eine ganze Zahl sein und darf nicht in der Zukunft liegen.
+- **Erinnerung an Zu- und Absagen ausschalten**: Unter [Einstellungen → Kalender](app:einstellungen/kalender) bleibt
+  die Erinnerung an Zu- und Absagen jetzt ausgeschaltet, wenn du den Haken entfernst und speicherst. In der
+  WordPress-Version war der Haken nach dem Neuladen wieder gesetzt, weil WordPress beim ersten Ausschalten nichts
+  gespeichert hat.
+- **Anwesenheit ohne Verbindung**: Wer in einer Anwesenheitsliste unter
+  [Verwaltung → Anwesenheit](app:verwaltung/anwesenheit) ohne Internet auf _Speichern_ tippt, verliert die Häkchen nicht
+  mehr. Die App merkt sie sich auf dem Gerät, auch über einen Neustart, zeigt sie mit dem Hinweis „Noch nicht
+  übertragen“ und überträgt sie von selbst, sobald wieder Netz da ist. Übertragen wird nur, was geändert wurde, Einträge
+  anderer bleiben. Bisher waren solche Eingaben nach dem Schließen der Liste weg.
+- **Ämter-Liste**: Unter [Verwaltung → Ämter](app:verwaltung/aemter) steht ein langer, zweizeiliger Name eines Amts jetzt
+  linksbündig wie die übrigen statt mittig. Unter „Gemeinsame Amtszeiten“ hat der Knopf „Neue gemeinsame Amtszeit“ wieder
+  Abstand zur Karte darüber.
+- **Benachrichtigung zu eingereichten Videos**: Wird ein eingereichtes Video in der Galerie freigegeben oder abgelehnt,
+  spricht die Benachrichtigung jetzt vom Video („Video freigegeben“, „Dein Video … ist jetzt im Album …“) statt immer vom
+  Bild. Wer prüft, liest bei neuen Einreichungen „Bilder oder Videos“, und die Rückfrage beim Ablehnen ohne Grund nennt
+  ebenfalls Bild oder Video. Auch die Namen der beiden Benachrichtigungen unter
+  [Meins → Benachrichtigungen](app:meins/benachrichtigungen) nennen jetzt Bilder und Videos.
+
+### Entfernt
+
+- **Aufteilung nach Gruppen in der Anwesenheit**: Unter dem Zähler einer Anwesenheitsliste steht nicht mehr zusätzlich die
+  Aufteilung nach Gruppen (z. B. „entschuldigt: Mitglied 1“); sie wiederholte den Zähler. Die Einstellung
+  [„Gruppen im Zähler“](app:einstellungen/rollen) wirkt weiter auf den Zähler über der Mitgliederliste.
+
 ## [0.12.0] – 2026-11-13
 
 ### Neu

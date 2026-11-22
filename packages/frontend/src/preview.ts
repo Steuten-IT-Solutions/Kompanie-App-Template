@@ -1,5 +1,6 @@
 /**
- * Vorschau „App als Rolle ansehen“ (Issue #63): Ein Admin sieht die App, wie eine Rolle sie sieht, bzw. ohne Anmeldung.
+ * Vorschau „App als Rolle ansehen“ (Issue #63): Ein Admin sieht die App, wie eine Rolle sie sieht, mit den Rechten einer
+ * bestimmten Person (Grundrolle, Zusatzrollen und Ausnahmen zusammen) bzw. ohne Anmeldung.
  *
  * Die Wahl gilt nur in diesem Tab (sessionStorage, übersteht Neuladen). Die App schickt sie bei jeder API-Anfrage im
  * Header X-Kompanie-Preview mit; der Server lädt dann alles mit den Rechten der Rolle und lehnt jede Änderung ab
@@ -12,6 +13,14 @@ const KEY = 'kompanie-preview';
 export const PREVIEW_HEADER = 'X-Kompanie-Preview';
 /** „App ohne Anmeldung ansehen“ */
 export const PUBLIC_PREVIEW = '@public';
+/** „App als Person ansehen“: Präfix vor der ID des Kontos */
+export const PERSON_PREVIEW = '@person:';
+
+/** ID der Person, deren Ansicht ein Wert der Vorschau zeigt; null bei einer Rolle oder ohne Anmeldung. */
+export function previewPerson(value: string | null): number | null {
+  const m = value?.startsWith(PERSON_PREVIEW) ? /^[1-9]\d*$/.exec(value.slice(PERSON_PREVIEW.length)) : null;
+  return m ? Number(m[0]) : null;
+}
 
 function read(): string | null {
   try {
@@ -57,7 +66,13 @@ export function startPreview(role: string): void {
   reloadWith(role, '#/');
 }
 
-/** Vorschau beenden: neu laden, zurück zu Einstellungen → Rollen. */
+/** Vorschau mit den Rechten einer Person starten (alle ihre Rollen zusammen). */
+export function startPersonPreview(id: number): void {
+  startPreview(PERSON_PREVIEW + id);
+}
+
+/** Vorschau beenden: neu laden, zurück zur Seite der Person bzw. zu Einstellungen → Rollen. */
 export function endPreview(): void {
-  reloadWith(null, '#/einstellungen/rollen');
+  const person = previewPerson(current);
+  reloadWith(null, person !== null ? `#/verwaltung/mitglied/${person}` : '#/einstellungen/rollen');
 }

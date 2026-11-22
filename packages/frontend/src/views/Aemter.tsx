@@ -1,12 +1,14 @@
 import { Fragment, useLayoutEffect, useRef, useState, type CSSProperties, type ReactElement } from 'react';
 import { type Office, type OfficeGroup, type OfficeGroupTerm, type OfficeHolder, type OfficesOverview, type OfficeTerm } from '../api';
 import brand from '../generated/brand';
+import { t, tn } from '../i18n';
 import { MemberAvatar } from '../memberPhoto';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
 import { titleBreaks, columnChars, lanes, yearRange } from '../yearGrid';
-import { officeSingular } from '../officeName';
+import { officeGroupSingular, officeGroupTitle, officeSingular, officeTitle } from '../officeName';
+import { defaultOpenJoint } from '../jointTerms';
 
 const sec = brand.labels.sections;
 
@@ -29,9 +31,9 @@ function Title({ text }: { text: string }) {
 }
 
 /** „2007–2020“, „seit 2020“ (läuft), „2025“ (einzelnes Jahr oder Anfang und Ende im selben Jahr). */
-export function termYears(t: Pick<OfficeTerm, 'kind' | 'start_year' | 'end_year'>): string {
-  if (t.kind === 'point' || t.end_year === t.start_year) return String(t.start_year);
-  return t.end_year === null ? `seit ${t.start_year}` : `${t.start_year}–${t.end_year}`;
+export function termYears(term: Pick<OfficeTerm, 'kind' | 'start_year' | 'end_year'>): string {
+  if (term.kind === 'point' || term.end_year === term.start_year) return String(term.start_year);
+  return term.end_year === null ? t('seit {year}', { year: term.start_year }) : `${term.start_year}–${term.end_year}`;
 }
 
 /**
@@ -47,11 +49,11 @@ export function useOffices(enabled = true) {
 }
 
 /** Dauer in Jahren: „18 Jahre“, laufende bis heute; leer bei einzelnen Jahren. */
-export function termDuration(t: Pick<OfficeTerm, 'kind' | 'start_year' | 'end_year'>, thisYear = new Date().getFullYear()): string {
-  if (t.kind === 'point') return '';
-  const years = (t.end_year ?? thisYear) - t.start_year;
-  if (years <= 0) return t.end_year === null ? 'seit diesem Jahr' : '';
-  return years === 1 ? '1 Jahr' : `${years} Jahre`;
+export function termDuration(term: Pick<OfficeTerm, 'kind' | 'start_year' | 'end_year'>, thisYear = new Date().getFullYear()): string {
+  if (term.kind === 'point') return '';
+  const years = (term.end_year ?? thisYear) - term.start_year;
+  if (years <= 0) return term.end_year === null ? t('seit diesem Jahr') : '';
+  return tn('{count} Jahr', '{count} Jahre', years);
 }
 
 /** Seite einer Person, zu der ein Name im Zeitstrahl führt: die öffentliche, in der Verwaltung die dortige. */
@@ -77,7 +79,7 @@ function HolderChip({ h, to }: { h: OfficeHolder; to: PersonPath }) {
 function Companions({ people, to }: { people: OfficeHolder[]; to: PersonPath }) {
   return (
     <div className="holder-companions">
-      <span className="holder-companions-label">mit</span>
+      <span className="holder-companions-label">{t('mit')}</span>
       <ul className="timeline-holders">
         {people.map((c, i) => (
           <li key={i}>
@@ -106,13 +108,15 @@ function Holders({ holders, to }: { holders: OfficeHolder[]; to: PersonPath }) {
 /** Begleitpersonen als Text: „Erika Muster“ bzw. „A und B“. */
 export function companionNames(h: OfficeHolder): string {
   const names = (h.companions ?? []).map((c) => c.name);
-  return names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} und ${names[names.length - 1]}`;
+  return names.length <= 1
+    ? (names[0] ?? '')
+    : t('{list} und {last}', { list: names.slice(0, -1).join(', '), last: names[names.length - 1] });
 }
 
 /** Name mit Begleitung für Textzeilen: „Max Muster mit Erika Muster“. */
 export function nameWithCompanions(h: OfficeHolder): string {
   const others = companionNames(h);
-  return others ? `${h.name} mit ${others}` : h.name;
+  return others ? t('{name} mit {others}', { name: h.name, others }) : h.name;
 }
 
 export type TimelineEntry = { key: string | number; term: OfficeTerm; office?: string };
@@ -122,9 +126,9 @@ function When({ term }: { term: OfficeTerm }) {
   const single = term.kind === 'point' || term.end_year === term.start_year;
   return (
     <div className="tl-when" aria-hidden="true">
-      {term.current && <span className="tl-when-small">seit</span>}
+      {term.current && <span className="tl-when-small">{t('seit')}</span>}
       <span className="tl-when-year">{term.start_year}</span>
-      {!single && !term.current && <span className="tl-when-small">bis {term.end_year}</span>}
+      {!single && !term.current && <span className="tl-when-small">{t('bis {year}', { year: term.end_year ?? '' })}</span>}
     </div>
   );
 }
@@ -152,7 +156,7 @@ export function Timeline({
     if (entries.length > 4 && d !== decade && !term.current) {
       rows.push(
         <li key={`d${d}-${i}`} className="tl-decade" aria-hidden="true">
-          <span className="tl-decade-label">{d}er</span>
+          <span className="tl-decade-label">{t('{decade}er', { decade: d })}</span>
         </li>,
       );
     }
@@ -172,8 +176,8 @@ export function Timeline({
           {(office || term.current || term.honor || duration) && (
             <div className="tl-meta">
               {office && <span className="tl-office">{office}</span>}
-              {term.current && <span className="badge timeline-now">im Amt</span>}
-              {term.honor && <span className="badge timeline-honor">Ehrung</span>}
+              {term.current && <span className="badge timeline-now">{t('im Amt')}</span>}
+              {term.honor && <span className="badge timeline-honor">{t('Ehrung')}</span>}
               {duration && <span className="tl-duration">{duration}</span>}
             </div>
           )}
@@ -192,7 +196,7 @@ export function Timeline({
                 <Holders holders={shown} to={to} />
               ) : (
                 <div className="tl-with">
-                  <span className="tl-with-label">mit</span>
+                  <span className="tl-with-label">{t('mit')}</span>
                   <Holders holders={shown} to={to} />
                 </div>
               ))
@@ -219,12 +223,12 @@ export function monogram(title: string): string {
 
 /** „Im Amt“: die aktuellen Inhaber groß, mit Foto und wie lange schon. */
 function Spotlight({ terms, link }: { terms: OfficeTerm[]; link: boolean }) {
-  const people = terms.flatMap((t) => t.holders.map((h) => ({ h, t })));
+  const people = terms.flatMap((term) => term.holders.map((h) => ({ h, term })));
   return (
-    <section className="spotlight" aria-label="Im Amt">
-      <div className="spotlight-label">Im Amt</div>
+    <section className="spotlight" aria-label={t('Im Amt')}>
+      <div className="spotlight-label">{t('Im Amt')}</div>
       <ul className="spotlight-list">
-        {people.map(({ h, t }, i) => {
+        {people.map(({ h, term }, i) => {
           const body = (
             <>
               <span className="spotlight-avatar" aria-hidden="true">
@@ -232,12 +236,12 @@ function Spotlight({ terms, link }: { terms: OfficeTerm[]; link: boolean }) {
               </span>
               <span className="spotlight-text">
                 <span className="spotlight-name">{h.name}</span>
-                {!!h.companions?.length && <span className="spotlight-with">mit {companionNames(h)}</span>}
+                {!!h.companions?.length && <span className="spotlight-with">{t('mit {names}', { names: companionNames(h) })}</span>}
                 <span className="spotlight-since">
-                  seit {t.start_year}
-                  {termDuration(t) ? ` · ${termDuration(t)}` : ''}
+                  {t('seit {year}', { year: term.start_year })}
+                  {termDuration(term) ? ` · ${termDuration(term)}` : ''}
                 </span>
-                {t.note && <span className="spotlight-note">{t.note}</span>}
+                {term.note && <span className="spotlight-note">{term.note}</span>}
               </span>
             </>
           );
@@ -262,7 +266,7 @@ function Spotlight({ terms, link }: { terms: OfficeTerm[]; link: boolean }) {
 function Summary({ office }: { office: Office }) {
   const current = office.terms.filter((t) => t.current);
   const shown = current.length > 0 ? current : office.terms.slice(0, 1);
-  if (shown.length === 0) return <span className="office-summary muted small">Noch keine Einträge</span>;
+  if (shown.length === 0) return <span className="office-summary muted small">{t('Noch keine Einträge')}</span>;
   const people = shown.flatMap((t) => t.holders);
   // Jahre nur, wenn sie für alle gezeigten Personen gelten
   const years = new Set(shown.map((t) => termYears(t)));
@@ -276,7 +280,7 @@ function Summary({ office }: { office: Office }) {
         {extra > 0 && <span className="office-faces-more">+{extra}</span>}
       </span>
       <span className="office-summary-text small">
-        {current.length === 0 && <span className="muted">zuletzt </span>}
+        {current.length === 0 && <span className="muted">{t('zuletzt')} </span>}
         {people.map((h) => h.name).join(', ')}
         {years.size === 1 && <span className="muted"> · {termYears(shown[0])}</span>}
       </span>
@@ -290,18 +294,19 @@ function OfficeCard({ office, open, onToggle }: { office: Office; open: boolean;
   const since = n > 0 ? Math.min(...office.terms.map((t) => t.start_year)) : null;
   const current = office.terms.filter((t) => t.current);
   const history = office.terms.filter((t) => !t.current);
+  const title = officeTitle(office);
   return (
     <section className={`card office-card${open ? ' open' : ''}`}>
       <button type="button" className="office-head" aria-expanded={open} aria-controls={id} onClick={onToggle}>
         <span className="office-mono" aria-hidden="true">
-          {monogram(office.title)}
+          {monogram(title)}
         </span>
         <span className="office-head-main">
-          <span className="office-title">{office.title}</span>
+          <span className="office-title">{title}</span>
           <Summary office={office} />
           {since !== null && (
             <span className="office-meta">
-              Chronik seit {since} · {n === 1 ? '1 Eintrag' : `${n} Einträge`}
+              {t('Chronik seit {year}', { year: since })} · {tn('{count} Eintrag', '{count} Einträge', n)}
             </span>
           )}
         </span>
@@ -311,12 +316,12 @@ function OfficeCard({ office, open, onToggle }: { office: Office; open: boolean;
       </button>
       {open && (
         <div id={id} className="office-body">
-          {n === 0 && <p className="muted small">Noch keine Einträge.</p>}
+          {n === 0 && <p className="muted small">{t('Noch keine Einträge.')}</p>}
           {current.length > 0 && <Spotlight terms={current} link />}
           {history.length > 0 && (
             <>
-              {current.length > 0 && <h3 className="tl-heading">Frühere</h3>}
-              <Timeline label={office.title} entries={history.map((t) => ({ key: t.id, term: t }))} />
+              {current.length > 0 && <h3 className="tl-heading">{t('Frühere')}</h3>}
+              <Timeline label={title} entries={history.map((t) => ({ key: t.id, term: t }))} />
             </>
           )}
         </div>
@@ -327,17 +332,22 @@ function OfficeCard({ office, open, onToggle }: { office: Office; open: boolean;
 
 /**
  * Gruppe mit gemeinsamen Amtszeiten (Issue #282): je Amtszeit eine Karte mit Gruppenbild und allen Personen mit ihren
- * Ämtern (in der Einzahl, „Prinz“ statt „Prinzen“), die laufende oben als „aktuell“.
+ * Ämtern (in der Einzahl, „Prinz“ statt „Prinzen“), die laufende oben als „aktuell“. Jede Karte klappt über ihren Kopf
+ * auf und zu; zugeklappt stehen nur Jahre und Namen da (welche offen sind, hält OfficesView).
  */
 export function JointTerms({
   terms,
   offices,
   group,
+  isOpen,
+  onToggle,
 }: {
   terms: OfficeGroupTerm[];
   offices: Office[];
   /** Einzahl der Gruppe („Königshaus“), sonst ihre Bezeichnung */
   group: string;
+  isOpen: (term: OfficeGroupTerm) => boolean;
+  onToggle: (term: OfficeGroupTerm) => void;
 }) {
   if (terms.length === 0) return null;
   return (
@@ -347,30 +357,45 @@ export function JointTerms({
           const t = o.terms.find((x) => x.group_term_id === gt.id);
           return t && t.holders.length > 0 ? [{ office: o, holders: t.holders }] : [];
         });
+        const open = isOpen(gt);
+        const id = `joint-term-${gt.id}`;
+        const names = rows.flatMap((r) => r.holders.map((h) => h.name));
         return (
-          <li key={gt.id} className={`card joint-term${gt.current ? ' current' : ''}`}>
-            {gt.image_url && (
-              <img className="joint-term-image" src={gt.image_url} alt={`${group} ${termYears(gt)}`} loading="lazy" decoding="async" />
+          <li key={gt.id} className={`card joint-term${gt.current ? ' current' : ''}${open ? ' open' : ''}`}>
+            <button type="button" className="joint-term-head" aria-expanded={open} aria-controls={id} onClick={() => onToggle(gt)}>
+              <span className="joint-term-head-main">
+                <span className="joint-term-title">
+                  {group} {termYears(gt)}
+                  {gt.current && <span className="badge">{t('aktuell')}</span>}
+                </span>
+                {!open && names.length > 0 && <span className="joint-term-names small muted">{names.join(', ')}</span>}
+              </span>
+              <span className="office-arrow" aria-hidden="true">
+                ›
+              </span>
+            </button>
+            {open && (
+              <div id={id} className="joint-term-content">
+                {gt.image_url && (
+                  <img className="joint-term-image" src={gt.image_url} alt={`${group} ${termYears(gt)}`} loading="lazy" decoding="async" />
+                )}
+                <div className="joint-term-body">
+                  {gt.note && <p className="muted small">{gt.note}</p>}
+                  <dl className="joint-term-offices">
+                    {rows.map((r) => (
+                      <div key={r.office.id}>
+                        <dt>
+                          <Title text={officeSingular(r.office)} />
+                        </dt>
+                        <dd>
+                          <Holders holders={r.holders} to={memberPath} />
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              </div>
             )}
-            <div className="joint-term-body">
-              <h3 className="joint-term-title">
-                {group} {termYears(gt)}
-                {gt.current && <span className="badge">aktuell</span>}
-              </h3>
-              {gt.note && <p className="muted small">{gt.note}</p>}
-              <dl className="joint-term-offices">
-                {rows.map((r) => (
-                  <div key={r.office.id}>
-                    <dt>
-                      <Title text={officeSingular(r.office)} />
-                    </dt>
-                    <dd>
-                      <Holders holders={r.holders} to={memberPath} />
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
           </li>
         );
       })}
@@ -453,11 +478,11 @@ export function YearGrid({
     thisYear,
   );
   const { wrap, head, body } = useStickyHead(years.length > 0);
-  if (years.length === 0) return <Empty>Noch keine Einträge.</Empty>;
+  if (years.length === 0) return <Empty>{t('Noch keine Einträge.')}</Empty>;
   const top = years[0];
   const row = (year: number) => 1 + (top - year);
   const ordered = [
-    ...groups.map((g) => ({ key: `g${g.id}`, title: g.title, offices: offices.filter((o) => o.group_id === g.id) })),
+    ...groups.map((g) => ({ key: `g${g.id}`, title: officeGroupTitle(g), offices: offices.filter((o) => o.group_id === g.id) })),
     { key: 'none', title: '', offices: offices.filter((o) => o.group_id === null) },
   ].filter((s) => s.offices.length > 0);
   const grouped = ordered.some((s) => s.title);
@@ -470,8 +495,9 @@ export function YearGrid({
     for (const o of section.offices) {
       const { bars, count } = lanes(o.terms, thisYear);
       // Breit genug, dass Bezeichnung und Namen nicht abgeschnitten werden (verteilt auf die Spuren des Amts)
+      const title = officeTitle(o);
       const chars = columnChars(
-        o.title,
+        title,
         o.terms.flatMap((t) => t.holders.map((h) => h.name)),
       );
       const min = `max(var(--yg-col), calc(${(chars * 1.1) / count}ch + ${Math.ceil(16 / count)}px))`;
@@ -479,13 +505,13 @@ export function YearGrid({
       heads.push(
         <div key={`o${o.id}`} className="yg-office" style={{ gridColumn: `${column} / span ${count}`, gridRow: 2 }}>
           <span>
-            <Title text={o.title} />
+            <Title text={title} />
           </span>
         </div>,
       );
       for (const { term, lane, first, last } of bars) {
         const names = term.holders.map((h) => h.name).join(', ');
-        const label = `${officeSingular(o)}: ${termYears(term)} · ${term.holders.map(nameWithCompanions).join(', ')}${term.note ? ` · ${term.note}` : ''}${term.honor ? ' · Ehrung' : ''}`;
+        const label = `${officeSingular(o)}: ${termYears(term)} · ${term.holders.map(nameWithCompanions).join(', ')}${term.note ? ` · ${term.note}` : ''}${term.honor ? ` · ${t('Ehrung')}` : ''}`;
         const style: CSSProperties = { gridColumn: column + lane, gridRow: `${row(last)} / ${row(first) + 1}` };
         cells.push(
           <div
@@ -523,7 +549,9 @@ export function YearGrid({
   const columns = `var(--yg-years) ${tracks.join(' ')}`;
   return (
     <>
-      <p className="yg-rotate-hint muted small">Tipp: Dreh das Handy quer, dann passen mehr {sec.offices} nebeneinander.</p>
+      <p className="yg-rotate-hint muted small">
+        {t('Tipp: Dreh das Handy quer, dann passen mehr {section} nebeneinander.', { section: sec.offices })}
+      </p>
       <div className="year-grid-wrap" ref={wrap}>
         <div className="year-grid-head" ref={head} aria-hidden="true">
           <div
@@ -539,7 +567,7 @@ export function YearGrid({
           <div
             className="year-grid"
             role="list"
-            aria-label={`${sec.offices} nach Jahren`}
+            aria-label={t('{section} nach Jahren', { section: sec.offices })}
             style={{ gridTemplateColumns: columns, gridTemplateRows: `repeat(${years.length}, minmax(var(--yg-row), auto))` }}
           >
             {years.map((y) => (
@@ -567,7 +595,7 @@ export function YearGrid({
       {picked && (
         <div className="yg-detail" role="status">
           <span>{picked.label}</span>
-          <button type="button" className="yg-detail-close" aria-label="Schließen" onClick={() => setPicked(null)}>
+          <button type="button" className="yg-detail-close" aria-label={t('Schließen')} onClick={() => setPicked(null)}>
             ×
           </button>
         </div>
@@ -580,12 +608,14 @@ export function YearGrid({
 export function OfficesView() {
   const { data, error, loading, reload } = useOffices();
   const [open, setOpen] = useState<Set<number>>(new Set());
+  // Offene gemeinsame Amtszeiten; null = Vorgabe (defaultOpenJoint)
+  const [jointOpen, setJointOpen] = useState<Set<number> | null>(null);
   const [view, setView] = useState(loadView);
 
   if (loading && !data) return <Loading />;
   if (error && !data) return <ErrorBox message={error} onRetry={reload} />;
   const offices = data?.offices ?? [];
-  if (offices.length === 0) return <Empty>Noch keine {sec.offices} eingetragen.</Empty>;
+  if (offices.length === 0) return <Empty>{t('Noch keine {section} eingetragen.', { section: sec.offices })}</Empty>;
 
   const toggle = (id: number) =>
     setOpen((prev) => {
@@ -597,14 +627,22 @@ export function OfficesView() {
   const sections = [
     ...(data?.groups ?? []).map((g) => ({
       key: `g${g.id}`,
-      title: g.title,
-      singular: g.singular || g.title,
+      title: officeGroupTitle(g),
+      singular: officeGroupSingular(g),
       offices: offices.filter((o) => o.group_id === g.id),
       joint: g.joint_terms ? (data?.group_terms ?? []).filter((t) => t.group_id === g.id) : null,
     })),
     { key: 'none', title: '', singular: '', offices: offices.filter((o) => o.group_id === null), joint: null },
   ].filter((s) => s.offices.length > 0);
-  const all = offices.every((o) => open.has(o.id));
+  const jointTerms = sections.flatMap((s) => s.joint ?? []);
+  const jointIds = jointOpen ?? new Set(sections.flatMap((s) => (s.joint ? defaultOpenJoint(s.joint) : [])));
+  const toggleJoint = (t: OfficeGroupTerm) => {
+    const next = new Set(jointIds);
+    if (next.has(t.id)) next.delete(t.id);
+    else next.add(t.id);
+    setJointOpen(next);
+  };
+  const all = offices.every((o) => open.has(o.id)) && jointTerms.every((t) => jointIds.has(t.id));
 
   const years = view === 'jahre';
   const choose = (next: 'chronik' | 'jahre') => {
@@ -619,21 +657,24 @@ export function OfficesView() {
   return (
     <div className="offices">
       <div className="button-row offices-tools">
-        <div className="segmented" role="group" aria-label="Ansicht">
+        <div className="segmented" role="group" aria-label={t('Ansicht')}>
           <button type="button" className={!years ? 'active' : ''} aria-pressed={!years} onClick={() => choose('chronik')}>
-            Chronik
+            {t('Chronik')}
           </button>
           <button type="button" className={years ? 'active' : ''} aria-pressed={years} onClick={() => choose('jahre')}>
-            Jahre
+            {t('Jahre')}
           </button>
         </div>
         {!years && (
           <button
             type="button"
             className="btn btn-small btn-secondary"
-            onClick={() => setOpen(all ? new Set() : new Set(offices.map((o) => o.id)))}
+            onClick={() => {
+              setOpen(all ? new Set() : new Set(offices.map((o) => o.id)));
+              setJointOpen(all ? new Set() : new Set(jointTerms.map((t) => t.id)));
+            }}
           >
-            {all ? 'Alle zuklappen' : 'Alle aufklappen'}
+            {all ? t('Alle zuklappen') : t('Alle aufklappen')}
           </button>
         )}
       </div>
@@ -642,7 +683,15 @@ export function OfficesView() {
         sections.map((s) => (
           <section key={s.key} className="office-group">
             {s.title && <h2 className="section-title">{s.title}</h2>}
-            {s.joint && <JointTerms terms={s.joint} offices={s.offices} group={s.singular} />}
+            {s.joint && (
+              <JointTerms
+                terms={s.joint}
+                offices={s.offices}
+                group={s.singular}
+                isOpen={(t) => jointIds.has(t.id)}
+                onToggle={toggleJoint}
+              />
+            )}
             {/* Mit gemeinsamen Amtszeiten nur noch, was nicht dazugehört (z. B. Ehrungen) je Amt */}
             {(s.joint
               ? s.offices.map((o) => ({ ...o, terms: o.terms.filter((t) => !t.group_term_id) })).filter((o) => o.terms.length > 0)
@@ -664,12 +713,12 @@ export function OfficesView() {
 export function personEntries(data: OfficesOverview | null | undefined, userId: number): TimelineEntry[] {
   const out: TimelineEntry[] = [];
   for (const o of data?.offices ?? []) {
-    for (const t of o.terms) {
+    for (const term of o.terms) {
       const office = officeSingular(o);
-      if (t.holders.some((h) => h.user_id === userId)) {
-        out.push({ key: t.id, term: t, office });
-      } else if (t.holders.some((h) => h.companions?.some((c) => c.user_id === userId))) {
-        out.push({ key: t.id, term: t, office: `${office} (Begleitung)` });
+      if (term.holders.some((h) => h.user_id === userId)) {
+        out.push({ key: term.id, term, office });
+      } else if (term.holders.some((h) => h.companions?.some((c) => c.user_id === userId))) {
+        out.push({ key: term.id, term, office: t('{office} (Begleitung)', { office }) });
       }
     }
   }

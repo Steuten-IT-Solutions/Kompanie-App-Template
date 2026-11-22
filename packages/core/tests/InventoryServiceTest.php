@@ -49,7 +49,7 @@ final class InventoryServiceTest extends TestCase
         $this->cand = $this->users->add('anwaerter', TestApp::candidateRole($this->app));
         $this->guest = $this->users->add('gast', Roles::GUEST);
         if ($features['inventory'] ?? false) {
-            // Standardrolle des Bereichs: „Inventar verwalten“ (member + manage_inventory)
+            // Standardrolle des Bereichs: „Inventar verwalten“ (member + view_inventory + manage_inventory)
             $this->keeper = $this->users->add('zeugwart', 'inventory');
         }
         $this->users->current = $this->admin;
@@ -91,7 +91,7 @@ final class InventoryServiceTest extends TestCase
     public function testRightsPerRole(): void
     {
         $this->setUpApp();
-        $this->assertSame(TestApp::caps(['member', 'manage_inventory']), array_column($this->app->roles()->describe(), 'capabilities', 'key')['inventory'] ?? null);
+        $this->assertSame(TestApp::caps(['member', 'view_inventory', 'manage_inventory']), array_column($this->app->roles()->describe(), 'capabilities', 'key')['inventory'] ?? null);
         $this->assertSame(401, $this->as(null)->call('GET', '/inventory')->status);
         foreach ([$this->m => 'Mitglied', $this->cand => 'Anwärter', $this->guest => 'Gast'] as $who => $label) {
             $this->as($who);
@@ -103,7 +103,7 @@ final class InventoryServiceTest extends TestCase
         $this->assertSame(['title' => 'Bierbank', 'quantity' => 10, 'unit' => null, 'location' => 'Lager', 'created_by_name' => 'Zeugwart'], array_intersect_key($item, array_flip(['title', 'quantity', 'unit', 'location', 'created_by_name'])));
         $this->assertSame(200, $this->as($this->admin)->call('PATCH', "/inventory/{$item['id']}", ['quantity' => 9])->status, 'Admin hat das Recht ohnehin');
         // Eigene Rolle mit dem Recht
-        $role = $this->app->roles()->create(['label' => 'Kammer', 'capabilities' => TestApp::caps(['member', 'manage_inventory'])]);
+        $role = $this->app->roles()->create(['label' => 'Kammer', 'capabilities' => TestApp::caps(['member', 'view_inventory', 'manage_inventory'])]);
         $this->assertSame(200, $this->as($this->users->add('kammer', $role['key']))->call('GET', '/inventory')->status);
     }
 

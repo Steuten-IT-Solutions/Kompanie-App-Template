@@ -1,7 +1,8 @@
 ---
 titel: "Verlauf im {bereich.inventory}"
 reihenfolge: 67
-rechte: [manage_inventory]
+rechte: []
+einrecht: [view_inventory, manage_inventory]
 bereiche: [inventory]
 ---
 Im Verlauf siehst du jede Änderung im {bereich.inventory}: wann, wer, was sich geändert hat und warum. So findest du heraus, wo etwas geblieben ist.
@@ -24,6 +25,7 @@ Im Verlauf siehst du jede Änderung im {bereich.inventory}: wann, wer, was sich 
 ![Der Verlauf eines einzelnen Eintrags](bild:inventar-verlauf-eintrag)
 
 ## Gut zu wissen
+- Den Verlauf sehen alle, die das {bereich.inventory} sehen dürfen, auch ohne das Recht zum Ändern.
 - Die neuesten Änderungen stehen oben.
 - Beim Umlagern bekommen der alte und der neue Ort je einen Eintrag im Verlauf. Am Zielort steht, ob die Menge dazukam oder der Eintrag neu angelegt wurde.
 - Auch gelöschte Einträge behalten ihren Verlauf. Im gesamten Verlauf findest du sie weiter.

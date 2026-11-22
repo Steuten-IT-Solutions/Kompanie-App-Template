@@ -1,20 +1,23 @@
-import { can, config, isMember, roleLabels, type Me } from '../api';
+import { api, can, config, isMember, roleLabels, type Me } from '../api';
+import { MyAdmission } from './Aufnahmen';
 import brand from '../generated/brand';
 import { formatEuro } from '../format';
 import { navigate } from '../router';
 import { DateRow, ErrorBox, lazyView, Loading, StatCard, useAsync } from '../ui';
 import Dienstgrad from './Dienstgrad';
 import MeineAnwesenheit from './MeineAnwesenheit';
+import { MyPassives } from './Passive';
 import Punkte from './Punkte';
 import Strafen from './Strafen';
 import { TitleBadges } from '../TitleBadges';
 import { MenuNav } from '../adminNav';
 import { ZoomableAvatar } from '../memberPhoto';
-import { RankBadge } from '../RankBadge';
+import { RankBadge, rankName } from '../RankBadge';
 import { formatBirthday, ownBirthday } from '../birthdays';
 import { joinText, profileChoice } from '../joinYear';
 import { PersonOffices } from './Aemter';
 import { sources, usePrefetchMenu } from '../viewData';
+import { localeTag, t } from '../i18n';
 
 const sec = brand.labels.sections;
 
@@ -39,18 +42,24 @@ export default function Meins({
 }) {
   const member = isMember();
   const me = useAsync(() => (member ? sources.me.load() : Promise.resolve(null)), [], sources.me.key);
+  // Meine Passiven: Die Zahl aus der Konfiguration stammt vom Laden der Seite und kann veraltet sein (gespeicherte
+  // App-Seite, gerade erst als Betreuer eingetragen). Deshalb mit dem Bereich auch die eigene Liste fragen.
+  const passiveOn = member && !!config?.features.passive;
+  const cared = useAsync(() => (passiveOn ? api.myPassives() : Promise.resolve([])), [], passiveOn ? 'my-passives' : undefined);
   const dataParts = (
     [
-      ['uebersicht', 'Übersicht', true],
+      ['uebersicht', t('Übersicht'), true],
       ['punkte', sec.points, config?.features.points && can('view_own_points')],
       ['strafen', sec.penalties, config?.features.penalties && can('view_own_penalties')],
       ['dienstgrad', brand.labels.rank, config?.features.ranks && can('view_own_rank')],
       ['anwesenheit', sec.attendance, config?.features.attendance && can('view_own_attendance')],
+      // Passive, die die Person betreut (Bereich passive): nur, wenn es welche gibt
+      ['passive', t('Meine Passiven'), passiveOn && ((config?.caredPassives ?? 0) > 0 || (cared.data?.length ?? 0) > 0)],
     ] as const
   )
     .filter(([, , on]) => member && on)
     .map(([id, label]) => [id, label] as const);
-  const parts = [...dataParts, ['konto', 'Konto'] as const];
+  const parts = [...dataParts, ['konto', t('Konto')] as const];
   const active = parts.find(([id]) => id === sub)?.[0] ?? parts[0]?.[0];
   // Die anderen Seiten von „Meins“ im Leerlauf vorab laden: Sie erscheinen dann schon beim ersten Öffnen ohne Warten.
   usePrefetchMenu(
@@ -61,7 +70,7 @@ export default function Meins({
     <div>
       {parts.length > 1 && (
         <MenuNav
-          label="Meine Daten"
+          label={t('Meine Daten')}
           className="meins-menu"
           active={active}
           items={parts.map(([id, label]) => ({ id, label, onSelect: () => navigate(`meins/${id}`) }))}
@@ -69,6 +78,8 @@ export default function Meins({
       )}
       {active === 'konto' ? (
         <Konto onToast={onToast} onLogout={onLogout} />
+      ) : active === 'passive' ? (
+        <MyPassives focus={focus} />
       ) : me.loading && !me.data ? (
         <Loading shape={active === 'uebersicht' ? 'overview' : active === 'anwesenheit' ? 'list' : 'stat'} />
       ) : me.error && !me.data ? (
@@ -113,59 +124,74 @@ function Uebersicht({ me }: { me: Me }) {
         <div className="member-rank-line">
           {rank && (
             <button type="button" className="member-rank-badge member-rank-open" onClick={() => navigate('meins/dienstgrad')}>
-              <RankBadge url={rank.badge_url} title={rank.title} size="large" />
-              <span>{rank.title}</span>
+              <RankBadge url={rank.badge_url} title={rankName(rank.id, rank.title)} size="large" />
+              <span>{rankName(rank.id, rank.title)}</span>
             </button>
           )}
           {photo && <ZoomableAvatar url={photo} name={me.name} />}
         </div>
       )}
       <p className="muted small member-level">
-        {(me.extra_roles ?? []).length > 0 ? 'Rollen' : 'Rolle'}: {roleLabels(me)}
+        {(me.extra_roles ?? []).length > 0
+          ? t('Rollen: {roles}', { roles: roleLabels(me) })
+          : t('Rolle: {roles}', { roles: roleLabels(me) })}
       </p>
-      {((f?.points && can('view_own_points')) || (f?.penalties && can('view_own_penalties'))) && (
-        <div className="stats member-stats">
-          {f.points && can('view_own_points') && (
-            <StatCard label={sec.points} value={me.points.toLocaleString('de-DE')} tone="good" onClick={() => navigate('meins/punkte')} />
+      {/* Am Computer zwei Spalten wie beim Mitglied in der Verwaltung: links Kacheln, Titel und Daten, rechts Ämter */}
+      <div className="member-columns">
+        <div className="member-col">
+          {((f?.points && can('view_own_points')) || (f?.penalties && can('view_own_penalties'))) && (
+            <div className="stats member-stats">
+              {f.points && can('view_own_points') && (
+                <StatCard
+                  label={sec.points}
+                  value={me.points.toLocaleString(localeTag())}
+                  tone="good"
+                  onClick={() => navigate('meins/punkte')}
+                />
+              )}
+              {f.penalties && can('view_own_penalties') && (
+                <StatCard
+                  label={t('Offen')}
+                  value={formatEuro(me.open_cents)}
+                  tone={me.open_cents > 0 ? 'warn' : 'good'}
+                  onClick={() => navigate('meins/strafen')}
+                />
+              )}
+            </div>
           )}
-          {f.penalties && can('view_own_penalties') && (
-            <StatCard
-              label="Offen"
-              value={formatEuro(me.open_cents)}
-              tone={me.open_cents > 0 ? 'warn' : 'good'}
-              onClick={() => navigate('meins/strafen')}
-            />
+          {f?.titles && me.titles !== undefined && (
+            <div className="card member-tile member-titles-tile my-titles">
+              <span className="member-tile-label">{sec.titles}</span>
+              <span className="member-tile-value">
+                {me.titles.length > 0 ? <TitleBadges titles={me.titles} /> : <span className="muted">{t('Keine')}</span>}
+              </span>
+            </div>
+          )}
+          {(birthday.data || joinYear.data) && (
+            <ul className="card member-dates">
+              {birthday.data && (
+                <DateRow label={t('Geburtstag')} onOpen={toAccount}>
+                  {birthday.data.birthday ? formatBirthday(birthday.data.birthday) : null}
+                </DateRow>
+              )}
+              {joinYear.data && (
+                <DateRow label={t('Eintritt')} onOpen={profileChoice() ? toAccount : undefined}>
+                  {joinYear.data.join_year ? joinText(joinYear.data.join_year) : null}
+                </DateRow>
+              )}
+            </ul>
           )}
         </div>
-      )}
-      {f?.titles && me.titles !== undefined && (
-        <div className="card member-tile member-titles-tile my-titles">
-          <span className="member-tile-label">{sec.titles}</span>
-          <span className="member-tile-value">
-            {me.titles.length > 0 ? <TitleBadges titles={me.titles} /> : <span className="muted">Keine</span>}
-          </span>
+        <div className="member-col">
+          {offices && (
+            <section className="member-offices">
+              <h3 className="section-title">{sec.offices}</h3>
+              <PersonOffices userId={config!.user!.id} empty={t('Du hast keine {offices} eingetragen.', { offices: sec.offices })} />
+            </section>
+          )}
+          {config?.features.attendance && <MyAdmission />}
         </div>
-      )}
-      {(birthday.data || joinYear.data) && (
-        <ul className="card member-dates">
-          {birthday.data && (
-            <DateRow label="Geburtstag" onOpen={toAccount}>
-              {birthday.data.birthday ? formatBirthday(birthday.data.birthday) : null}
-            </DateRow>
-          )}
-          {joinYear.data && (
-            <DateRow label="Eintritt" onOpen={profileChoice() ? toAccount : undefined}>
-              {joinYear.data.join_year ? joinText(joinYear.data.join_year) : null}
-            </DateRow>
-          )}
-        </ul>
-      )}
-      {offices && (
-        <section className="member-offices">
-          <h3 className="section-title">{sec.offices}</h3>
-          <PersonOffices userId={config!.user!.id} empty={`Du hast keine ${sec.offices} eingetragen.`} />
-        </section>
-      )}
+      </div>
     </div>
   );
 }

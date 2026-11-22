@@ -52,6 +52,8 @@ final class ViewRightsMigrationTest extends TestCase
         ]);
         $settings->delete(RoleService::VIEW_SETTING);
         $settings->delete(RoleService::ADDED_VIEW_SETTING);
+        $settings->delete(RoleService::RESPOND_SETTING);
+        $settings->delete(RoleService::READ_SPLIT_SETTING);
 
         $app = TestApp::create($db, $users, settings: $settings, features: false);
         $this->assertTrue($settings->get(RoleService::VIEW_SETTING));
@@ -61,19 +63,19 @@ final class ViewRightsMigrationTest extends TestCase
 
         $this->assertEqualsCanonicalizing($public, $caps($a), 'Mitgliederbereich entzogen: nur das Öffentliche');
         $this->assertEqualsCanonicalizing([...Roles::MEMBER_DEFAULTS, ...Roles::ADDED_VIEW, 'manage_events'], $caps($b));
-        $this->assertEqualsCanonicalizing([...Roles::MEMBER_DEFAULTS, ...Roles::ADDED_VIEW, 'manage_documents'], $caps($c));
+        $this->assertEqualsCanonicalizing([...Roles::MEMBER_DEFAULTS, ...Roles::ADDED_VIEW, 'view_restricted_documents', 'manage_documents'], $caps($c));
         $this->assertEqualsCanonicalizing([...Roles::MEMBER_DEFAULTS, ...Roles::ADDED_VIEW], $caps($d), 'Zusatzrolle, ihr Recht entzogen');
         $this->assertEqualsCanonicalizing([...Roles::CANDIDATE_DEFAULTS, 'view_intern'], $caps($e));
         $this->assertEqualsCanonicalizing($public, $caps($f), 'Kalender entzogen: auch das Brett nicht mehr');
         $this->assertEqualsCanonicalizing($public, $caps($g));
         $this->assertEqualsCanonicalizing($public, array_map(static fn (Capability $cap): string => $cap->value, $app->anonymous()->capabilities), 'ohne Anmeldung wie bisher');
-        $this->assertSame(TestApp::caps(['member', 'manage_points']), $app->roles()->find('r1')['capabilities'] ?? null);
+        $this->assertSame(TestApp::caps(['member', 'view_points', 'manage_points']), $app->roles()->find('r1')['capabilities'] ?? null);
 
         // Nur einmal: Was der Admin danach ändert, bleibt.
         $app->roles()->update(Roles::MEMBER, ['capabilities' => array_values(array_diff(TestApp::caps(['member']), ['view_catalog']))]);
         $again = TestApp::create($db, $users, settings: $settings, features: false);
         $this->assertNotContains('view_catalog', $again->roles()->find(Roles::MEMBER)['capabilities'] ?? []);
-        $this->assertEqualsCanonicalizing([...Roles::MEMBER_DEFAULTS, ...Roles::ADDED_VIEW, 'manage_documents'], [...$caps($c), 'view_catalog'], 'Ausnahmen bleiben');
+        $this->assertEqualsCanonicalizing([...Roles::MEMBER_DEFAULTS, ...Roles::ADDED_VIEW, 'view_restricted_documents', 'manage_documents'], [...$caps($c), 'view_catalog'], 'Ausnahmen bleiben');
     }
 
     public function testNewInstallationNeedsNoMigration(): void

@@ -1,17 +1,26 @@
 import { useEffect, useMemo, useState } from 'react';
-import { can, config } from '../api';
+import { api, can, config, eventKindTag, eventKinds } from '../api';
+import { CollapsibleKindChecks, kindsOf } from '../eventKindChecks';
+import { kindName } from '../names';
 import GuestPushButton from '../GuestPushButton';
 import { birthdaysVisible, UpcomingBirthdays, UpcomingBirthdaysCard, useUpcomingBirthdays } from '../upcomingBirthdays';
 import { navigate } from '../router';
 import { eventEnd, eventStart, formatEventWhen, formatMonth, shortMonth } from '../format';
 import { downloadIcs } from '../ics';
+import { t } from '../i18n';
+import { UntranslatedNote } from '../language';
 import { mapLinkTarget, mapPlatform, mapSearchUrl } from '../address';
 import { useFocusEntry } from '../focus';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { hasEvents, prefetcher, prefetchOnTap, sources, type EventLike } from '../viewData';
+import { ResponseBar, ResponseDetails } from '../eventResponses';
+import type { CalendarEvent } from '../api';
 
 /** Interne Termine in der App pflegen: Quelle „In der App“ und das Recht dazu. */
 export const canManageCalendar = (): boolean => !!config?.calendarInApp && !!config.features.calendar && can('manage_calendar');
+
+/** Terminart am Termin wählen: wer Termine pflegt (manage_calendar), bei jeder Quelle des Kalenders. */
+const canSetKind = (): boolean => !!config?.features.calendar && can('manage_calendar') && eventKinds().length > 0;
 
 /** `focus`: Kennung eines Termins aus der Adresse termine/termin/<id> (Ziel einer Benachrichtigung, Issue #190). */
 export default function Termine({ focus }: { focus?: string }) {
@@ -21,7 +30,18 @@ export default function Termine({ focus }: { focus?: string }) {
 }
 
 function EventList({ focus }: { focus?: string }) {
-  const { data, error, loading, reload } = useAsync(sources.termine.load, sources.termine.deps, sources.termine.key);
+  const { data, error, loading, reload, setData } = useAsync(sources.termine.load, sources.termine.deps, sources.termine.key);
+  // Nach einer Zu- oder Absage: den Termin in der Liste (und im Zwischenspeicher) ersetzen.
+  const replace = (ev: CalendarEvent) => setData((data ?? []).map((e) => (e.id === ev.id ? { ...e, responses: ev.responses } : e)));
+  // Nach dem Setzen der Terminart: nur die Art übernehmen (der Vorschlag entfällt mit einer gesetzten Art).
+  const replaceKinds = (id: string, kinds: string[]) =>
+    setData(
+      (data ?? []).map((e) =>
+        e.id === id
+          ? { ...e, kind: kinds[0] ?? null, kinds, ...(kinds.length > 0 ? { kind_suggestion: null, kind_suggestions: [] } : {}) }
+          : e,
+      ),
+    );
   // Geburtstage gleichzeitig laden und erst mit den Terminen zeigen: Sonst taucht die Karte oben nachträglich auf und
   // schiebt die Liste nach unten.
   const showBirthdays = birthdaysVisible();
@@ -54,7 +74,7 @@ function EventList({ focus }: { focus?: string }) {
   const canCalendar = canManageCalendar();
   // Wer Termine pflegt, öffnet die Seite dahinter oft: im Leerlauf vorab laden, beim Antippen sofort.
   useEffect(() => {
-    if (canManage) void prefetcher.idle([sources.events]);
+    if (canManage) void prefetcher.idle([sources.eventsSource]);
     if (canCalendar) void prefetcher.idle([sources.calendarEntries]);
   }, [canManage, canCalendar]);
   const manage =
@@ -66,22 +86,22 @@ function EventList({ focus }: { focus?: string }) {
             onClick={() => navigate('termine/kalender')}
             {...prefetchOnTap(sources.calendarEntries)}
           >
-            Internen Kalender verwalten
+            {t('Internen Kalender verwalten')}
           </button>
         )}
         {canManage && (
           <button
             className="btn btn-secondary btn-block manage-events"
             onClick={() => navigate('termine/verwalten')}
-            {...prefetchOnTap(sources.events)}
+            {...prefetchOnTap(sources.eventsSource)}
           >
-            Öffentliche Termine verwalten
+            {t('Öffentliche Termine verwalten')}
           </button>
         )}
       </>
     ) : null;
 
-  const notify = <GuestPushButton label="Bei neuen Terminen benachrichtigen" />;
+  const notify = <GuestPushButton label={t('Bei neuen Terminen benachrichtigen')} />;
 
   if ((loading && !data) || (showBirthdays && upcoming.loading && !upcoming.data)) return <Loading shape="events" />;
   if (error)
@@ -96,7 +116,7 @@ function EventList({ focus }: { focus?: string }) {
       <>
         {birthdays}
         {manage}
-        <Empty>Zurzeit steht nichts an.</Empty>
+        <Empty>{t('Zurzeit steht nichts an.')}</Empty>
         {notify}
       </>
     );
@@ -122,26 +142,39 @@ function EventList({ focus }: { focus?: string }) {
                       <span className="mon">{shortMonth(s)}</span>
                     </div>
                     <div className="event-main">
-                      <div className="event-title">{ev.title}</div>
+                      <div className="event-title">
+                        {ev.title}{' '}
+                        {kindsOf(ev)
+                          .filter(eventKindTag)
+                          .map((k) => (
+                            <span key={k} className="badge event-kind">
+                              {kindName(k)}
+                            </span>
+                          ))}
+                      </div>
                       <div className="event-when">{formatEventWhen(ev)}</div>
                       {ev.location && <div className="event-where">{ev.location}</div>}
                     </div>
                   </button>
+                  <ResponseBar ev={ev} onChange={replace} />
                   {isOpen && (
                     <div className="event-body">
+                      <UntranslatedNote untranslated={ev.untranslated} />
                       {ev.description && <p className="event-desc">{ev.description}</p>}
+                      {canSetKind() && <KindPicker ev={ev} onChange={replaceKinds} />}
+                      <ResponseDetails ev={ev} onChange={replace} />
                       <div className="event-actions">
                         <button className="btn btn-secondary" onClick={() => downloadIcs(ev)}>
-                          In meinen Kalender
+                          {t('In meinen Kalender')}
                         </button>
                         {ev.url && (
                           <a className="btn btn-secondary" href={ev.url} target="_blank" rel="noreferrer">
-                            Mehr Infos
+                            {t('Mehr Infos')}
                           </a>
                         )}
                         {map && (
                           <a className="btn btn-secondary" href={map} {...mapLinkTarget(map)}>
-                            Karte
+                            {t('Karte')}
                           </a>
                         )}
                       </div>
@@ -154,6 +187,55 @@ function EventList({ focus }: { focus?: string }) {
         </section>
       ))}
       {notify}
+    </div>
+  );
+}
+
+/**
+ * Terminarten eines Termins ankreuzen (mehrere möglich); speichert sofort. Eingeklappt, bis man auf „Terminarten“ tippt;
+ * dann stehen nur die gewählten Arten da. Ohne Art mit Vorschlag aus dem Titel (zählt erst übernommen).
+ */
+function KindPicker({ ev, onChange }: { ev: CalendarEvent; onChange: (id: string, kinds: string[]) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // Während des Speicherns schon die neue Auswahl zeigen
+  const [draft, setDraft] = useState<string[] | null>(null);
+  const current = kindsOf(ev);
+  const shown = draft ?? current;
+  const listId = `event-kinds-${ev.id}`;
+  const suggestions = ev.kind_suggestions ?? (ev.kind_suggestion ? [ev.kind_suggestion] : []);
+
+  async function choose(kinds: string[]) {
+    setBusy(true);
+    setDraft(kinds);
+    setError(null);
+    try {
+      const r = await api.setKindsOfEvent(ev.id, kinds);
+      onChange(ev.id, kindsOf(r));
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setDraft(null);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="event-kind-picker">
+      <CollapsibleKindChecks id={listId} value={shown} disabled={busy} onChange={(kinds) => void choose(kinds)} />
+      {current.length === 0 && suggestions.length > 0 && (
+        <p className="small muted">
+          {t('Vorschlag aus dem Titel: {kinds}.', { kinds: suggestions.map((k) => kindName(k)).join(', ') })}{' '}
+          <button type="button" className="btn btn-link inline-link" disabled={busy} onClick={() => void choose(suggestions)}>
+            {t('Übernehmen')}
+          </button>
+        </p>
+      )}
+      {error && (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 ---
 titel: "{bereich.points} eines Mitglieds"
 reihenfolge: 51
-rechte: [manage_points]
+rechte: [view_points]
 bereiche: [points]
 ---
 Auf der Seite eines Mitglieds öffnest du ein Fenster mit seinen {bereich.points}. Dort vergibst du {bereich.points} nur an diese Person und stornierst falsche Einträge.
@@ -32,6 +32,4 @@ Mit **✕** oder der Zurück-Taste schließt du es wieder.
 - Ein stornierter Eintrag zählt nicht mehr und verschwindet aus den Listen. Gespeichert bleibt, wer ihn angelegt und wer ihn storniert hat.
 - Hat die Rolle des Mitglieds einen {bereich.points}faktor, erscheint **{bereich.points}faktor der Rolle anwenden**; unter **Einträge** steht der Wert, der zählt.
 - Bei ehemaligen Mitgliedern (Liste **Ehemalige** der Verwaltung, nur für alle, die Mitglieder anlegen dürfen) und bei Personen, die kein Mitglied mehr sind, fehlt das Formular. Die Einträge kannst du dort weiter ansehen und stornieren.
-
-## Siehe auch
-- [{bereich.points} vergeben](seite:punkte-vergeben)
+- **Nur sehen:** Mit dem Recht **{bereich.points} aller Mitglieder sehen** ohne **{bereich.points} vergeben** zeigt das Fenster nur die Einträge, ohne Formular und ohne **Stornieren**.

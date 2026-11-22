@@ -75,6 +75,7 @@ function load({
   now = () => 0,
   clientIds = [],
   windowId = '',
+  apiTimeout = 6000,
 } = {}) {
   const listeners = {};
   const fetched = [];
@@ -86,6 +87,8 @@ function load({
     `const PRECACHE = ${JSON.stringify(precache)};`,
   );
   assert.notEqual(source, SOURCE, 'Platzhalter in sw.js gefunden');
+  const timed = source.replace('const API_TIMEOUT_MS = 6000;', `const API_TIMEOUT_MS = ${apiTimeout};`);
+  assert.ok(apiTimeout === 6000 || timed !== source, 'API_TIMEOUT_MS in sw.js gefunden');
   const self = {
     location: { href: `${ORIGIN}/app/sw.js?api=${encodeURIComponent(API)}&assets=${encodeURIComponent(ASSETS)}`, origin: ORIGIN },
     registration: { scope: SCOPE },
@@ -124,7 +127,7 @@ function load({
       return make();
     },
   };
-  vm.runInNewContext(source, context);
+  vm.runInNewContext(timed, context);
 
   /** Ereignis mit waitUntil (install, activate); wartet, bis alles erledigt ist. */
   async function lifecycle(type) {
@@ -247,21 +250,21 @@ test('Als App-Seite wird nur HTML gespeichert', async () => {
 
 test('App-Seite ohne Netz aus dem Speicher; Daten-Speicher begrenzt, die App-Seite bleibt', async () => {
   const net = { [SCOPE]: () => response('<html>app</html>', 'text/html') };
-  for (let i = 0; i < 130; i++) net[`${API}events?i=${i}`] = () => response('[]', 'application/json');
+  for (let i = 0; i < 330; i++) net[`${API}events?i=${i}`] = () => response('[]', 'application/json');
   const sw = load({ net });
   await sw.request(SCOPE, 'navigate');
-  for (let i = 0; i < 130; i++) await sw.request(`${API}events?i=${i}`);
+  for (let i = 0; i < 330; i++) await sw.request(`${API}events?i=${i}`);
   await sw.lifecycle('activate'); // räumt ebenfalls auf
   const keys = (await (await sw.storage.open('kompanie-data-v2')).keys()).map((r) => r.url);
   assert.ok(keys.includes(SCOPE), 'App-Seite bleibt');
-  assert.equal(keys.length, 101, 'höchstens 100 Daten-Einträge und die App-Seite');
-  assert.ok(keys.includes(`${API}events?i=129`) && !keys.includes(`${API}events?i=0`), 'die ältesten fallen heraus');
+  assert.equal(keys.length, 301, 'höchstens 300 Daten-Einträge und die App-Seite');
+  assert.ok(keys.includes(`${API}events?i=329`) && !keys.includes(`${API}events?i=0`), 'die ältesten fallen heraus');
 
   // Ohne Netz: gespeicherte App-Seite und Daten.
   delete net[SCOPE];
-  delete net[`${API}events?i=129`];
+  delete net[`${API}events?i=329`];
   assert.equal(await (await sw.request(`${SCOPE}`, 'navigate')).text(), '<html>app</html>');
-  assert.equal(await (await sw.request(`${API}events?i=129`)).text(), '[]');
+  assert.equal(await (await sw.request(`${API}events?i=329`)).text(), '[]');
 });
 
 test('Verwaltung (/admin/) wird nie gespeichert', async () => {
@@ -696,4 +699,79 @@ test('Bilder der Galerie: höchstens PHOTOS_MAX Vorschaubilder, die ältesten fa
   const keys = (await (await sw.storage.open('kompanie-fotos-v1')).keys()).map((r) => r.url);
   assert.equal(keys.length, max);
   assert.ok(!keys.includes(`${SCOPE}foto/1/thumb?v=a`) && !keys.includes(`${SCOPE}foto/2/thumb?v=a`));
+});
+
+test('Schlechtes Netz nach einer eigenen Änderung: nach dem Zeitlimit die gespeicherte Version, gekennzeichnet; die späte Antwort wird gemeldet', async () => {
+  let t = 1000;
+  let late;
+  const net = { [`${API}members`]: json('[1]') };
+  const sw = load({ net, now: () => t, apiTimeout: 20 });
+  await sw.request(`${API}members`, 'cors', STALE_OK);
+  t = 2000;
+  await sw.request(`${API}points`, 'cors', {}, 'POST');
+  // Netz antwortet erst nach dem Zeitlimit.
+  net[`${API}members`] = () => new Promise((resolve) => (late = () => resolve(json('[1,2]')())));
+  t = 3000;
+  const { answer, done } = sw.requestSplit(`${API}members`, 'cors', STALE_OK);
+  const res = await answer;
+  assert.equal(await res.text(), '[1]');
+  assert.equal(res.headers.get('X-Kompanie-Stale'), '1');
+  late();
+  await done;
+  assert.deepEqual(JSON.parse(JSON.stringify(sw.messages)), [{ type: 'kompanie-data', url: `${API}members` }]);
+  // Danach frisch gespeichert: sofort und ohne Kennzeichen
+  const again = await sw.request(`${API}members`, 'cors', STALE_OK);
+  assert.equal(await again.text(), '[1,2]');
+  assert.equal(again.headers.get('X-Kompanie-Stale'), null);
+});
+
+test('Erste Anfrage mit Stale-Ok: gespeichert, auch wenn die App den Körper sofort liest', async () => {
+  const net = { [`${API}events`]: json('[7]') };
+  const sw = load({ net });
+  const { answer, done } = sw.requestSplit(`${API}events`, 'cors', STALE_OK);
+  // Wie im Browser: Die App liest die Antwort, bevor der Service Worker sie gespeichert hat.
+  assert.equal(await (await answer).text(), '[7]');
+  await done;
+  delete net[`${API}events`];
+  const res = await sw.request(`${API}events`, 'cors', STALE_OK);
+  assert.equal(await res.text(), '[7]');
+});
+
+test('Ohne Netz nach einer eigenen Änderung: gespeicherte Version gekennzeichnet; nie die einer anderen Person', async () => {
+  let t = 1000;
+  const net = { [`${API}members`]: json('[1]') };
+  const sw = load({ net, now: () => t, apiTimeout: 20 });
+  await sw.request(`${API}members`, 'cors', STALE_OK);
+  t = 2000;
+  await sw.request(`${API}points`, 'cors', {}, 'POST');
+  delete net[`${API}members`];
+  const res = await sw.request(`${API}members`, 'cors', STALE_OK);
+  assert.equal(await res.text(), '[1]');
+  assert.equal(res.headers.get('X-Kompanie-Stale'), '1');
+  await assert.rejects(sw.request(`${API}members`, 'cors', { ...STALE_OK, 'X-Kompanie-User': '6' }));
+  await assert.rejects(sw.request(`${API}members`, 'cors', { 'X-Kompanie-User': '6' }), 'auch ohne Stale-Ok');
+});
+
+test('Mitgliedsfotos, Logos und Bilder in Texten: zuerst aus dem Speicher, auch offline; neue Fassung ersetzt die alte', async () => {
+  const photo = (v) => `${SCOPE}mitgliedsfoto/7?v=${v}&s=128`;
+  const logo = `${SCOPE}?kompanie_app=sponsorlogo/3&v=a`;
+  const rich = `${SCOPE}bild/0123456789abcdef0123456789abcdef`;
+  const net = {
+    [photo('a')]: () => response('foto-a', 'image/webp'),
+    [photo('b')]: () => response('foto-b', 'image/webp'),
+    [logo]: () => response('logo', 'image/png'),
+    [rich]: () => response('bild', 'image/jpeg'),
+  };
+  const sw = load({ net });
+  for (const u of [photo('a'), logo, rich]) await sw.request(u, 'no-cors');
+  for (const u of [photo('a'), logo, rich]) delete net[u];
+  assert.equal(await (await sw.request(photo('a'), 'no-cors')).text(), 'foto-a', 'offline aus dem Speicher');
+  assert.equal(await (await sw.request(logo, 'no-cors')).text(), 'logo');
+  assert.equal(await (await sw.request(rich, 'no-cors')).text(), 'bild');
+  await sw.request(photo('b'), 'no-cors');
+  const keys = (await (await sw.storage.open('kompanie-bilder-v1')).keys()).map((r) => r.url);
+  assert.ok(keys.includes(photo('b')) && !keys.includes(photo('a')), 'nur die aktuelle Fassung');
+  // Ohne Fassung und in der Vorschau durchgereicht
+  assert.equal(await sw.request(`${SCOPE}mitgliedsfoto/7?s=128`, 'no-cors'), undefined);
+  assert.equal(await sw.request(`${photo('b')}&vorschau=member`, 'no-cors'), undefined);
 });

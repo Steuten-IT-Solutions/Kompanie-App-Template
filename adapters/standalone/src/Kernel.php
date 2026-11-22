@@ -12,6 +12,7 @@ use KompanieApp\Core\Http\FileCache;
 use KompanieApp\Core\Http\ManifestIcons;
 use KompanieApp\Core\Http\Request;
 use KompanieApp\Core\Http\Response;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Infra\CurlHttpClient;
 use KompanieApp\Core\Infra\GdImageResizer;
 use KompanieApp\Core\Infra\LocalFileStorage;
@@ -36,7 +37,7 @@ use KompanieApp\Core\Storage\Sql\PdoConnection;
  *   /manifest.webmanifest    Manifest         (index.php?r=/manifest.webmanifest)
  *   /foto/<id>/<größe>       Galeriebild      (index.php?r=/foto/…)
  *   /foto/<id>/video         Galerievideo in Ausschnitten (Range), aus Drive oder der eigenen Ablage
- *   /foto/<id>/einreichung   Video einer offenen Einreichung zum Prüfen (review_gallery, Issue #350)
+ *   /foto/<id>/einreichung   Video einer offenen Einreichung zum Prüfen (view_submissions, Issue #350)
  *   /dokument/<id>?v=…       Dokument         (index.php?r=/dokument/…&v=…)
  *   /abzeichen/<id>?v=…&s=…  Abzeichen        (index.php?r=/abzeichen/…&v=…&s=…)
  *   /mitgliedsfoto/<id>?v=…&s=… Foto eines Mitglieds (index.php?r=/mitgliedsfoto/…&v=…&s=…)
@@ -47,6 +48,10 @@ use KompanieApp\Core\Storage\Sql\PdoConnection;
  *   /sicherung               Datensicherung herunterladen, nur Admins (index.php?r=/sicherung);
  *                            ?datei=<Name> eine Sicherung, die auf dem Server liegt
  *   /cron?key=…              Aufgaben         (index.php?r=/cron&key=…)
+ *   /webseite.css?v=…        Stylesheet der Webseite (index.php?r=/webseite.css&v=…)
+ *
+ * Website (Issue #273): index.php in the folder above <root> (StandaloneWebsiteHost) defines KOMPANIE_WEBSITE and
+ * includes <root>/index.php; handleHttp() then answers with the website (handleWebsite()).
  *   /google/callback         Rückkehr von Google („Mit Google verbinden“, index.php?r=/google/callback)
  */
 final class Kernel
@@ -83,7 +88,14 @@ final class Kernel
         private readonly ?HttpClient $httpClient = null,
         private readonly array $packageOverride = [],
     ) {
-        $this->http = $http ?? HttpContext::fromGlobals(self::basePath($_SERVER));
+        // Through the website's entry file (StandaloneWebsiteHost) SCRIPT_NAME is the folder above the program.
+        $this->http = $http ?? HttpContext::fromGlobals(self::basePath($_SERVER) . (self::website() ? basename($root) . '/' : ''));
+    }
+
+    /** Called through the website's entry file (Issue #273)? */
+    public static function website(): bool
+    {
+        return defined('KOMPANIE_WEBSITE');
     }
 
     /** Pfad der Installation in der Adresse, z. B. /app/ (aus SCRIPT_NAME von index.php). */
@@ -235,6 +247,7 @@ final class Kernel
             backup: new StandaloneBackup($this),
             healthChecks: new StandaloneHealthChecks($config, $httpClient, $cache, $settings, $this),
             packageConfig: $this->packageConfig(),
+            websiteHost: new StandaloneWebsiteHost($this->root, $this->env),
         );
         $this->app->watchFatals();
         return $this->app;
@@ -296,6 +309,10 @@ final class Kernel
 
     public function handleHttp(): void
     {
+        if (self::website()) {
+            $this->handleWebsite();
+            return;
+        }
         $path = $this->requestPath();
         try {
             $this->route($path);
@@ -303,34 +320,21 @@ final class Kernel
             // Nie Einzelheiten (Pfade, SQL) an Besucher; sie stehen im Fehlerprotokoll des Servers.
             error_log('Kompanie-App: ' . $e::class . ': ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
             if (!headers_sent()) {
-                $this->sendError($path, 500, 'internal_error', 'Es ist ein Fehler aufgetreten. Bitte später erneut versuchen.');
+                $this->sendError($path, 500, 'internal_error', I18n::t('Es ist ein Fehler aufgetreten. Bitte später erneut versuchen.'));
             }
         }
     }
 
     private function route(string $path): void
     {
-        if (!$this->installed()) {
-            $this->sendNotInstalled($path);
-            return;
-        }
-        try {
-            $this->config()->secret();
-        } catch (\Throwable $e) {
-            error_log('Kompanie-App: config.php: ' . $e->getMessage());
-            $this->sendError($path, 503, 'config_invalid', 'Die Einrichtung ist unvollständig oder beschädigt (data/config.php). Bitte install.php erneut hochladen und „Reparieren“ wählen.');
-            return;
-        }
-        try {
-            $this->upgrade();
-        } catch (\Throwable $e) {
-            error_log('Kompanie-App: Datenbank nicht erreichbar: ' . $e->getMessage());
-            $this->sendError($path, 503, 'database_unavailable', 'Die Datenbank ist gerade nicht erreichbar. Bitte später erneut versuchen.');
+        if (!$this->ready($path)) {
             return;
         }
 
         if (str_starts_with($path, '/api/v1/') || $path === '/api/v1') {
             $this->sendApi(substr($path, strlen('/api/v1')) ?: '/');
+        } elseif ($path === '/webseite.css') {
+            $this->sendWebsiteCss();
         } elseif ($path === '/manifest.webmanifest') {
             $this->sendManifest();
         } elseif ($path === '/sw.js') {
@@ -380,6 +384,81 @@ final class Kernel
         $this->afterResponse();
     }
 
+    /** Eingerichtet, config.php lesbar und die Datenbank auf Stand? Sonst ist die Antwort (503) schon verschickt. */
+    private function ready(string $path): bool
+    {
+        if (!$this->installed()) {
+            $this->sendNotInstalled($path);
+            return false;
+        }
+        try {
+            $this->config()->secret();
+        } catch (\Throwable $e) {
+            error_log('Kompanie-App: config.php: ' . $e->getMessage());
+            $this->sendError($path, 503, 'config_invalid', I18n::t('Die Einrichtung ist unvollständig oder beschädigt (data/config.php). Bitte install.php erneut hochladen und „Reparieren“ wählen.'));
+            return false;
+        }
+        try {
+            $this->upgrade();
+        } catch (\Throwable $e) {
+            error_log('Kompanie-App: Datenbank nicht erreichbar: ' . $e->getMessage());
+            $this->sendError($path, 503, 'database_unavailable', I18n::t('Die Datenbank ist gerade nicht erreichbar. Bitte später erneut versuchen.'));
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Website (Issue #273), through the entry file in the folder above the program: the home page as plain HTML for
+     * everyone, without session or cookies. While the area is off, visitors go to the App.
+     */
+    private function handleWebsite(): void
+    {
+        try {
+            if (!$this->ready('/')) {
+                return;
+            }
+            $site = $this->app()->website();
+            if (!$site->enabled()) {
+                header('Cache-Control: no-store');
+                header('Location: ' . $this->env->appUrl(), true, 302);
+                return;
+            }
+            if (!in_array($this->http->method(), ['GET', 'HEAD'], true)) {
+                header('Allow: GET, HEAD');
+                $this->sendPlain(405, I18n::t('Diese Adresse lässt sich nur aufrufen.'));
+                return;
+            }
+            $res = $site->renderHome();
+            http_response_code($res['status']);
+            header('Content-Type: text/html; charset=utf-8');
+            // Always fresh (upcoming events, countdown), but without personal data: no-cache, not no-store.
+            header('Cache-Control: no-cache');
+            $this->securityHeaders();
+            header("Content-Security-Policy: default-src 'none'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'self'");
+            echo $res['html'];
+        } catch (\Throwable $e) {
+            error_log('Kompanie-App: Webseite: ' . $e::class . ': ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+            if (!headers_sent()) {
+                $this->sendPlain(500, I18n::t('Es ist ein Fehler aufgetreten. Bitte später erneut versuchen.'));
+            }
+            return;
+        }
+        $this->afterResponse();
+    }
+
+    /** Stylesheet of the website; with the version from its address a year in the browser cache. */
+    private function sendWebsiteCss(): void
+    {
+        $app = $this->app();
+        $css = $app->website()->stylesheet();
+        $current = \KompanieApp\Core\Website\WebsiteRenderer::stylesheetVersion($app);
+        header('Content-Type: text/css; charset=utf-8');
+        header('Cache-Control: ' . (($_GET['v'] ?? null) === $current ? 'public, max-age=31536000, immutable' : 'public, max-age=300'));
+        $this->securityHeaders();
+        echo $css;
+    }
+
     /**
      * Vorschau „App als Rolle ansehen“ (Issue #63) für Bilder, Dokumente und Abzeichen: Der Browser lädt sie ohne den
      * Header der App, ihre Adressen tragen deshalb ?vorschau=… (der Kern prüft, ob die Person Admin ist).
@@ -420,7 +499,7 @@ final class Kernel
             if ($raw !== '') {
                 $body = json_decode($raw, true);
                 if (!is_array($body)) {
-                    throw ApiError::invalid('Die Anfrage enthält kein gültiges JSON.');
+                    throw ApiError::invalid(I18n::t('Die Anfrage enthält kein gültiges JSON.'));
                 }
             }
             if ($path === '/config') {
@@ -429,7 +508,7 @@ final class Kernel
             }
             $query = $_GET;
             unset($query['r']);
-            $res = $this->app()->api()->handle(new Request($method, $path, $query, $body, [], $this->http->clientIp(), $this->http->header(Preview::HEADER)));
+            $res = $this->app()->api()->handle(new Request($method, $path, $query, $body, [], $this->http->clientIp(), $this->http->header(Preview::HEADER), $this->http->header(I18n::HEADER)));
         } catch (ApiError $e) {
             $res = Response::error($e);
         }
@@ -476,7 +555,7 @@ final class Kernel
     {
         $file = is_file($this->root . '/sw.js') ? $this->root . '/sw.js' : $this->appDir() . '/sw.js';
         if (!is_file($file)) {
-            $this->sendPlain(404, 'Nicht gefunden.');
+            $this->sendPlain(404, I18n::t('Nicht gefunden.'));
             return;
         }
         header('Content-Type: application/javascript; charset=utf-8');
@@ -548,7 +627,7 @@ final class Kernel
         @ini_set('zlib.output_compression', '0');
         $access = static function () use ($app, $submission): array {
             $user = $app->authContext->currentUser();
-            $cap = $submission ? \KompanieApp\Core\Auth\Capability::ReviewGallery : \KompanieApp\Core\Auth\Capability::ViewGalleryInternal;
+            $cap = $submission ? \KompanieApp\Core\Auth\Capability::ViewSubmissions : \KompanieApp\Core\Auth\Capability::ViewGalleryInternal;
             return [$app->can($cap), $user !== null];
         };
         $deliver = $submission ? $app->gallerySubmissions()->deliverVideo(...) : $app->gallery()->deliverVideo(...);
@@ -709,7 +788,7 @@ final class Kernel
         $key = ($header ?: $this->http->header('X-Kompanie-Cron-Key')) ?: (is_string($_GET['key'] ?? null) ? $_GET['key'] : '');
         header('Cache-Control: no-store');
         if (!hash_equals($this->cronKey(), $key)) {
-            $this->sendPlain(403, 'Falscher Schlüssel.');
+            $this->sendPlain(403, I18n::t('Falscher Schlüssel.'));
             return;
         }
         ignore_user_abort(true);
@@ -742,7 +821,7 @@ final class Kernel
         }
         $file = $this->appDir() . '/index.html';
         if (!is_readable($file)) {
-            $this->sendPlain(500, 'Die App wurde noch nicht gebaut (app/index.html fehlt).');
+            $this->sendPlain(500, I18n::t('Die App wurde noch nicht gebaut (app/index.html fehlt).'));
             return;
         }
         $app = $this->app();
@@ -774,7 +853,7 @@ final class Kernel
 
     private function sendNotInstalled(string $path): void
     {
-        $msg = 'Die Kompanie-App ist hier noch nicht eingerichtet. Bitte install.php hochladen und im Browser öffnen.';
+        $msg = I18n::t('Die Kompanie-App ist hier noch nicht eingerichtet. Bitte install.php hochladen und im Browser öffnen.');
         if (str_starts_with($path, '/api/')) {
             http_response_code(503);
             header('Content-Type: application/json; charset=utf-8');

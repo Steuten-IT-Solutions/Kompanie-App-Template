@@ -61,11 +61,12 @@ final class PointRepository
     /**
      * @param array<int, float> $factors Benutzer-ID => Punktefaktor
      * @param int|null $attendanceId Liste, aus deren Vorschlag gebucht wird (Issue #21)
+     * @param string|null $requestId Kennung der Buchung aus der App (idsForRequest), null ohne
      * @return int[] IDs der neuen Einträge
      */
-    public function add(array $factors, int $points, string $reason, ?int $catalogId, string $date, int $by, string $now, ?int $attendanceId = null): array
+    public function add(array $factors, int $points, string $reason, ?int $catalogId, string $date, int $by, string $now, ?int $attendanceId = null, ?string $requestId = null): array
     {
-        return $this->db->transaction(function () use ($factors, $points, $reason, $catalogId, $date, $by, $now, $attendanceId): array {
+        return $this->db->transaction(function () use ($factors, $points, $reason, $catalogId, $date, $by, $now, $attendanceId, $requestId): array {
             $ids = [];
             foreach ($factors as $userId => $factor) {
                 $ids[] = $this->db->insert('points', [
@@ -78,10 +79,21 @@ final class PointRepository
                     'created_by' => $by,
                     'created_at' => $now,
                     'attendance_id' => $attendanceId,
+                    'request_id' => $requestId,
                 ]);
             }
             return $ids;
         });
+    }
+
+    /**
+     * Einträge einer früheren Buchung mit derselben Kennung (von derselben Person gebucht), auch storniert.
+     *
+     * @return int[]
+     */
+    public function idsForRequest(string $requestId, int $by): array
+    {
+        return array_map('intval', array_column($this->db->select('SELECT id FROM {points} WHERE request_id = ? AND created_by = ? ORDER BY id', [$requestId, $by]), 'id'));
     }
 
     public function cancel(int $id, int $by, string $now): bool

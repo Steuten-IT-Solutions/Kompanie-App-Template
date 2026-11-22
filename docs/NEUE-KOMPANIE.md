@@ -32,6 +32,10 @@ Keine Zugangsdaten in das Formular oder in das Repo der Kompanie schreiben.
    öffnen und **„Neue Kompanie“** wählen.
 2. Die Angaben aus Schritt 1 eintragen. Das Logo **in das Feld „Logo“ ziehen** (ein Link auf eine andere
    Webseite reicht nicht; der Workflow lädt nur Bilder, die GitHub als Anhang gespeichert hat).
+   **Basissprache** (Deutsch oder English): In ihr stehen Namen und Inhalte der Kompanie, jede weitere Sprache ist eine
+   Übersetzung davon. Sie lässt sich danach nicht mehr ändern (auch nicht mit „Kompanie ändern“); die übrigen Angaben im
+   Formular (Name, Begrüßung, Bezeichnungen) in dieser Sprache eintragen. Deutsch steht nicht in `kompanie.json`,
+   Englisch als `"language": "en"`. Englisch braucht einen Kern, der `language` kennt (ab dem nächsten stable-Release).
 3. Absenden.
 
 Auslösen kann das Formular nur, wer Schreibrecht auf das Kern-Repo hat (sowohl wer das Issue anlegt als auch wer
@@ -49,6 +53,9 @@ Vorschau mit Bildschirmfotos, legt das Repo aus der Vorlage `Kompanie-App-Vorlag
   Brach das Anlegen mittendrin ab, setzt das erneute Speichern des offenen Issues fort.
 - **Kanal:** Die erste Version liegt direkt in `stable`, wenn der Kern schon geprüft ist (`STABLE_CORE`), sonst
   zuerst in `early`.
+- **Wartungsabo:** Die erste Version entsteht immer. Weitere Versionen (auch nach „Kompanie ändern“) gibt es nur, wenn
+  das Repo mit „Wartung bis“ in der Variable `KOMPANIE_WARTUNG` des Kern-Repos steht
+  ([RELEASE.md](RELEASE.md#wartungsabo)).
 
 Die Vorschau (Bildschirmfotos) liegt als Ergebnis „vorschau“ am Workflow-Lauf, der im Kommentar verlinkt ist.
 
@@ -73,7 +80,7 @@ Empfohlen: beim Hoster einen Cronjob alle 15 Minuten einrichten (Einzelheiten in
 Logo, Farben oder Texte ändert das Formular **„Kompanie ändern“** im Kern-Repo: nur die zu ändernden Felder
 ausfüllen (`-` entfernt einen Wert). Es öffnet im Repo der Kompanie einen Pull Request mit Vorschau; nach dem
 Zusammenführen wird die neue Version veröffentlicht (innerhalb von 30 Minuten). Neue Kern-Versionen bekommt
-jede Kompanie automatisch über „Kompanien abgleichen“.
+jede Kompanie mit laufendem Wartungsabo automatisch über „Kompanien abgleichen“.
 
 ## Noch offen
 

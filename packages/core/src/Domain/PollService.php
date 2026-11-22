@@ -8,6 +8,7 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\Settings;
 use KompanieApp\Core\Storage\PollRepository;
 
@@ -27,6 +28,11 @@ use KompanieApp\Core\Storage\PollRepository;
  *   namentlichen Umfragen und nur für die, die die Ergebnisse sehen dürfen.
  * - Laufende Umfragen stehen am Schwarzen Brett (boardItems); Benachrichtigung bei neuen Umfragen und eine Erinnerung
  *   24 Stunden vor dem Ende an alle, die noch nicht teilgenommen haben (Aufgabe poll_reminders, einmal je Umfrage).
+ * - Inhalte je Sprache (Plan „Mehrsprachigkeit“, PR 9d, ContentTranslations, Art KIND): je weitere eingeschaltete
+ *   Sprache eine eigene Frage, Beschreibung und Antwortmöglichkeiten (gleich viele wie auf Deutsch, in derselben
+ *   Reihenfolge), über translations beim Anlegen und Ändern. Antworten gelten für alle Sprachen (dieselben
+ *   Möglichkeiten). Gelesen wird in der Sprache der Anfrage, Fehlendes deutsch mit untranslated; wer verwaltet, bekommt
+ *   dazu source (deutsch, wenn die App in einer anderen Sprache läuft) und translations zum Bearbeiten.
  *
  * @phpstan-import-type Poll from PollRepository
  * @phpstan-import-type PollOption from PollRepository
@@ -37,6 +43,8 @@ final class PollService
     public const TASK = 'poll_reminders';
     public const SECRET_SETTING = 'polls_secret';
     public const KIND_POLL = 'poll';
+    /** Art in translations */
+    public const KIND = 'poll';
     public const TYPES = ['single', 'multiple', 'text'];
     public const RESULTS = ['after_vote', 'after_end', 'managers'];
     public const TITLE_MAX = 150;
@@ -68,6 +76,12 @@ final class PollService
     public static function canManage(?User $user): bool
     {
         return $user !== null && $user->can(Capability::ManagePolls);
+    }
+
+    /** Ergebnisse immer sehen (view_poll_results; manage_polls setzt das voraus). */
+    public static function seesAllResults(?User $user): bool
+    {
+        return $user !== null && $user->can(Capability::ViewPollResults);
     }
 
     /* ---------------------------------------------------------------- */
@@ -136,17 +150,136 @@ final class PollService
             return [];
         }
         $voted = array_flip($this->repository()->votedPolls($user->id));
+        $running = $this->repository()->running($this->app->time()->nowUtc());
+        $tr = $this->translationsOf(array_column($running, 'id'));
+        $current = $this->app->contentTranslations()->current();
         return array_map(static fn (array $p): array => [
             'kind' => self::KIND_POLL,
             'id' => $p['id'],
-            'title' => $p['title'],
+            'title' => ($current !== null ? ($tr[$p['id']][$current]['title'] ?? '') : '') ?: $p['title'],
             'type' => $p['type'],
             'ends_at' => Time::utcToIso($p['ends_at']),
             'expires_at' => Time::utcToIso($p['ends_at']),
             'has_voted' => isset($voted[$p['id']]),
             'created_at' => Time::utcToIso($p['created_at']),
             'updated_at' => Time::utcToIso($p['updated_at']),
-        ], $this->repository()->running($this->app->time()->nowUtc()));
+        ], $running);
+    }
+
+    /**
+     * Fassungen (ID => Sprache => Feld => Text); leer ohne weitere Sprache.
+     *
+     * @param list<int> $ids
+     * @return array<int, array<string, array<string, string>>>
+     */
+    private function translationsOf(array $ids): array
+    {
+        $content = $this->app->contentTranslations();
+        return $ids === [] || $content->locales() === [] ? [] : $content->ofMany(self::KIND, $ids);
+    }
+
+    /** Frage einer Umfrage in $locale (Benachrichtigung); fehlt die Fassung, die deutsche (sonst $title). */
+    public function titleIn(int $id, string $title, string $locale): string
+    {
+        $german = (string) ($this->repository()->find($id)['title'] ?? $title);
+        if ($locale === I18n::base()) {
+            return $german;
+        }
+        $own = $this->app->contentTranslations()->of(self::KIND, $id)[$locale]['title'] ?? '';
+        return $own !== '' ? $own : $german;
+    }
+
+    /**
+     * Fassungen aus einer Anfrage prüfen (Längen wie auf Deutsch, Antwortmöglichkeiten gleich viele wie $options);
+     * '' bzw. eine leere Liste löscht ein Feld.
+     *
+     * @param list<string> $options die deutschen Antwortmöglichkeiten
+     * @return array<string, array<string, string>> Sprache => Feld => zu speichernder Text
+     */
+    private function translationInput(mixed $in, array $options): array
+    {
+        $out = [];
+        foreach ($this->app->contentTranslations()->input($in) as $locale => $fields) {
+            if (array_key_exists('title', $fields)) {
+                $title = is_string($fields['title']) ? Text::line($fields['title']) : '';
+                $out[$locale]['title'] = $title === '' ? '' : self::validTitle($title);
+            }
+            if (array_key_exists('description', $fields)) {
+                $out[$locale]['description'] = self::validDescription(is_string($fields['description']) ? $fields['description'] : '');
+            }
+            if (array_key_exists('options', $fields)) {
+                $list = is_array($fields['options']) ? array_values($fields['options']) : [];
+                $texts = array_map(static fn (mixed $o): string => is_string($o) ? Text::line($o) : '', $list);
+                if (implode('', $texts) === '') {
+                    $out[$locale]['options'] = '';
+                    continue;
+                }
+                if (count($texts) !== count($options)) {
+                    throw ApiError::invalid(I18n::t('Die Übersetzung braucht gleich viele Antwortmöglichkeiten wie die Fassung in der Basissprache.'));
+                }
+                foreach ($texts as $t) {
+                    // leer bleibt leer und erscheint beim Lesen deutsch (auch nach einer Änderung der deutschen Möglichkeit)
+                    if (mb_strlen($t) > self::OPTION_MAX) {
+                        throw ApiError::invalid(I18n::t('Eine Antwortmöglichkeit ist zu lang (höchstens {max} Zeichen).', ['max' => self::OPTION_MAX]));
+                    }
+                }
+                $out[$locale]['options'] = (string) json_encode($texts, JSON_UNESCAPED_UNICODE);
+            }
+        }
+        return $out;
+    }
+
+    /** @param array<string, array<string, string>> $translations */
+    private function saveTranslations(int $id, array $translations, int $userId): void
+    {
+        foreach ($translations as $locale => $fields) {
+            $this->app->contentTranslations()->save(self::KIND, $id, $locale, $fields, $userId);
+        }
+    }
+
+    /**
+     * Neue deutsche Antwortmöglichkeiten ohne neue Fassung: Übersetzungen gehen mit ihrer Möglichkeit mit (gleicher
+     * deutscher Text, sonst bei gleicher Anzahl die umformulierte an derselben Stelle); neue Möglichkeiten bleiben leer und erscheinen deutsch.
+     *
+     * @param list<string> $before
+     * @param list<string> $after
+     * @param array<string, array<string, string>> $translations aus der Anfrage
+     * @return array<string, array<string, string>>
+     */
+    private function keepOptionTranslations(int $id, array $before, array $after, array $translations): array
+    {
+        if ($this->app->contentTranslations()->locales() === []) {
+            return $translations;
+        }
+        foreach ($this->app->contentTranslations()->of(self::KIND, $id) as $locale => $fields) {
+            if (isset($translations[$locale]['options'])) {
+                continue;
+            }
+            $old = self::translatedOptions($fields['options'] ?? null, count($before));
+            if ($old === null) {
+                continue;
+            }
+            $next = [];
+            foreach ($after as $i => $german) {
+                $k = array_search($german, $before, true);
+                // umformuliert: gleiche Stelle, wenn deren alter Text nicht mehr vorkommt
+                $edited = count($before) === count($after) && !in_array($before[$i], $after, true);
+                $next[] = $k !== false ? $old[$k] : ($edited ? $old[$i] : '');
+            }
+            $translations[$locale]['options'] = implode('', $next) === '' ? '' : (string) json_encode($next, JSON_UNESCAPED_UNICODE);
+        }
+        return $translations;
+    }
+
+    /**
+     * Antwortmöglichkeiten einer Fassung (nur, wenn es gleich viele wie auf Deutsch sind).
+     *
+     * @return list<string>|null
+     */
+    private static function translatedOptions(?string $json, int $count): ?array
+    {
+        $list = $json === null || $json === '' ? null : json_decode($json, true);
+        return is_array($list) && count($list) === $count && array_is_list($list) ? array_map('strval', $list) : null;
     }
 
     /* ---------------------------------------------------------------- */
@@ -166,8 +299,9 @@ final class PollService
         $anonymous = self::validBool($in['anonymous'] ?? false, 'anonymous');
         $results = self::validResults($in['results'] ?? 'after_vote');
         $endsAt = $this->validEnd($in['ends_at'] ?? null);
+        $translations = $this->translationInput($in['translations'] ?? null, $options);
         $now = $this->app->time()->nowUtc();
-        $id = $this->app->db->transaction(function () use ($title, $description, $type, $anonymous, $results, $endsAt, $author, $now, $options): int {
+        $id = $this->app->db->transaction(function () use ($title, $description, $type, $anonymous, $results, $endsAt, $author, $now, $options, $translations): int {
             $id = $this->repository()->insert([
                 'title' => $title,
                 'description' => $description,
@@ -183,6 +317,7 @@ final class PollService
                 'updated_at' => $now,
             ]);
             $this->repository()->replaceOptions($id, $options);
+            $this->saveTranslations($id, $translations, $author->id);
             return $id;
         });
         $this->secret(); // gleich anlegen, nicht erst bei der ersten (womöglich gleichzeitigen) Antwort
@@ -200,7 +335,7 @@ final class PollService
     {
         $poll = $this->find($id);
         if ($this->ended($poll)) {
-            throw ApiError::invalid('Die Umfrage ist beendet und lässt sich nicht mehr ändern.');
+            throw ApiError::invalid(I18n::t('Die Umfrage ist beendet und lässt sich nicht mehr ändern.'));
         }
         $locked = $this->repository()->hasVotes($id);
         $values = [];
@@ -213,7 +348,7 @@ final class PollService
         if (array_key_exists('ends_at', $in)) {
             $values['ends_at'] = $this->validEnd($in['ends_at']);
         }
-        $lockedMessage = 'Es gibt schon Antworten: Art, Antwortmöglichkeiten, Anonymität und Sichtbarkeit der Ergebnisse lassen sich nicht mehr ändern.';
+        $lockedMessage = I18n::t('Es gibt schon Antworten: Art, Antwortmöglichkeiten, Anonymität und Sichtbarkeit der Ergebnisse lassen sich nicht mehr ändern.');
         if (array_key_exists('anonymous', $in)) {
             $values['anonymous'] = self::validBool($in['anonymous'], 'anonymous') ? 1 : 0;
         }
@@ -242,6 +377,13 @@ final class PollService
             default => $poll[$k],
         }, ARRAY_FILTER_USE_BOTH);
         $optionsChanged = $options !== null && $options !== $current;
+        $translations = $this->translationInput($in['translations'] ?? null, $options ?? $current);
+        if ($optionsChanged && $options !== null) {
+            $translations = $this->keepOptionTranslations($id, $current, $options, $translations);
+        }
+        if ($translations !== []) {
+            $this->saveTranslations($id, $translations, $user->id);
+        }
         if ($changed !== [] || $optionsChanged) {
             $now = $this->app->time()->nowUtc();
             $changed['updated_at'] = $now;
@@ -264,7 +406,7 @@ final class PollService
     {
         $poll = $this->find($id);
         if ($this->ended($poll)) {
-            throw ApiError::invalid('Die Umfrage ist schon beendet.');
+            throw ApiError::invalid(I18n::t('Die Umfrage ist schon beendet.'));
         }
         $now = $this->app->time()->nowUtc();
         $this->repository()->update($id, ['closed_at' => $now, 'updated_at' => $now]);
@@ -275,7 +417,10 @@ final class PollService
     public function delete(int $id): void
     {
         $this->find($id);
-        $this->app->db->transaction(fn () => $this->repository()->delete($id));
+        $this->app->db->transaction(function () use ($id): void {
+            $this->repository()->delete($id);
+            $this->app->contentTranslations()->delete(self::KIND, $id);
+        });
     }
 
     /* ---------------------------------------------------------------- */
@@ -296,28 +441,28 @@ final class PollService
             $text = $in['text'] ?? null;
             $text = is_string($text) ? Text::multiline($text) : '';
             if ($text === '') {
-                throw ApiError::invalid('Bitte eine Antwort eingeben.');
+                throw ApiError::invalid(I18n::t('Bitte eine Antwort eingeben.'));
             }
             if (mb_strlen($text) > self::TEXT_MAX) {
-                throw ApiError::invalid('Die Antwort ist zu lang (höchstens ' . self::TEXT_MAX . ' Zeichen).');
+                throw ApiError::invalid(I18n::t('Die Antwort ist zu lang (höchstens {max} Zeichen).', ['max' => self::TEXT_MAX]));
             }
             $answers[] = ['option_id' => 0, 'answer_text' => $text];
         } else {
             $raw = $in['option_ids'] ?? null;
             if (!is_array($raw) || $raw === []) {
-                throw ApiError::invalid($poll['type'] === 'single' ? 'Bitte eine Antwort auswählen.' : 'Bitte mindestens eine Antwort auswählen.');
+                throw ApiError::invalid($poll['type'] === 'single' ? I18n::t('Bitte eine Antwort auswählen.') : I18n::t('Bitte mindestens eine Antwort auswählen.'));
             }
             $valid = array_column($this->repository()->options([$id])[$id], 'id');
             $chosen = [];
             foreach ($raw as $value) {
                 $optionId = Input::integer($value);
                 if ($optionId === null || !in_array($optionId, $valid, true)) {
-                    throw ApiError::invalid('Diese Antwortmöglichkeit gehört nicht zu der Umfrage.');
+                    throw ApiError::invalid(I18n::t('Diese Antwortmöglichkeit gehört nicht zu der Umfrage.'));
                 }
                 $chosen[$optionId] = true;
             }
             if ($poll['type'] === 'single' && count($chosen) !== 1) {
-                throw ApiError::invalid('Bitte genau eine Antwort auswählen.');
+                throw ApiError::invalid(I18n::t('Bitte genau eine Antwort auswählen.'));
             }
             foreach (array_keys($chosen) as $optionId) {
                 $answers[] = ['option_id' => $optionId, 'answer_text' => ''];
@@ -395,10 +540,39 @@ final class PollService
             }
         }
         $names = (new UserNames($this->app->users))->prime($people);
-        $manager = self::canManage($user);
+        $manager = self::seesAllResults($user);
+        $content = $this->app->contentTranslations();
+        $current = $content->current();
+        $tr = $this->translationsOf($ids);
+        $editor = self::canManage($user) && $content->locales() !== [];
         $out = [];
         foreach ($polls as $p) {
             $id = $p['id'];
+            $german = ['title' => $p['title'], 'description' => $p['description'], 'options' => array_column($options[$id], 'title')];
+            $untranslated = null;
+            if ($current !== null) {
+                $own = $tr[$id][$current] ?? [];
+                $total = 1 + ($p['description'] !== '' ? 1 : 0) + ($options[$id] !== [] ? 1 : 0);
+                $done = 0;
+                if (($own['title'] ?? '') !== '') {
+                    $p['title'] = $own['title'];
+                    $done++;
+                }
+                if ($p['description'] !== '' && ($own['description'] ?? '') !== '') {
+                    $p['description'] = $own['description'];
+                    $done++;
+                }
+                $texts = $options[$id] !== [] ? self::translatedOptions($own['options'] ?? null, count($options[$id])) : null;
+                if ($texts !== null) {
+                    foreach ($options[$id] as $i => $o) {
+                        $options[$id][$i]['title'] = $texts[$i] !== '' ? $texts[$i] : $o['title'];
+                    }
+                    if (!in_array('', $texts, true)) {
+                        $done++;
+                    }
+                }
+                $untranslated = ContentTranslations::untranslated($total, $done);
+            }
             $ended = $this->ended($p);
             $hasVoted = isset($voted[$id]);
             $visible = $manager || match ($p['results']) {
@@ -424,13 +598,29 @@ final class PollService
                 // Art, Möglichkeiten, Anonymität und Sichtbarkeit sind fest, sobald es Antworten gibt.
                 'locked' => $counts[$id] > 0,
                 'has_voted' => $hasVoted,
-                'my_answer' => $hasVoted ? [
+                // Anonyme Antworten sieht nur die Person selbst, nie ein Admin in der Vorschau als diese Person.
+                'my_answer' => $hasVoted && !($p['anonymous'] && $user->previewPerson) ? [
                     'option_ids' => array_values(array_filter(array_column($own, 'option_id'))),
                     'text' => $p['type'] === 'text' ? ($own[0]['answer_text'] ?? '') : null,
                 ] : null,
                 'results_visible' => $visible,
                 'results_data' => $visible ? $this->results($p, $options[$id], $answers[$id], $counts[$id], $names) : null,
-            ];
+            ] + ($untranslated !== null ? ['untranslated' => $untranslated] : []);
+            if ($editor) {
+                // Zum Bearbeiten: die deutsche Fassung (läuft die App in einer anderen Sprache) und alle Fassungen
+                if ($current !== null) {
+                    $out[count($out) - 1]['source'] = $german;
+                }
+                $versions = [];
+                foreach ($tr[$id] ?? [] as $locale => $fields) {
+                    $versions[$locale] = [
+                        'title' => $fields['title'] ?? '',
+                        'description' => $fields['description'] ?? '',
+                        'options' => self::translatedOptions($fields['options'] ?? null, count($german['options'])) ?? [],
+                    ];
+                }
+                $out[count($out) - 1]['translations'] = (object) $versions;
+            }
         }
         return $out;
     }
@@ -486,7 +676,7 @@ final class PollService
     /** @return Poll */
     private function find(int $id): array
     {
-        return $this->repository()->find($id) ?? throw ApiError::notFound('Diese Umfrage gibt es nicht (mehr).');
+        return $this->repository()->find($id) ?? throw ApiError::notFound(I18n::t('Diese Umfrage gibt es nicht (mehr).'));
     }
 
     /** @return Poll */
@@ -494,7 +684,7 @@ final class PollService
     {
         $poll = $this->find($id);
         if ($this->ended($poll)) {
-            throw ApiError::invalid('Die Umfrage ist beendet. Antworten lassen sich nicht mehr abgeben, ändern oder zurückziehen.');
+            throw ApiError::invalid(I18n::t('Die Umfrage ist beendet. Antworten lassen sich nicht mehr abgeben, ändern oder zurückziehen.'));
         }
         return $poll;
     }
@@ -514,7 +704,7 @@ final class PollService
     private static function validType(mixed $type): string
     {
         if (!is_string($type) || !in_array($type, self::TYPES, true)) {
-            throw ApiError::invalid('Bitte die Art der Umfrage wählen (Einfachauswahl, Mehrfachauswahl oder Freitext).');
+            throw ApiError::invalid(I18n::t('Bitte die Art der Umfrage wählen (Einfachauswahl, Mehrfachauswahl oder Freitext).'));
         }
         return $type;
     }
@@ -522,7 +712,7 @@ final class PollService
     private static function validResults(mixed $results): string
     {
         if (!is_string($results) || !in_array($results, self::RESULTS, true)) {
-            throw ApiError::invalid('Bitte wählen, wer die Ergebnisse sieht.');
+            throw ApiError::invalid(I18n::t('Bitte wählen, wer die Ergebnisse sieht.'));
         }
         return $results;
     }
@@ -530,7 +720,7 @@ final class PollService
     private static function validBool(mixed $value, string $field): bool
     {
         if (!is_bool($value)) {
-            throw ApiError::invalid('Ungültiger Wert für ' . $field . ' (ja oder nein erwartet).');
+            throw ApiError::invalid(I18n::t('Ungültiger Wert für {field} (ja oder nein erwartet).', ['field' => $field]));
         }
         return $value;
     }
@@ -539,10 +729,10 @@ final class PollService
     {
         $t = is_string($title) ? Text::line($title) : '';
         if ($t === '') {
-            throw ApiError::invalid('Bitte eine Frage eingeben.');
+            throw ApiError::invalid(I18n::t('Bitte eine Frage eingeben.'));
         }
         if (mb_strlen($t) > self::TITLE_MAX) {
-            throw ApiError::invalid('Die Frage ist zu lang (höchstens ' . self::TITLE_MAX . ' Zeichen).');
+            throw ApiError::invalid(I18n::t('Die Frage ist zu lang (höchstens {max} Zeichen).', ['max' => self::TITLE_MAX]));
         }
         return $t;
     }
@@ -553,11 +743,11 @@ final class PollService
             return '';
         }
         if (!is_string($description)) {
-            throw ApiError::invalid('Ungültige Beschreibung.');
+            throw ApiError::invalid(I18n::t('Ungültige Beschreibung.'));
         }
         $d = Text::multiline($description);
         if (mb_strlen($d) > self::DESCRIPTION_MAX) {
-            throw ApiError::invalid('Die Beschreibung ist zu lang (höchstens ' . self::DESCRIPTION_MAX . ' Zeichen).');
+            throw ApiError::invalid(I18n::t('Die Beschreibung ist zu lang (höchstens {max} Zeichen).', ['max' => self::DESCRIPTION_MAX]));
         }
         return $d;
     }
@@ -566,7 +756,7 @@ final class PollService
     private static function validOptions(mixed $options): array
     {
         if (!is_array($options)) {
-            throw ApiError::invalid('Bitte mindestens ' . self::OPTIONS_MIN . ' Antwortmöglichkeiten eingeben.');
+            throw ApiError::invalid(I18n::t('Bitte mindestens {min} Antwortmöglichkeiten eingeben.', ['min' => self::OPTIONS_MIN]));
         }
         $out = [];
         $seen = [];
@@ -576,20 +766,20 @@ final class PollService
                 continue; // leere Zeilen im Formular überspringen
             }
             if (mb_strlen($t) > self::OPTION_MAX) {
-                throw ApiError::invalid('Eine Antwortmöglichkeit ist zu lang (höchstens ' . self::OPTION_MAX . ' Zeichen).');
+                throw ApiError::invalid(I18n::t('Eine Antwortmöglichkeit ist zu lang (höchstens {max} Zeichen).', ['max' => self::OPTION_MAX]));
             }
             $key = mb_strtolower($t);
             if (isset($seen[$key])) {
-                throw ApiError::invalid('Die Antwortmöglichkeit „' . $t . '“ steht doppelt da.');
+                throw ApiError::invalid(I18n::t('Die Antwortmöglichkeit „{option}“ steht doppelt da.', ['option' => $t]));
             }
             $seen[$key] = true;
             $out[] = $t;
         }
         if (count($out) < self::OPTIONS_MIN) {
-            throw ApiError::invalid('Bitte mindestens ' . self::OPTIONS_MIN . ' Antwortmöglichkeiten eingeben.');
+            throw ApiError::invalid(I18n::t('Bitte mindestens {min} Antwortmöglichkeiten eingeben.', ['min' => self::OPTIONS_MIN]));
         }
         if (count($out) > self::OPTIONS_MAX) {
-            throw ApiError::invalid('Höchstens ' . self::OPTIONS_MAX . ' Antwortmöglichkeiten.');
+            throw ApiError::invalid(I18n::t('Höchstens {max} Antwortmöglichkeiten.', ['max' => self::OPTIONS_MAX]));
         }
         return $out;
     }
@@ -604,14 +794,14 @@ final class PollService
             return null;
         }
         if (!is_string($value)) {
-            throw ApiError::invalid('Ungültiges Ende.');
+            throw ApiError::invalid(I18n::t('Ungültiges Ende.'));
         }
         $utc = $this->app->time()->parseToUtc($value);
         if ($utc === null) {
-            throw ApiError::invalid('Ungültiges Ende (Datum und Uhrzeit erwartet).');
+            throw ApiError::invalid(I18n::t('Ungültiges Ende (Datum und Uhrzeit erwartet).'));
         }
         if ($utc <= $this->app->time()->nowUtc()) {
-            throw ApiError::invalid('Das Ende muss in der Zukunft liegen.');
+            throw ApiError::invalid(I18n::t('Das Ende muss in der Zukunft liegen.'));
         }
         return $utc;
     }

@@ -8,17 +8,18 @@ import { sources } from '../viewData';
 import { CompanyLogo } from './Kompanien';
 import { confirmAsk } from '../ask';
 import { IconButton } from '../icons';
+import { t, tn } from '../i18n';
 
 const RichTextEditor = lazyView(() => import('../richtext/RichTextEditor'));
 
 const sec = brand.labels.sections;
 
-/** Grenzen wie auf dem Server (CompanyService, LogoImage, OfficeService::YEAR_MIN). */
+/** Grenzen wie auf dem Server (CompanyService, LogoImage). Das Gründungsjahr hat keine Untergrenze außer > 0. */
 const LOGO_ACCEPT = '.png,.jpg,.jpeg,.webp,.svg';
 const LOGO_MAX_BYTES = 2 * 1024 * 1024;
 const NAME_MAX = 100;
 const SHORT_MAX = 30;
-const YEAR_MIN = 1800;
+const YEAR_MIN = 1;
 
 type Draft = {
   name: string;
@@ -82,7 +83,7 @@ function CompanyFields({
   return (
     <>
       <label className="field">
-        <span>Name</span>
+        <span>{t('Name')}</span>
         <input
           type="text"
           maxLength={NAME_MAX}
@@ -93,11 +94,11 @@ function CompanyFields({
         />
       </label>
       <label className="field">
-        <span>Kurzname (optional, steht ohne Logo an seiner Stelle)</span>
+        <span>{t('Kurzname (optional, steht ohne Logo an seiner Stelle)')}</span>
         <input type="text" maxLength={SHORT_MAX} value={draft.short_name} onChange={(e) => set({ short_name: e.target.value })} />
       </label>
       <label className="field">
-        <span>Gründungsjahr (optional)</span>
+        <span>{t('Gründungsjahr (optional)')}</span>
         <input
           type="number"
           inputMode="numeric"
@@ -112,16 +113,16 @@ function CompanyFields({
           <RichTextEditor
             value={draft.description}
             onChange={(html) => set({ description: html })}
-            label="Beschreibung (optional)"
+            label={t('Beschreibung (optional)')}
             id={`${idPrefix}-description`}
           />
         </Suspense>
       </div>
-      <LinkField label="Webseite (optional)" value={draft.website_url} onChange={(v) => set({ website_url: v })} />
-      <LinkField label="App der Kompanie (optional)" value={draft.app_url} onChange={(v) => set({ app_url: v })} />
+      <LinkField label={t('Webseite (optional)')} value={draft.website_url} onChange={(v) => set({ website_url: v })} />
+      <LinkField label={t('App der Kompanie (optional)')} value={draft.app_url} onChange={(v) => set({ app_url: v })} />
       <label className="toggle">
         <input type="checkbox" checked={!draft.active} onChange={(e) => set({ active: !e.target.checked })} />
-        <span>Aufgelöst (steht als „ehemalig“ unten in der Liste)</span>
+        <span>{t('Aufgelöst (steht als „ehemalig“ unten in der Liste)')}</span>
       </label>
     </>
   );
@@ -156,12 +157,12 @@ function CompanyMembers({ company, onSaved, onCancel }: { company: Company; onSa
 
   return (
     <form className="form company-member-form" onSubmit={save}>
-      <h3>Mitglieder von {company.name}</h3>
+      <h3>{t('Mitglieder von {name}', { name: company.name })}</h3>
       <label className="field">
-        <span>Suchen</span>
+        <span>{t('Suchen')}</span>
         <input type="search" value={filter} onChange={(e) => setFilter(e.target.value)} />
       </label>
-      <p className="muted small">{selected.length} ausgewählt</p>
+      <p className="muted small">{t('{count} ausgewählt', { count: selected.length })}</p>
       <div className="company-member-options">
         {options.map((m) => (
           <label key={m.id} className="toggle">
@@ -173,7 +174,7 @@ function CompanyMembers({ company, onSaved, onCancel }: { company: Company; onSa
             <span>{m.name}</span>
           </label>
         ))}
-        {options.length === 0 && <p className="muted small">Keine Treffer.</p>}
+        {options.length === 0 && <p className="muted small">{t('Keine Treffer.')}</p>}
       </div>
       {formError && (
         <p className="form-error" role="alert">
@@ -182,10 +183,10 @@ function CompanyMembers({ company, onSaved, onCancel }: { company: Company; onSa
       )}
       <div className="button-row">
         <button className="btn" type="submit" disabled={busy}>
-          Speichern
+          {t('Speichern')}
         </button>
         <button className="btn btn-secondary" type="button" onClick={onCancel}>
-          Abbrechen
+          {t('Abbrechen')}
         </button>
       </div>
     </form>
@@ -226,7 +227,7 @@ export function CompanyAdmin({ onToast }: { onToast: (msg: string) => void }) {
 
   async function add(e: FormEvent) {
     e.preventDefault();
-    if (await run(() => api.createCompany(inputOf(draft)), 'Kompanie angelegt')) {
+    if (await run(() => api.createCompany(inputOf(draft)), t('Kompanie angelegt'))) {
       setDraft(EMPTY);
       setNewKey((k) => k + 1);
     }
@@ -244,14 +245,14 @@ export function CompanyAdmin({ onToast }: { onToast: (msg: string) => void }) {
     if (!file || id === null) return;
     const ext = file.name.toLowerCase().split('.').pop() ?? '';
     if (!['png', 'jpg', 'jpeg', 'webp', 'svg'].includes(ext)) {
-      setFormError('Erlaubt sind PNG, JPG, WebP und SVG.');
+      setFormError(t('Erlaubt sind PNG, JPG, WebP und SVG.'));
       return;
     }
     if (file.size > LOGO_MAX_BYTES) {
-      setFormError('Das Logo darf höchstens 2 MB groß sein.');
+      setFormError(t('Das Logo darf höchstens 2 MB groß sein.'));
       return;
     }
-    await run(() => api.uploadCompanyLogo(id, file), 'Logo gespeichert');
+    await run(() => api.uploadCompanyLogo(id, file), t('Logo gespeichert'));
   }
 
   const saveOrder = useSaveQueue();
@@ -271,7 +272,10 @@ export function CompanyAdmin({ onToast }: { onToast: (msg: string) => void }) {
   const sort = useDragSort(data ?? [], reorder, editing !== null || assigning !== null);
 
   if (loading && !data) return <Loading />;
-  if (error || !data) return <ErrorBox message={error ?? `Die ${sec.companies} konnten nicht geladen werden.`} onRetry={reload} />;
+  if (error || !data)
+    return (
+      <ErrorBox message={error ?? t('Die {companies} konnten nicht geladen werden.', { companies: sec.companies })} onRetry={reload} />
+    );
   const list = data;
 
   return (
@@ -282,7 +286,7 @@ export function CompanyAdmin({ onToast }: { onToast: (msg: string) => void }) {
         </p>
       )}
       {list.length === 0 ? (
-        <Empty>Noch keine {sec.companies}.</Empty>
+        <Empty>{t('Noch keine {companies}.', { companies: sec.companies })}</Empty>
       ) : (
         <ul className="card-list company-admin-list">
           {list.map((c, i) =>
@@ -292,16 +296,16 @@ export function CompanyAdmin({ onToast }: { onToast: (msg: string) => void }) {
                   className="form"
                   onSubmit={async (e) => {
                     e.preventDefault();
-                    if (await run(() => api.updateCompany(c.id, inputOf(editDraft)), 'Gespeichert')) setEditing(null);
+                    if (await run(() => api.updateCompany(c.id, inputOf(editDraft)), t('Gespeichert'))) setEditing(null);
                   }}
                 >
                   <CompanyFields draft={editDraft} onChange={setEditDraft} autoFocus idPrefix={`company-${c.id}`} />
                   <div className="button-row">
                     <button className="btn" type="submit" disabled={busy}>
-                      Speichern
+                      {t('Speichern')}
                     </button>
                     <button className="btn btn-secondary" type="button" onClick={() => setEditing(null)}>
-                      Abbrechen
+                      {t('Abbrechen')}
                     </button>
                   </div>
                 </form>
@@ -313,7 +317,7 @@ export function CompanyAdmin({ onToast }: { onToast: (msg: string) => void }) {
                   onCancel={() => setAssigning(null)}
                   onSaved={() => {
                     setAssigning(null);
-                    onToast('Mitglieder gespeichert');
+                    onToast(t('Mitglieder gespeichert'));
                     reload();
                   }}
                 />
@@ -327,17 +331,21 @@ export function CompanyAdmin({ onToast }: { onToast: (msg: string) => void }) {
                 <div className="row-main">
                   <div className="row-title">
                     {c.name}
-                    {!c.active && <span className="badge badge-level-guest">ehemalig</span>}
+                    {!c.active && <span className="badge badge-level-guest">{t('ehemalig')}</span>}
                   </div>
                   <div className="row-sub">
-                    {[c.short_name, c.founded_year ? `gegründet ${c.founded_year}` : '', `${(c.member_ids ?? []).length} Mitglieder`]
+                    {[
+                      c.short_name,
+                      c.founded_year ? t('gegründet {year}', { year: c.founded_year }) : '',
+                      tn('{count} Mitglied', '{count} Mitglieder', (c.member_ids ?? []).length),
+                    ]
                       .filter(Boolean)
                       .join(' · ')}
                   </div>
                   <div className="row-actions">
                     <IconButton
                       icon="edit"
-                      label="Bearbeiten"
+                      label={t('Bearbeiten')}
                       disabled={busy}
                       onClick={() => {
                         setEditDraft(draftOf(c));
@@ -345,31 +353,35 @@ export function CompanyAdmin({ onToast }: { onToast: (msg: string) => void }) {
                       }}
                     />
                     <button className="btn btn-small btn-secondary" disabled={busy} onClick={() => setAssigning(c.id)}>
-                      Mitglieder
+                      {t('Mitglieder')}
                     </button>
                     <button className="btn btn-small btn-secondary" disabled={busy} onClick={() => chooseLogo(c.id)}>
-                      {c.logo_url ? 'Logo ersetzen' : 'Logo hochladen'}
+                      {c.logo_url ? t('Logo ersetzen') : t('Logo hochladen')}
                     </button>
                     {c.logo_url && (
                       <button
                         className="btn btn-small btn-secondary"
                         disabled={busy}
                         onClick={async () =>
-                          (await confirmAsk(`Logo von „${c.name}“ entfernen?`)) && run(() => api.removeCompanyLogo(c.id), 'Logo entfernt')
+                          (await confirmAsk(t('Logo von „{name}“ entfernen?', { name: c.name }))) &&
+                          run(() => api.removeCompanyLogo(c.id), t('Logo entfernt'))
                         }
                       >
-                        Logo entfernen
+                        {t('Logo entfernen')}
                       </button>
                     )}
                     <IconButton
                       icon="delete"
-                      label="Löschen"
+                      label={t('Löschen')}
                       variant="danger"
                       disabled={busy}
                       onClick={async () =>
                         (await confirmAsk(
-                          `„${c.name}“ löschen? Die Zuordnungen der Mitglieder gehen verloren. Aufgelöste besser als „aufgelöst“ markieren.`,
-                        )) && run(() => api.deleteCompany(c.id), 'Gelöscht')
+                          t(
+                            '„{name}“ löschen? Die Zuordnungen der Mitglieder gehen verloren. Aufgelöste besser als „aufgelöst“ markieren.',
+                            { name: c.name },
+                          ),
+                        )) && run(() => api.deleteCompany(c.id), t('Gelöscht'))
                       }
                     />
                   </div>
@@ -385,15 +397,15 @@ export function CompanyAdmin({ onToast }: { onToast: (msg: string) => void }) {
         type="file"
         accept={LOGO_ACCEPT}
         hidden
-        aria-label="Logo-Datei"
+        aria-label={t('Logo-Datei')}
         onChange={(e) => uploadLogo(e.target.files?.[0] ?? null)}
       />
 
       <form className="form card" onSubmit={add}>
-        <h3>Neue Kompanie</h3>
+        <h3>{t('Neue Kompanie')}</h3>
         <CompanyFields key={newKey} draft={draft} onChange={setDraft} idPrefix="company-new" />
         <button className="btn btn-block" type="submit" disabled={busy}>
-          Anlegen
+          {t('Anlegen')}
         </button>
       </form>
     </div>
@@ -407,12 +419,15 @@ export function MemberCompanies({
   companies,
   onChanged,
   onToast,
+  readOnly = false,
 }: {
   id: number;
   member: boolean;
   companies: CompanyRef[];
   onChanged: () => void;
   onToast: (msg: string) => void;
+  /** Nur sehen (view_company_members ohne manage_companies): die zugeordneten Kompanien ohne Auswahl. */
+  readOnly?: boolean;
 }) {
   const all = useAsync(sources.companies.load, sources.companies.deps, sources.companies.key);
   const current = companies.map((c) => c.id);
@@ -428,13 +443,33 @@ export function MemberCompanies({
     setFormError(null);
     try {
       await api.setMemberCompanies(id, selected);
-      onToast(`${sec.companies} gespeichert`);
+      onToast(t('{companies} gespeichert', { companies: sec.companies }));
       onChanged();
     } catch (err) {
       setFormError((err as Error).message);
     } finally {
       setBusy(false);
     }
+  }
+
+  if (readOnly) {
+    return (
+      <section className="member-companies">
+        {companies.length === 0 ? (
+          <Empty>{t('Keine {companies}.', { companies: sec.companies })}</Empty>
+        ) : (
+          <ul className="card-list">
+            {companies.map((c) => (
+              <li key={c.id} className="card row">
+                <div className="row-main">
+                  <div className="row-title">{c.name}</div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    );
   }
 
   return (
@@ -445,7 +480,9 @@ export function MemberCompanies({
         <Loading shape="text" />
       ) : options.length === 0 ? (
         <p className="muted small">
-          {member ? `Noch keine ${sec.companies} angelegt (Verwaltung → ${sec.companies}).` : `Nur Mitglieder bekommen ${sec.companies}.`}
+          {member
+            ? t('Noch keine {companies} angelegt (Verwaltung → {companies}).', { companies: sec.companies })
+            : t('Nur Mitglieder bekommen {companies}.', { companies: sec.companies })}
         </p>
       ) : (
         <form className="form" onSubmit={save}>
@@ -458,7 +495,7 @@ export function MemberCompanies({
               />
               <span>
                 {c.name}
-                {!c.active && <span className="muted small"> (ehemalig)</span>}
+                {!c.active && <span className="muted small"> {t('(ehemalig)')}</span>}
               </span>
             </label>
           ))}
@@ -468,7 +505,7 @@ export function MemberCompanies({
             </p>
           )}
           <button className="btn btn-block" type="submit" disabled={busy || !changed}>
-            {sec.companies} speichern
+            {t('{companies} speichern', { companies: sec.companies })}
           </button>
         </form>
       )}

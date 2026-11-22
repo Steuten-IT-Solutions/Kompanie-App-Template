@@ -202,4 +202,86 @@ final class PreviewTest extends TestCase
         $this->assertSame(403, $badge('guest')['status']);
         $this->assertSame(401, $badge(Preview::PUBLIC)['status']);
     }
+    public function testPersonCombinesBaseAndExtraRolesWithHerOwnData(): void
+    {
+        $this->app->roles()->setExtraRoles($this->m, ['points']);
+        $preview = $this->app->preview();
+        $preview->begin(Preview::forPerson($this->m));
+        $this->assertSame('@person:' . $this->m, $preview->role());
+        $user = $this->app->authContext->currentUser();
+        $this->assertNotNull($user);
+        // Die Person selbst (ihre eigenen Daten unter „Meins“), mit ihrer Grundrolle und ihren Rechten; angemeldet bleibt der Admin.
+        $this->assertSame([$this->m, 'mitglied', Roles::MEMBER, true, true], [$user->id, $user->login, $user->role, $user->preview, $user->previewPerson]);
+        $this->assertSame($this->admin, $preview->realUser()?->id);
+        $this->assertSame(['points'], $this->app->roles()->extraRolesOf($user), 'ihre Zusatzrollen');
+        $this->assertFalse($user->isAdmin());
+        $this->assertContains(Capability::Member, $user->capabilities);
+        $this->assertContains(Capability::ManagePoints, $user->capabilities, 'Recht aus der Zusatzrolle wirkt mit');
+        $this->assertNotContains(Capability::ManageSettings, $user->capabilities);
+        $this->assertEqualsCanonicalizing($this->app->roles()->capabilitiesFor($this->m, Roles::MEMBER), $user->capabilities);
+
+        $preview->begin('member');
+        $this->assertNotContains(Capability::ManagePoints, $this->app->authContext->currentUser()?->capabilities ?? [], 'als Rolle ohne Zusatzrollen');
+        $preview->begin(null);
+
+        $d = $this->call('GET', '/config', [], Preview::forPerson($this->m))->data;
+        $this->assertSame(['role' => '@person:' . $this->m, 'label' => 'Mitglied', 'person' => $this->m, 'roles' => [$this->app->roles()->label(Roles::MEMBER), $this->app->roles()->label('points')]], $d['preview']);
+        $this->assertSame($this->m, $d['user']['id'], 'die Person selbst');
+        $this->assertSame(['points'], $d['user']['extra_roles']);
+        $this->assertContains('manage_points', $d['user']['capabilities']);
+        $this->assertSame('preview_readonly', $this->call('POST', '/board', ['title' => 'Titel', 'text' => 'Hallo'], Preview::forPerson($this->m))->data['code'] ?? null, 'nur lesend');
+    }
+
+    public function testPersonRightsOverridesAndInvalidTargets(): void
+    {
+        // Ausnahmen der Person (einzeln entzogene Rechte) gelten in ihrer Ansicht.
+        $this->app->roles()->setOverrides($this->users->find($this->admin) ?? throw new \LogicException(), $this->m, [], ['view_birthdays']);
+        $preview = $this->app->preview();
+        $preview->begin(Preview::forPerson($this->m));
+        $this->assertNotContains(Capability::ViewBirthdays, $this->app->authContext->currentUser()?->capabilities ?? []);
+        $this->assertContains(Capability::Member, $this->app->authContext->currentUser()?->capabilities ?? []);
+
+        $other = $this->users->add('chef', Roles::ADMIN);
+        foreach (['@person:' . $other, '@person:' . $this->admin, '@person:999', '@person:abc', '@person:0', '@person:-1', '@person:'] as $value) {
+            $preview->begin($value);
+            $this->assertNull($preview->role(), $value);
+            $this->assertTrue($preview->requested(), $value . ': trotzdem nur lesend');
+            $this->assertTrue($this->app->authContext->currentUser()?->isAdmin(), $value . ': ohne Vorschau');
+        }
+        // Nicht-Admins: nie die Rechte einer anderen Person.
+        $this->users->current = $this->m;
+        $preview->begin(Preview::forPerson($other));
+        $this->assertNull($preview->role());
+        $this->assertSame($this->m, $this->app->authContext->currentUser()?->id);
+        $this->assertFalse($this->app->authContext->currentUser()?->isAdmin());
+        $preview->begin(null);
+    }
+
+    public function testPersonPreviewLoadsHerOwnDataReadOnly(): void
+    {
+        $this->app->scores()->givePoints(['user_ids' => [$this->m], 'points' => 7, 'reason' => 'Dienst', 'apply_factor' => false], $this->admin);
+        $me = $this->call('GET', '/me', [], Preview::forPerson($this->m));
+        $this->assertSame(200, $me->status);
+        $this->assertSame([$this->m, 7], [$me->data['id'], $me->data['points']], 'Meins zeigt ihre Punkte');
+        $this->assertSame($this->admin, $this->call('GET', '/me')->data['id'], 'ohne Vorschau wieder der Admin');
+        $this->assertSame('preview_readonly', $this->call('PATCH', '/me/account', ['phone' => '0123'], Preview::forPerson($this->m))->data['code'] ?? null);
+        $this->assertSame('preview_readonly', $this->call('POST', '/me/password', ['current_password' => 'x', 'new_password' => 'yyyyyyyyyy'], Preview::forPerson($this->m))->data['code'] ?? null);
+    }
+
+    public function testPersonPreviewNeverShowsHerAnonymousAnswers(): void
+    {
+        $this->app->features()->update(['polls' => true]);
+        $admin = $this->users->find($this->admin) ?? throw new \LogicException();
+        $member = $this->users->find($this->m) ?? throw new \LogicException();
+        $ids = [];
+        foreach ([true, false] as $anonymous) {
+            $poll = $this->app->polls()->create($admin, ['title' => $anonymous ? 'Anonym' : 'Namentlich', 'type' => 'single', 'options' => ['Ja', 'Nein'], 'anonymous' => $anonymous, 'results' => 'after_vote']);
+            $this->app->polls()->vote($member, $poll['id'], ['option_ids' => [$poll['options'][0]['id']]]);
+            $ids[$anonymous ? 'anon' : 'named'] = $poll['id'];
+        }
+        $polls = array_column($this->call('GET', '/polls', [], Preview::forPerson($this->m))->data, null, 'id');
+        $this->assertTrue($polls[$ids['anon']]['has_voted']);
+        $this->assertNull($polls[$ids['anon']]['my_answer'], 'anonyme Antwort bleibt geheim');
+        $this->assertNotNull($polls[$ids['named']]['my_answer'], 'namentliche Antwort sichtbar');
+    }
 }

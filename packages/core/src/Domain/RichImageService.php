@@ -8,6 +8,7 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Storage\RichImageRepository;
 
 /**
@@ -105,7 +106,7 @@ final class RichImageService
         $name = is_array($file) && is_string($file['name'] ?? null) ? $file['name'] : '';
         $data = is_array($file) && is_string($file['data'] ?? null) ? $file['data'] : '';
         if ($data === '') {
-            throw ApiError::invalid($this->postTooLarge() ?? 'Es ist kein Bild angekommen.');
+            throw ApiError::invalid($this->postTooLarge() ?? I18n::t('Es ist kein Bild angekommen.'));
         }
         if (str_starts_with($data, 'data:') && ($comma = strpos($data, ',')) !== false) {
             $data = substr($data, $comma + 1);
@@ -113,17 +114,17 @@ final class RichImageService
         $bytes = base64_decode($data, true);
         unset($data);
         if ($bytes === false || $bytes === '') {
-            throw ApiError::invalid('Es ist kein Bild angekommen.');
+            throw ApiError::invalid(I18n::t('Es ist kein Bild angekommen.'));
         }
         $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
         if (!isset(self::TYPES[$ext])) {
-            throw ApiError::invalid('Erlaubt sind Bilder als JPG, PNG oder WebP.');
+            throw ApiError::invalid(I18n::t('Erlaubt sind Bilder als JPG, PNG oder WebP.'));
         }
         $signature = self::TYPES[$ext];
         $ok = strncmp($bytes, $signature, strlen($signature)) === 0 && ($ext !== 'webp' || substr($bytes, 8, 4) === 'WEBP');
         $info = $ok ? @getimagesizefromstring($bytes) : false;
         if ($info === false || $info[0] < 1 || $info[1] < 1) {
-            throw ApiError::invalid(sprintf('Die Datei ist keine gültige .%s-Datei.', $ext));
+            throw ApiError::invalid(I18n::t('Die Datei ist keine gültige .{extension}-Datei.', ['extension' => $ext]));
         }
         $png = $ext === 'png';
         $edge = max((int) $info[0], (int) $info[1]);
@@ -217,7 +218,7 @@ final class RichImageService
 
     /**
      * Darf $viewer das Bild sehen? Entwürfe und Signaturen nur ihr Konto, Bilder am Brett wie die Nachricht (öffentliche
-     * auch ohne Anmeldung, BoardService::canSeeImage), Bilder in E-Mails alle mit send_mail (MailingService::canSeeImage), Bilder einer
+     * auch ohne Anmeldung, BoardService::canSeeImage), Bilder in E-Mails alle mit view_mail (MailingService::canSeeImage), Bilder einer
      * Kompanie wie die Liste, Gruppenbilder und Fotos freier Namen der Ämter wie die Ämter (alle auch ohne Anmeldung, s. isPublic).
      *
      * @param array{owner_type: string, owner_id: int, user_id: int, uid?: string} $img
@@ -325,10 +326,9 @@ final class RichImageService
         if ($post === null || $length <= $post) {
             return null;
         }
-        return sprintf(
-            'Das Bild ist zu groß für den Server: Er nimmt höchstens %s je Anfrage an (PHP-Einstellung post_max_size), das Bild braucht %s. Bitte ein kleineres Bild wählen oder den Hoster bitten, den Wert zu erhöhen.',
-            ServerLimits::format($post),
-            ServerLimits::format($length),
+        return I18n::t(
+            'Das Bild ist zu groß für den Server: Er nimmt höchstens {max} je Anfrage an (PHP-Einstellung post_max_size), das Bild braucht {size}. Bitte ein kleineres Bild wählen oder den Hoster bitten, den Wert zu erhöhen.',
+            ['max' => ServerLimits::format($post), 'size' => ServerLimits::format($length)],
         );
     }
 
@@ -344,13 +344,15 @@ final class RichImageService
         }
         $needed = (int) ($width * $height * 4 * ($jpeg ? 1 : 2) * 1.25) + 3 * $fileBytes + 2 * 1024 * 1024;
         if ($needed > $available) {
-            throw ApiError::invalid(sprintf(
-                'Das Bild hat %d × %d Pixel. Zum Verarbeiten braucht der Server rund %s Arbeitsspeicher, frei sind %s (PHP-Einstellung memory_limit: %s). Bitte das Bild verkleinern oder den Hoster bitten, den Wert zu erhöhen.',
-                $width,
-                $height,
-                ServerLimits::format($needed),
-                ServerLimits::format($available),
-                ServerLimits::format((int) ServerLimits::memoryLimit()),
+            throw ApiError::invalid(I18n::t(
+                'Das Bild hat {width} × {height} Pixel. Zum Verarbeiten braucht der Server rund {needed} Arbeitsspeicher, frei sind {available} (PHP-Einstellung memory_limit: {limit}). Bitte das Bild verkleinern oder den Hoster bitten, den Wert zu erhöhen.',
+                [
+                    'width' => $width,
+                    'height' => $height,
+                    'needed' => ServerLimits::format($needed),
+                    'available' => ServerLimits::format($available),
+                    'limit' => ServerLimits::format((int) ServerLimits::memoryLimit()),
+                ],
             ));
         }
     }
@@ -361,10 +363,9 @@ final class RichImageService
         $packet = ServerLimits::maxAllowedPacket($this->app->db);
         $needed = intdiv($bytes + 2, 3) * 4 + 4096;
         if ($packet !== null && $needed > $packet) {
-            throw ApiError::invalid(sprintf(
-                'Das Bild ist nach dem Verarbeiten %s groß; die Datenbank nimmt höchstens %s auf einmal an (Einstellung max_allowed_packet). Bitte ein kleineres Bild wählen oder den Hoster bitten, den Wert zu erhöhen.',
-                ServerLimits::format($needed),
-                ServerLimits::format($packet),
+            throw ApiError::invalid(I18n::t(
+                'Das Bild ist nach dem Verarbeiten {size} groß; die Datenbank nimmt höchstens {max} auf einmal an (Einstellung max_allowed_packet). Bitte ein kleineres Bild wählen oder den Hoster bitten, den Wert zu erhöhen.',
+                ['size' => ServerLimits::format($needed), 'max' => ServerLimits::format($packet)],
             ));
         }
     }
@@ -382,18 +383,18 @@ final class RichImageService
         $target = $tmp . '-out.' . ($png ? 'png' : 'jpg');
         try {
             if (@file_put_contents($source, $bytes) === false) {
-                throw new ApiError(500, 'storage_failed', 'Das Bild konnte nicht gespeichert werden.');
+                throw new ApiError(500, 'storage_failed', I18n::t('Das Bild konnte nicht gespeichert werden.'));
             }
             try {
                 $size = $png
                     ? $this->app->images->resizeToPng($source, $target, $edge)
                     : $this->app->images->resizeToJpeg($source, $target, $edge, self::QUALITY);
             } catch (\RuntimeException $e) {
-                throw ApiError::invalid('Das Bild kann nicht verarbeitet werden: ' . $e->getMessage());
+                throw ApiError::invalid(I18n::t('Das Bild kann nicht verarbeitet werden: {error}', ['error' => $e->getMessage()]));
             }
             $out = @file_get_contents($target);
             if ($out === false || $out === '') {
-                throw new ApiError(500, 'storage_failed', 'Das Bild konnte nicht gespeichert werden.');
+                throw new ApiError(500, 'storage_failed', I18n::t('Das Bild konnte nicht gespeichert werden.'));
             }
             return ['bytes' => $out, 'width' => $size['width'], 'height' => $size['height']];
         } finally {

@@ -8,6 +8,7 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 
 /**
  * Signatur je Konto (Issue #172): formatierter Inhalt mit Text und Bildern, eingerichtet unter Konto → Signatur
@@ -44,7 +45,7 @@ final class SignatureService
     public function save(User $user, mixed $content): ?array
     {
         if (!is_string($content)) {
-            throw ApiError::invalid('Bitte eine Signatur eingeben.');
+            throw ApiError::invalid(I18n::t('Bitte eine Signatur eingeben.'));
         }
         $html = RichText::sanitize($content);
         if (RichText::isEmpty($html)) {

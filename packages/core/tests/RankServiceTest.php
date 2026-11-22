@@ -158,6 +158,36 @@ final class RankServiceTest extends TestCase
         $this->assertSame('Gefreiter', $this->call('GET', '/me')->data['rank']['title']);
     }
 
+    public function testSoonReadyWithAtMostOnePointMissing(): void
+    {
+        $this->setUpApp(['ranks' => true, 'points' => true]);
+        $r = $this->ranks([['Gefreiter', 10], ['Ehrenrang', null], ['Unteroffizier', 50]]);
+        $a = $this->users->add('anna', Roles::MEMBER);
+        $b = $this->users->add('bernd', Roles::MEMBER);
+        $c = $this->users->add('carla', Roles::MEMBER);
+        $this->points($a, 9, '2026-01-10');  // 1 zur 10 fehlt: bald
+        $this->points($b, 49, '2026-01-10'); // 1 zur 50 fehlt: bald
+        $this->points($c, 48, '2026-01-10'); // 2 fehlen: nicht bald
+        $this->points($this->m, 12, '2026-01-10'); // Schwelle erreicht: nicht bald, sondern bereit
+        foreach ([$b, $c] as $id) {
+            $this->assertSame(200, $this->call('PUT', "/members/$id/rank", ['rank_id' => $r['Gefreiter']])->status);
+        }
+
+        $soon = [];
+        foreach ($this->call('GET', '/promotions')->data as $row) {
+            $soon[$row['name']] = $row['soon'];
+        }
+        ksort($soon);
+        $this->assertSame(['Admin' => false, 'Anna' => true, 'Bernd' => true, 'Carla' => false, 'Mitglied' => false], $soon);
+
+        // Auch im Stand des Mitglieds; ohne nächsten Dienstgrad mit Schwelle nie.
+        $this->users->current = $b;
+        $this->assertTrue($this->call('GET', '/me/rank')->data['soon']);
+        $this->users->current = $this->admin;
+        $this->assertSame(200, $this->call('PATCH', '/ranks/' . $r['Unteroffizier'], ['min_points' => null])->status);
+        $this->assertFalse($this->call('GET', "/members/$b")->data['rank']['soon']);
+    }
+
     public function testCreateMemberWithInitialPointsAndRank(): void
     {
         $this->setUpApp(['ranks' => true, 'points' => true]);
@@ -188,7 +218,7 @@ final class RankServiceTest extends TestCase
         $this->setUpApp(['ranks' => true, 'points' => true]);
         $r = $this->ranks([['Gefreiter', null]]);
         // Konten anlegen ohne Dienstgrade/Punkte verwalten: keine Anfangswerte.
-        $key = $this->app->roles()->create(['label' => 'Konten', 'capabilities' => TestApp::caps(['member', 'create_users'])])['key'];
+        $key = $this->app->roles()->create(['label' => 'Konten', 'capabilities' => TestApp::caps(['member', 'view_accounts', 'create_users'])])['key'];
         $this->users->current = $this->users->add('konten', $key);
         $this->assertSame(403, $this->call('POST', '/users', ['name' => 'X', 'rank_id' => $r['Gefreiter']])->status);
         $this->assertSame(403, $this->call('POST', '/users', ['name' => 'X', 'initial_points' => 5])->status);
@@ -258,6 +288,194 @@ final class RankServiceTest extends TestCase
         $this->points($a, 10, '2026-02-01');
         $row = array_column($this->call('GET', '/promotions')->data, null, 'user_id')[$a];
         $this->assertSame('2026-01-10', $row['threshold_reached_since']);
+    }
+
+    public function testChangeOnAnEarlierDayCountsPointsUpToThatDay(): void
+    {
+        $this->setUpApp(['ranks' => true, 'points' => true]);
+        $r = $this->ranks([['Gefreiter', 10], ['Unteroffizier', 20]]);
+        $this->points($this->m, 12, '2026-03-01');
+        $this->points($this->m, 10, '2026-09-01');
+
+        $this->assertSame(400, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Gefreiter'], 'date' => '2026-10-21'])->status, 'nicht in der Zukunft');
+        $this->assertSame(400, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Gefreiter'], 'date' => '21.10.2026'])->status, 'nur JJJJ-MM-TT');
+        $res = $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Gefreiter'], 'date' => '2026-02-15']);
+        $this->assertSame(400, $res->status, 'am 15.02. noch keine Punkte');
+        $this->assertStringContainsString('am 15.02.2026 noch nicht erreicht (fehlen 10 Punkte)', $res->data['message']);
+
+        $res = $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Gefreiter'], 'date' => '2026-04-01', 'reason' => 'Versammlung']);
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $this->assertSame('Gefreiter', $res->data['rank']['title'], 'gilt sofort');
+        // Unteroffizier am 01.06. nicht (12 Punkte), heute schon (22 Punkte); danach nicht mehr vor dem letzten Wechsel.
+        $this->assertSame(400, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Unteroffizier'], 'date' => '2026-06-01'])->status);
+        $res = $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Unteroffizier'], 'date' => '2026-03-31']);
+        $this->assertSame(400, $res->status, 'vor dem letzten Wechsel');
+        $this->assertStringContainsString('01.04.2026', $res->data['message']);
+        // Am selben Tag wie der letzte Wechsel geht es (Reihenfolge bleibt).
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => null, 'date' => '2026-04-01'])->status);
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Unteroffizier']])->status, 'ohne Datum = heute');
+
+        $history = $this->call('GET', "/members/{$this->m}")->data['rank_history'];
+        $this->assertSame(['Unteroffizier', null, 'Gefreiter'], array_column($history, 'to'));
+        $this->assertSame([22, 12, 12], array_column($history, 'points_at_change'), 'Punkte am Tag des Wechsels');
+        $this->assertSame('2026-10-20 12:00:00', $history[0]['changed_at']);
+        $this->assertSame('2026-04-01 10:00:01', $history[1]['changed_at'], 'eine Sekunde nach dem Wechsel desselben Tages');
+        $this->assertSame('2026-04-01 10:00:00', $history[2]['changed_at'], '12:00 Uhr Ortszeit (Sommerzeit) in UTC');
+        $this->assertSame('Versammlung', $history[2]['reason']);
+    }
+
+    public function testDateOfABookedChangeCanBeChangedLater(): void
+    {
+        $this->setUpApp(['ranks' => true, 'points' => true]);
+        $r = $this->ranks([['Gefreiter', 10], ['Unteroffizier', 20]]);
+        $this->points($this->m, 12, '2026-03-01');
+        $this->points($this->m, 10, '2026-09-01');
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Gefreiter'], 'date' => '2026-04-01'])->status);
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Unteroffizier'], 'date' => '2026-09-15'])->status);
+        $history = $this->call('GET', "/members/{$this->m}")->data['rank_history'];
+        [$uffz, $gefr] = [$history[0]['id'], $history[1]['id']];
+        $path = fn (int $entry): string => "/members/{$this->m}/rank-history/{$entry}";
+
+        $this->assertSame(400, $this->call('PATCH', $path($uffz), ['date' => '2026-10-21'])->status, 'nicht in der Zukunft');
+        $this->assertSame(400, $this->call('PATCH', $path($uffz), [])->status, 'Datum nötig');
+        $this->assertSame(400, $this->call('PATCH', $path($uffz), ['date' => '2026-03-31'])->status, 'nicht vor dem Wechsel davor');
+        $this->assertSame(400, $this->call('PATCH', $path($gefr), ['date' => '2026-09-16'])->status, 'nicht nach dem Wechsel danach');
+        $res = $this->call('PATCH', $path($uffz), ['date' => '2026-08-01']);
+        $this->assertSame(400, $res->status, 'am 01.08. erst 12 Punkte');
+        $this->assertStringContainsString('am 01.08.2026 noch nicht erreicht (fehlen 8 Punkte)', $res->data['message']);
+        $this->assertSame(404, $this->call('PATCH', "/members/{$this->admin}/rank-history/{$uffz}", ['date' => '2026-09-15'])->status, 'Eintrag einer anderen Person');
+
+        $res = $this->call('PATCH', $path($gefr), ['date' => '2026-03-15']);
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $this->assertSame('2026-03-15 11:00:00', $res->data[1]['changed_at'], '12:00 Uhr Ortszeit (Winterzeit)');
+        $this->assertSame(12, $res->data[1]['points_at_change']);
+        $res = $this->call('PATCH', $path($uffz), ['date' => '2026-10-20']);
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $this->assertSame('2026-10-20 10:00:00', $res->data[0]['changed_at']);
+        $this->assertSame(22, $res->data[0]['points_at_change']);
+        $this->assertSame('Unteroffizier', $this->call('GET', "/members/{$this->m}")->data['rank']['rank']['title'], 'Dienstgrad bleibt');
+
+        $this->users->current = $this->m;
+        $this->assertSame(403, $this->call('PATCH', $path($uffz), ['date' => '2026-10-01'])->status, 'nur mit „Dienstgrade verwalten“');
+    }
+
+    public function testRankOfABookedEntryCanBeChangedLater(): void
+    {
+        $this->setUpApp(['ranks' => true, 'points' => true]);
+        $r = $this->ranks([['Gefreiter', 10], ['Obergefreiter', 15], ['Unteroffizier', 20], ['Feldwebel', 30]]);
+        $this->points($this->m, 16, '2026-03-01');
+        $this->points($this->m, 10, '2026-09-01');
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Gefreiter'], 'date' => '2026-04-01'])->status);
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Unteroffizier'], 'date' => '2026-09-15'])->status);
+        [$uffz, $gefr] = array_column($this->call('GET', "/members/{$this->m}")->data['rank_history'], 'id');
+        $path = fn (int $entry): string => "/members/{$this->m}/rank-history/{$entry}/rank";
+
+        $this->assertSame(404, $this->call('PUT', "/members/{$this->admin}/rank-history/{$uffz}/rank", ['rank_id' => $r['Feldwebel']])->status, 'Eintrag einer anderen Person');
+        $this->assertSame(404, $this->call('PUT', $path($uffz), ['rank_id' => 999])->status, 'unbekannter Dienstgrad');
+        $this->assertSame(400, $this->call('PUT', $path($uffz), ['rank_id' => $r['Unteroffizier']])->status, 'schon dieser');
+        $this->assertSame(400, $this->call('PUT', $path($uffz), ['rank_id' => $r['Gefreiter']])->status, 'der davor');
+        $this->assertSame(400, $this->call('PUT', $path($gefr), ['rank_id' => null])->status, 'davor war auch keiner');
+        $res = $this->call('PUT', $path($uffz), ['rank_id' => $r['Feldwebel']]);
+        $this->assertSame(400, $res->status, '26 Punkte am 15.09. reichen nicht für 30');
+        $this->assertStringContainsString('am 15.09.2026 noch nicht erreicht (fehlen 4 Punkte)', $res->data['message']);
+        $this->assertSame(400, $this->call('PUT', $path($gefr), ['rank_id' => $r['Unteroffizier']])->status, 'danach ginge auf denselben');
+        $this->users->current = $this->m;
+        $this->assertSame(403, $this->call('PUT', $path($uffz), ['rank_id' => $r['Obergefreiter']])->status, 'nur mit „Dienstgrade verwalten“');
+        $this->users->current = $this->admin;
+
+        // Ein älterer Eintrag: Der danach beginnt beim neuen Dienstgrad; der aktuelle bleibt.
+        $res = $this->call('PUT', $path($gefr), ['rank_id' => $r['Obergefreiter']]);
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $this->assertSame(['Obergefreiter', 'promotion', 16], [$res->data['history'][1]['to'], $res->data['history'][1]['kind'], $res->data['history'][1]['points_at_change']]);
+        $this->assertSame(['Obergefreiter', 'Unteroffizier', 'promotion'], [$res->data['history'][0]['from'], $res->data['history'][0]['to'], $res->data['history'][0]['kind']]);
+        $this->assertSame('Unteroffizier', $res->data['rank']['rank']['title']);
+
+        // Der neueste Eintrag: auch der aktuelle Dienstgrad, „seit“ bleibt; die Art ergibt sich neu.
+        $since = $this->app->db->scalar('SELECT assigned_at FROM {member_ranks} WHERE user_id = ?', [$this->m]);
+        $res = $this->call('PUT', $path($uffz), ['rank_id' => $r['Gefreiter']]);
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $this->assertSame('Gefreiter', $res->data['rank']['rank']['title']);
+        $this->assertSame($since, $this->app->db->scalar('SELECT assigned_at FROM {member_ranks} WHERE user_id = ?', [$this->m]));
+        $this->assertSame(['Gefreiter', 'demotion'], [$res->data['history'][0]['to'], $res->data['history'][0]['kind']]);
+
+        // Auf „kein“: aktueller Dienstgrad weg.
+        $res = $this->call('PUT', $path($uffz), ['rank_id' => null]);
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $this->assertNull($res->data['rank']['rank']);
+        $this->assertSame(['demotion', null], [$res->data['history'][0]['kind'], $res->data['history'][0]['to']]);
+
+        $log = $this->app->db->select("SELECT action, changes FROM {change_log} WHERE type = 'Mitglied' ORDER BY id DESC");
+        $this->assertSame('update', $log[0]['action']);
+        $this->assertStringContainsString('Dienstgrad-Verlauf', (string) $log[0]['changes']);
+    }
+
+    public function testEntryInHistoryCanBeDeleted(): void
+    {
+        $this->setUpApp(['ranks' => true]);
+        $r = $this->ranks([['Gefreiter', null], ['Unteroffizier', null], ['Feldwebel', null]]);
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Gefreiter'], 'date' => '2026-03-01'])->status);
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Unteroffizier'], 'date' => '2026-06-01'])->status);
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Feldwebel'], 'date' => '2026-09-01'])->status);
+        [$fw, $uffz, $gefr] = array_column($this->call('GET', "/members/{$this->m}")->data['rank_history'], 'id');
+        $path = fn (int $entry): string => "/members/{$this->m}/rank-history/{$entry}";
+
+        $this->assertSame(404, $this->call('DELETE', "/members/{$this->admin}/rank-history/{$fw}")->status, 'Eintrag einer anderen Person');
+        $this->assertSame(404, $this->call('DELETE', $path(999))->status);
+        $this->users->current = $this->m;
+        $this->assertSame(403, $this->call('DELETE', $path($fw))->status, 'nur mit „Dienstgrade verwalten“');
+        $this->users->current = $this->admin;
+
+        // Ein älterer Eintrag: Der Dienstgrad bleibt.
+        $res = $this->call('DELETE', $path($uffz));
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $this->assertSame('Feldwebel', $res->data['rank']['rank']['title']);
+        $this->assertSame([$fw, $gefr], array_column($res->data['history'], 'id'));
+
+        // Der neueste: wieder der Dienstgrad davor, „seit“ = Zeitpunkt des Eintrags davor.
+        $res = $this->call('DELETE', $path($fw));
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $this->assertSame('Unteroffizier', $res->data['rank']['rank']['title'], 'from des gelöschten Eintrags');
+        $this->assertSame('2026-03-01 11:00:00', $this->app->db->scalar('SELECT assigned_at FROM {member_ranks} WHERE user_id = ?', [$this->m]));
+        $this->assertSame([$gefr], array_column($res->data['history'], 'id'));
+
+        // Im Änderungsprotokoll als Änderung am Mitglied, nicht als gelöschtes Mitglied.
+        $log = $this->app->db->select("SELECT action, type, changes FROM {change_log} WHERE type = 'Mitglied' ORDER BY id DESC");
+        $this->assertSame('update', $log[0]['action']);
+        $this->assertStringContainsString('Dienstgrad-Verlauf', (string) $log[0]['changes']);
+        $this->assertStringContainsString('Feldwebel', (string) $log[0]['changes']);
+        $this->assertNotContains('delete', array_column($log, 'action'));
+
+        // Passt der neueste Eintrag nicht mehr zum Dienstgrad (älterer davor gelöscht), bleibt der Dienstgrad.
+        $res = $this->call('DELETE', $path($gefr));
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $this->assertSame('Unteroffizier', $res->data['rank']['rank']['title']);
+        $this->assertSame([], $res->data['history']);
+
+        // Die Ersteinstufung als einziger Eintrag: danach kein Dienstgrad.
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->admin}/rank", ['rank_id' => $r['Gefreiter']])->status);
+        $only = $this->call('GET', "/members/{$this->admin}")->data['rank_history'][0]['id'];
+        $res = $this->call('DELETE', "/members/{$this->admin}/rank-history/{$only}");
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $this->assertNull($res->data['rank']['rank']);
+        $this->assertSame(0, (int) $this->app->db->scalar('SELECT COUNT(*) FROM {member_ranks} WHERE user_id = ?', [$this->admin]));
+    }
+
+    public function testDeletingNewestEntryNeedsThePreviousRank(): void
+    {
+        $this->setUpApp(['ranks' => true]);
+        $r = $this->ranks([['Gefreiter', null], ['Unteroffizier', null]]);
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Gefreiter']])->status);
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Unteroffizier']])->status);
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->admin}/rank", ['rank_id' => $r['Gefreiter']])->status);
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->admin}/rank", ['rank_id' => null])->status);
+        $this->assertSame(200, $this->call('DELETE', "/ranks/{$r['Gefreiter']}")->status, 'nicht mehr vergeben');
+        $newest = $this->call('GET', "/members/{$this->m}")->data['rank_history'][0]['id'];
+
+        $res = $this->call('DELETE', "/members/{$this->m}/rank-history/{$newest}");
+        $this->assertSame(400, $res->status, 'den Dienstgrad davor gibt es nicht mehr');
+        $this->assertStringContainsString('„Gefreiter“', $res->data['message']);
+        $this->assertSame('Unteroffizier', $this->call('GET', "/members/{$this->m}")->data['rank']['rank']['title'], 'nichts geändert');
+        $this->assertCount(2, $this->call('GET', "/members/{$this->m}")->data['rank_history']);
     }
 
     public function testOldBackupWithoutRankTablesEmptiesThem(): void

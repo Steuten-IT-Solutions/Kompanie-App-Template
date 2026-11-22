@@ -53,7 +53,7 @@ final class ExtraRolesTest extends TestCase
         $res = $this->setRoles($m, ['penalties', 'events']);
         $this->assertSame(200, $res->status, json_encode($res->data) ?: '');
         $this->assertSame(['id' => $m, 'level' => Roles::MEMBER, 'extra_roles' => ['events', 'penalties']], $res->data, 'Reihenfolge der Rollen, level bleibt die Grundrolle');
-        $this->assertEqualsCanonicalizing(TestApp::caps(['member', 'manage_penalties', 'manage_events']), $this->caps($m));
+        $this->assertEqualsCanonicalizing(TestApp::caps(['member', 'view_penalties', 'manage_penalties', 'manage_events']), $this->caps($m));
 
         $list = array_column($this->call('GET', '/members')->data, null, 'id');
         $this->assertSame(['events', 'penalties'], $list[$m]['extra_roles']);
@@ -158,7 +158,7 @@ final class ExtraRolesTest extends TestCase
 
     public function testNonAdminsAssignOnlyRolesTheyCouldGiveAsBaseRole(): void
     {
-        $this->app->roles()->create(['label' => 'Schriftführer', 'capabilities' => TestApp::caps(['member', 'promote_users', 'manage_points', 'manage_events'])]);
+        $this->app->roles()->create(['label' => 'Schriftführer', 'capabilities' => TestApp::caps(['member', 'view_accounts', 'promote_users', 'view_points', 'manage_points', 'manage_events'])]);
         $schrift = $this->users->add('schrift', 'r1');
         $m = $this->users->add('m', Roles::MEMBER);
         $kasse = $this->users->add('kasse', Roles::MEMBER);
@@ -178,7 +178,7 @@ final class ExtraRolesTest extends TestCase
     public function testDeletingARoleReplacesOrDropsItAsExtraRole(): void
     {
         $r1 = $this->app->roles()->create(['label' => 'Fahnenträger', 'capabilities' => TestApp::caps(['member', 'manage_events'])])['key'];
-        $r2 = $this->app->roles()->create(['label' => 'Ersatz', 'capabilities' => TestApp::caps(['member', 'manage_documents'])])['key'];
+        $r2 = $this->app->roles()->create(['label' => 'Ersatz', 'capabilities' => TestApp::caps(['member', 'view_restricted_documents', 'manage_documents'])])['key'];
         $a = $this->users->add('a', Roles::MEMBER);
         $b = $this->users->add('b', $r2);
         $this->setRoles($a, [$r1]);

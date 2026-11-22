@@ -8,6 +8,7 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Storage\Sql\Schema;
 use KompanieApp\Core\Storage\UserData;
 
@@ -44,12 +45,12 @@ final class PersonalDataExport
     private const ACTIVITY_TABLES = ['activity', 'activity_last'];
     /**
      * Rechte für die Auskunft über andere: Sie enthält Punkte, Strafen, Dienstgrade, Titel, Anwesenheit, namentliche
-     * Umfragen, E-Mails, Listen, Änderungen am Schwarzen Brett und Ämter; wer davon etwas in der App nicht sehen darf, bekommt es auch so nicht (in der Regel: Admins).
+     * Umfragen, E-Mails, Listen, Änderungen am Schwarzen Brett, Ämter und Zu- und Absagen bei Terminen; wer davon etwas in der App nicht sehen darf, bekommt es auch so nicht (in der Regel: Admins).
      */
     public const OTHERS_REQUIRE = [
-        Capability::CreateUsers, Capability::ViewPersonal, Capability::ManagePoints, Capability::ManagePenalties,
-        Capability::ManageRanks, Capability::ManageTitles, Capability::ManageAttendance, Capability::ManagePolls, Capability::SendMail,
-        Capability::ManageLists, Capability::PostBoard, Capability::ViewOffices,
+        Capability::ViewAccounts, Capability::ManageFormer, Capability::ViewPersonal, Capability::ViewPoints, Capability::ViewPenalties,
+        Capability::ViewPromotions, Capability::ViewTitles, Capability::ViewAttendance, Capability::ViewPollResults, Capability::ViewMail,
+        Capability::ViewLists, Capability::ViewBoardHistory, Capability::ViewOffices, Capability::ViewResponses,
     ];
 
     public function __construct(private readonly App $app)
@@ -60,13 +61,13 @@ final class PersonalDataExport
     public function export(User $actor, int $userId): array
     {
         if ($actor->preview) {
-            throw ApiError::forbidden('In der Vorschau gibt es keinen Export.');
+            throw ApiError::forbidden(I18n::t('In der Vorschau gibt es keinen Export.'));
         }
         $self = $actor->id === $userId;
         if (!self::mayExport($actor, $userId)) {
-            throw ApiError::forbidden('Die Auskunft über andere enthält alle Bereiche (Punkte, Strafen, Anwesenheit, Umfragen, E-Mails, persönliche Angaben); dafür fehlen dir Rechte.');
+            throw ApiError::forbidden(I18n::t('Die Auskunft über andere enthält alle Bereiche (Punkte, Strafen, Anwesenheit, Umfragen, E-Mails, persönliche Angaben); dafür fehlen dir Rechte.'));
         }
-        $target = $this->app->users->find($userId) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
+        $target = $this->app->users->find($userId) ?? throw ApiError::notFound(I18n::t('Mitglied nicht gefunden.'));
         // Prüft für andere guardAccount (z. B. Konten von Admins nur für Admins).
         $profile = $this->app->members()->profile($userId, $actor);
         unset($profile['can_change_login'], $profile['can_export']);

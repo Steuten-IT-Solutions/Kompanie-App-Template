@@ -1,7 +1,8 @@
 ---
 titel: "{bereich.lists}"
 reihenfolge: 61
-rechte: [manage_lists]
+rechte: []
+einrecht: [view_lists, manage_lists]
 bereiche: [lists]
 ---
 Hier legst du Listen zum Ausdrucken oder als Datei für Excel an, z. B. Unterschriftenlisten, Teilnehmerlisten oder Listen zum Abhaken. Du siehst alle gespeicherten Listen, öffnest, kopierst oder löschst sie.
@@ -31,7 +32,8 @@ Tippe unten auf **Verwaltung** und dann auf den Knopf **{bereich.lists}**.
 2. Öffne die Kopie und ändere Titel und Datum.
 
 ## Gut zu wissen
-- Eine neue Liste hat die Spalten „Name“ (Nachname), „Vorname“ und eine breite leere Spalte „Unterschrift“. Zeilen hat sie noch keine.
+- **Nur sehen:** Mit dem Recht **{bereich.lists} sehen, drucken und als CSV laden** ohne das Recht zum Anlegen und Bearbeiten öffnest du die Listen, druckst sie und lädst sie als PDF oder CSV herunter. **Kopieren**, **Löschen** und **Neue Liste** fehlen dann.
+- Eine neue Liste hat die Spalten „Name“ (Nachname), „Vorname“ und eine breite leere Spalte „Unterschrift“. Zeilen hat sie noch keine. Nutzt die Person, die die Liste anlegt, die App auf Englisch, stehen diese Überschriften und „(Kopie)“ auf Englisch.
 - Alle, die {bereich.lists} pflegen dürfen, sehen und bearbeiten dieselben Listen. Andere {rolle.member} sehen die {bereich.lists} nicht.
 - Die Listen enthalten personenbezogene Daten. Vernichte Ausdrucke nach Gebrauch und lösche heruntergeladene Dateien.
 

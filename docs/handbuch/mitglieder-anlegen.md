@@ -52,7 +52,7 @@ So trägst du eine Person ein, die noch kein Konto hat, z. B. weil sie in einer 
 - Das Startpasswort steht **nur dieses eine Mal** da. Eine E-Mail verschickt die App nicht. **Teilen …** gibt es nur, wenn dein Gerät es kann.
 - Rolle und Zusatzrollen lassen sich danach unter **Konto und Rolle** auf der Seite des Mitglieds ändern, von allen, die Rollen vergeben dürfen.
 - Ist **Zugang beantragen** eingeschaltet, können Personen ihren Zugang auch selbst beantragen; du gibst ihn dann nur noch frei (siehe [Anfragen auf einen Zugang](seite:anfragen-freigeben)).
-- Ein Mitglied ohne Zugang bekommt keine Benachrichtigungen aufs Handy. E-Mails an alle Mitglieder bekommt es nur, wenn eine E-Mail-Adresse eingetragen ist. Eine Person, die schon ausgeschieden ist, trägst du besser als ehemalig ein (siehe [Ehemalige](seite:ehemalige-mitglieder)).
+- Ein Mitglied ohne Zugang bekommt keine Benachrichtigungen aufs Handy. E-Mails an alle Mitglieder bekommt es nur, wenn eine E-Mail-Adresse eingetragen ist. Eine Person, die schon ausgeschieden ist, trägst du besser als ehemalig ein (siehe **Ehemalige** im Handbuch, mit dem Recht **Ehemalige verwalten**).
 - Wie die neue Person die App aufs Handy holt und sich anmeldet, steht unter [App installieren](seite:app-installieren) und [Mein Konto](seite:anmelden-und-konto).
 - Bitte lade ein Foto nur mit dem Einverständnis der Person hoch. Erlaubt sind JPG, PNG und WebP.
 
@@ -60,4 +60,3 @@ So trägst du eine Person ein, die noch kein Konto hat, z. B. weil sie in einer 
 - [Mitgliederliste](seite:mitgliederliste)
 - [Anfragen auf einen Zugang](seite:anfragen-freigeben)
 - [Seite eines Mitglieds](seite:mitglied-uebersicht)
-- [Ehemalige](seite:ehemalige-mitglieder)

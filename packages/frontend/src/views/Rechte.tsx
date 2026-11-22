@@ -3,6 +3,7 @@ import { api, type Capability, type MemberRights } from '../api';
 import { requires, toggleMany } from '../capabilities';
 import { RightsTree } from '../rightsTree';
 import { confirmAsk } from '../ask';
+import { t } from '../i18n';
 
 /** Rechte nach den Rollen und Ausnahmen; was seine Voraussetzung nicht hat, fällt weg (wie RoleService::effective). */
 function effective(r: MemberRights): Set<Capability> {
@@ -48,6 +49,8 @@ export function MemberRightsPanel({
     grant.some((c) => !rights.grant.includes(c)) ||
     revoke.some((c) => !rights.revoke.includes(c));
   const overridden = new Set([...rights.grant, ...rights.revoke]);
+  // Nur sehen (Konten sehen ohne Rollen vergeben): nichts änderbar, kein Speichern.
+  const readOnly = rights.editable.length === 0;
 
   async function save(g: Capability[], r: Capability[], msg: string) {
     setBusy(true);
@@ -65,41 +68,52 @@ export function MemberRightsPanel({
 
   return (
     <section className="member-rights">
-      <h3 className="section-title">Rechte</h3>
+      <h3 className="section-title">{t('Rechte')}</h3>
       <div className="card">
         <p className="small muted">
-          {plural ? `Grundlage sind die Rollen „${roles}“.` : `Grundlage ist die Rolle „${roles}“.`} Hier kannst du {name} einzelne Rechte
-          zusätzlich geben oder entziehen. Die Ausnahmen bleiben auch bei einem Rollenwechsel bestehen.
+          {plural ? t('Grundlage sind die Rollen „{roles}“.', { roles }) : t('Grundlage ist die Rolle „{roles}“.', { roles })}{' '}
+          {readOnly
+            ? t('Markiert ist, was {name} zusätzlich bekommen hat oder was entzogen ist.', { name })
+            : t(
+                'Hier kannst du {name} einzelne Rechte zusätzlich geben oder entziehen. Die Ausnahmen bleiben auch bei einem Rollenwechsel bestehen.',
+                { name },
+              )}
         </p>
         <RightsTree
-          legend={`Rechte von ${name}`}
+          legend={t('Rechte von {name}', { name })}
           disabled={busy}
           isOn={(c) => checked.has(c)}
           isDisabled={(c) => !rights.editable.includes(c)}
           onToggle={(keys, on) => setChecked((prev) => toggleMany(prev, keys, on))}
           badge={(c) =>
-            checked.has(c) !== fromRole.has(c) && <span className="badge badge-override">{checked.has(c) ? 'zusätzlich' : 'entzogen'}</span>
+            checked.has(c) !== fromRole.has(c) && (
+              <span className="badge badge-override">{checked.has(c) ? t('zusätzlich') : t('entzogen')}</span>
+            )
           }
           initiallyOpen={(g) => g.items.some((i) => overridden.has(i.key))}
         />
-        <div className="button-row">
-          <button className="btn" disabled={busy || !dirty} onClick={() => save(grant, revoke, 'Rechte gespeichert')}>
-            Rechte speichern
-          </button>
-          {hasOverrides(rights) && (
-            <button
-              className="btn btn-secondary"
-              disabled={busy}
-              onClick={async () =>
-                (await confirmAsk(
-                  `Alle Ausnahmen von ${name} entfernen? Dann gelten nur die Rechte ${plural ? 'der Rollen' : 'der Rolle'}.`,
-                )) && save([], [], 'Rechte wie die Rolle')
-              }
-            >
-              Wie die Rolle
+        {!readOnly && (
+          <div className="button-row">
+            <button className="btn" disabled={busy || !dirty} onClick={() => save(grant, revoke, t('Rechte gespeichert'))}>
+              {t('Rechte speichern')}
             </button>
-          )}
-        </div>
+            {hasOverrides(rights) && (
+              <button
+                className="btn btn-secondary"
+                disabled={busy}
+                onClick={async () =>
+                  (await confirmAsk(
+                    plural
+                      ? t('Alle Ausnahmen von {name} entfernen? Dann gelten nur die Rechte der Rollen.', { name })
+                      : t('Alle Ausnahmen von {name} entfernen? Dann gelten nur die Rechte der Rolle.', { name }),
+                  )) && save([], [], t('Rechte wie die Rolle'))
+                }
+              >
+                {t('Wie die Rolle')}
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </section>
   );

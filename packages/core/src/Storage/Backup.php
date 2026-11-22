@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core\Storage;
 
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\FileStorage;
 use KompanieApp\Core\Storage\Sql\Connection;
 use KompanieApp\Core\Storage\Sql\Schema;
@@ -74,11 +75,12 @@ final class Backup
         // Mailversand (Issue #172): gemerktes Limit des Mailservers und Pause zwischen den Portionen.
         'mail_server_size', 'board_mail_next',
         'push_calendar_seen', 'push_news_seen', 'push_reminder_date', 'push_board_offered', 'push_polls_offered', 'push_birthdays_offered',
+        'push_responses_date', 'push_responses_offered',
         // Protokoll der Benachrichtigungen (PushService::LOG_SETTING): Stand dieser Installation.
         'push_log',
     ];
     /** Tabellen des Kerns, in einer Reihenfolge, die beim Einfügen passt. */
-    public const CORE_TABLES = ['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'ranks', 'member_ranks', 'rank_history', 'titles', 'member_titles', 'member_roles', 'attendance_lists', 'attendance_entries', 'doc_categories', 'documents', 'board_messages', 'board_message_revisions', 'rich_images', 'user_signatures', 'user_settings', 'polls', 'poll_options', 'poll_votes', 'poll_answers', 'birthdays', 'join_years', 'inventory_items', 'inventory_log', 'member_photos', 'member_contacts', 'office_groups', 'offices', 'office_terms', 'office_holders', 'office_group_terms', 'former_members', 'lists', 'list_columns', 'list_rows', 'mailings', 'attachments', 'sponsors', 'companies', 'member_companies', 'gallery_submissions', 'app_pages', 'app_news', 'push_subscriptions', 'internal_events'];
+    public const CORE_TABLES = ['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'ranks', 'member_ranks', 'rank_history', 'titles', 'member_titles', 'member_roles', 'attendance_lists', 'attendance_entries', 'doc_categories', 'documents', 'board_messages', 'board_message_revisions', 'rich_images', 'user_signatures', 'user_settings', 'polls', 'poll_options', 'poll_votes', 'poll_answers', 'birthdays', 'join_years', 'inventory_items', 'inventory_log', 'member_photos', 'member_contacts', 'office_groups', 'offices', 'office_terms', 'office_holders', 'office_group_terms', 'former_members', 'lists', 'list_columns', 'list_rows', 'mailings', 'attachments', 'sponsors', 'companies', 'member_companies', 'gallery_submissions', 'app_pages', 'app_news', 'push_subscriptions', 'internal_events', 'event_responses', 'passive_members', 'passive_payments', 'event_kinds', 'candidate_since', 'translations'];
     /**
      * Tabellen, die beim Wiederherstellen nur geleert werden, wenn die Sicherung sie enthält: Push-Abos waren früher nicht
      * in Sicherungen; eine ältere Sicherung soll die Geräte nicht abmelden (der Schlüssel bleibt dann ebenfalls).
@@ -187,12 +189,12 @@ final class Backup
                 $columns = array_flip($this->columns($t));
                 foreach ($tables[$t] as $row) {
                     if (!is_array($row)) {
-                        throw new \RuntimeException('Die Sicherung ist beschädigt (Tabelle ' . $t . ').');
+                        throw new \RuntimeException(I18n::t('Die Sicherung ist beschädigt (Tabelle {table}).', ['table' => $t]));
                     }
                     $row = array_intersect_key(self::olderRow($t, $row), $columns);
                     foreach ($row as $v) {
                         if (!is_scalar($v) && $v !== null) {
-                            throw new \RuntimeException('Die Sicherung ist beschädigt (Tabelle ' . $t . ').');
+                            throw new \RuntimeException(I18n::t('Die Sicherung ist beschädigt (Tabelle {table}).', ['table' => $t]));
                         }
                     }
                     if ($row !== []) {
@@ -215,7 +217,7 @@ final class Backup
         foreach (self::fileList($files, $tables) as $path => $file) {
             $data = file_get_contents($file);
             if ($data === false) {
-                throw new \RuntimeException('Die Datei ' . $path . ' ließ sich nicht lesen.');
+                throw new \RuntimeException(I18n::t('Die Datei {file} ließ sich nicht lesen.', ['file' => $path]));
             }
             $out[$path] = base64_encode($data);
         }
@@ -290,7 +292,7 @@ final class Backup
             for ($done = 0; $done < $len;) {
                 $n = fwrite($out, $done === 0 ? $chunk : substr($chunk, $done));
                 if ($n === false || $n === 0) {
-                    throw new \RuntimeException('Die Sicherung ließ sich nicht schreiben (Speicherplatz?).');
+                    throw new \RuntimeException(I18n::t('Die Sicherung ließ sich nicht schreiben (Speicherplatz?).'));
                 }
                 $done += $n;
             }
@@ -335,7 +337,7 @@ final class Backup
             foreach (self::fileList($files, $refs) as $path => $file) {
                 $in = @fopen($file, 'rb');
                 if ($in === false) {
-                    throw new \RuntimeException('Die Datei ' . $path . ' ließ sich nicht lesen.');
+                    throw new \RuntimeException(I18n::t('Die Datei {file} ließ sich nicht lesen.', ['file' => $path]));
                 }
                 try {
                     $put(($first ? '' : ',') . $json($path) . ':"');
@@ -344,7 +346,7 @@ final class Backup
                     while (!feof($in)) {
                         $block = fread($in, self::FILE_BLOCK);
                         if ($block === false) {
-                            throw new \RuntimeException('Die Datei ' . $path . ' ließ sich nicht lesen.');
+                            throw new \RuntimeException(I18n::t('Die Datei {file} ließ sich nicht lesen.', ['file' => $path]));
                         }
                         while ($block !== '' && strlen($block) % 3 !== 0 && !feof($in)) {
                             $more = fread($in, 3 - strlen($block) % 3);
@@ -378,7 +380,7 @@ final class Backup
         if ($files === null) {
             return [];
         }
-        $broken = new \RuntimeException('Die Sicherung ist beschädigt (Dateien).');
+        $broken = new \RuntimeException(I18n::t('Die Sicherung ist beschädigt (Dateien).'));
         if (!is_array($files)) {
             throw $broken;
         }
@@ -409,7 +411,7 @@ final class Backup
             $tmp = $target . '.' . bin2hex(random_bytes(4)) . '.tmp';
             if (@file_put_contents($tmp, $bytes) !== strlen($bytes) || !@rename($tmp, $target)) {
                 @unlink($tmp);
-                throw new \RuntimeException('Die Daten sind wiederhergestellt, aber die Datei ' . $path . ' ließ sich nicht speichern (Speicherplatz, Schreibrechte?). Bitte die Sicherung erneut einspielen.');
+                throw new \RuntimeException(I18n::t('Die Daten sind wiederhergestellt, aber die Datei {file} ließ sich nicht speichern (Speicherplatz, Schreibrechte?). Bitte die Sicherung erneut einspielen.', ['file' => $path]));
             }
         }
     }
@@ -450,13 +452,13 @@ final class Backup
     {
         $data = json_decode($json, true, 64);
         if (!is_array($data) || ($data['format'] ?? '') !== self::FORMAT) {
-            throw new \RuntimeException('Das ist keine Datensicherung der Kompanie-App.');
+            throw new \RuntimeException(I18n::t('Das ist keine Datensicherung der Kompanie-App.'));
         }
         if ((int) ($data['formatVersion'] ?? 0) > self::FORMAT_VERSION) {
-            throw new \RuntimeException('Die Sicherung stammt aus einer neueren Version. Bitte erst die App aktualisieren.');
+            throw new \RuntimeException(I18n::t('Die Sicherung stammt aus einer neueren Version. Bitte erst die App aktualisieren.'));
         }
         if (!is_array($data['tables'] ?? null)) {
-            throw new \RuntimeException('Die Sicherung enthält keine Daten.');
+            throw new \RuntimeException(I18n::t('Die Sicherung enthält keine Daten.'));
         }
         return $data;
     }

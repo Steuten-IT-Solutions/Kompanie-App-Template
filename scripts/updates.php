@@ -13,6 +13,9 @@
  *       gibt „Version early|stable“ aus, wenn die neueste Version genau diesen Stand enthält, „Version withdrawn“,
  *       wenn sie denselben Code und Commit hat, aber zurückgezogen ist (sonst nichts)
  *
+ *   php scripts/updates.php --list=updates.json [--add=…] --maintenance=JJJJ-MM-TT|unbefristet|keine
+ *       setzt „Wartung bis“ in der Liste (keine = Angabe entfernen); die App zeigt es Admins an
+ *
  * --channel=auto (Standard): stable, wenn der Kern schon auf der Demo geprüft ist (--stable-core=Inhalt
  * von STABLE_CORE: „Kern-Version Code-Prüfsumme“) oder sich nur das Aussehen ändert; sonst early.
  * --kompanie legt fest, zu welcher Kompanie eine neue Liste gehört (sonst aus der release.json).
@@ -29,7 +32,7 @@ use KompanieApp\Core\Update\SignedEnvelope;
 use KompanieApp\Core\Update\TrustedKeys;
 use KompanieApp\Core\Update\UpdateList;
 
-$opt = getopt('', ['list:', 'add:', 'base-url:', 'channel:', 'promote:', 'withdraw:', 'show', 'kompanie:', 'stable-core:', 'dry-run', 'next-version:', 'find:', 'core-code:', 'config-hash:', 'checked-version']);
+$opt = getopt('', ['list:', 'add:', 'base-url:', 'channel:', 'promote:', 'withdraw:', 'show', 'kompanie:', 'stable-core:', 'dry-run', 'next-version:', 'find:', 'core-code:', 'config-hash:', 'checked-version', 'maintenance:']);
 $fail = static function (string $msg): never {
     fwrite(STDERR, "Fehler: $msg\n");
     exit(1);
@@ -113,6 +116,11 @@ try {
         }
         $list->addRelease($release, rtrim($base, '/') . '/', $channel);
         echo "Version {$release['version']} aufgenommen (Kanal $channel).\n";
+    }
+    if (isset($opt['maintenance'])) {
+        $m = (string) $opt['maintenance'];
+        $list->setMaintenance($m === 'keine' ? null : $m);
+        echo 'Wartung bis: ', $list->maintenance() ?? '–', "\n";
     }
     if (isset($opt['promote'])) {
         $list->promote((string) $opt['promote']);

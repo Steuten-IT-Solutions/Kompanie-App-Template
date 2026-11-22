@@ -13,7 +13,7 @@ final class GallerySubmissionRepository
     public const APPROVED = 'approved';
     public const REJECTED = 'rejected';
     /** Spalten für Listen: ohne die Vorschau (thumb), die nur einzeln mitkommt. */
-    private const LIST_COLUMNS = 's.id, s.user_id, s.album_id, s.file_key, s.name, s.width, s.height, s.bytes, s.status, s.consent_at, s.created_at, s.reviewed_by, s.reviewed_at, s.reason, s.photo_id, a.title AS album_title, a.year AS album_year';
+    private const LIST_COLUMNS = 's.id, s.user_id, s.album_id, s.file_key, s.name, s.width, s.height, s.bytes, s.status, s.consent_at, s.created_at, s.reviewed_by, s.reviewed_at, s.reason, s.photo_id, s.drive_file_id, a.title AS album_title, a.year AS album_year';
 
     public function __construct(private readonly Connection $db)
     {

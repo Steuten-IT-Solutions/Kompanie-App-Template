@@ -2,9 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { can, config, levelLabel, type Capability, type Feature } from '../api';
 import brand from '../generated/brand';
 import handbuch from '../generated/handbuch.json';
+import { t } from '../i18n';
 import { LegalLinks } from '../legal';
 import { navigate } from '../router';
 import { Empty, lazyView } from '../ui';
+import { UntranslatedNote } from '../language';
 import FehlerMelden, { ReportButton } from './FehlerMelden';
 
 // Lizenztexte sind groß: eigenes Teilstück, erst beim Öffnen geladen (Issue #173).
@@ -20,9 +22,32 @@ interface Seite {
   bereiche: string[];
   variante: string | null;
   html: string;
+  /** In einer weiteren Sprache ohne Fassung: die deutsche Seite (Hinweis „Nur auf Deutsch verfügbar“) */
+  untranslated?: boolean;
+}
+
+/** Fassungen einer weiteren Sprache (generated/handbuch.en.json): Name der Seite => Titel und Text. */
+export interface Fassungen {
+  seiten: Record<string, { titel: string; html: string }>;
+}
+
+/**
+ * Englische Fassungen (Plan „Mehrsprachigkeit“), nur auf Englisch geladen (App.tsx); null = Deutsch. Nach einem Wechsel
+ * der Sprache lädt die App neu.
+ */
+let fassungen: Fassungen | null = null;
+export function setTranslations(next: Fassungen | null): void {
+  fassungen = next;
 }
 
 const GRUPPEN = ['Für alle', 'Für Mitglieder', 'Für Aufgaben in der Verwaltung', 'Für Admins'];
+/** Überschriften der Gruppen in der Sprache der App (die Gruppe der Seite bleibt der deutsche Wert). */
+const GRUPPEN_TITEL: Record<string, string> = {
+  'Für alle': t('Für alle'),
+  'Für Mitglieder': t('Für Mitglieder'),
+  'Für Aufgaben in der Verwaltung': t('Für Aufgaben in der Verwaltung'),
+  'Für Admins': t('Für Admins'),
+};
 
 const escape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 /** Text einer Seite für die Suche: ohne Tags, Zeichen wie & und " wieder als Zeichen. */
@@ -41,7 +66,7 @@ function labels(): Record<string, string> {
   return {
     'kompanie.name': brand.name,
     'bereich.events': sec.events,
-    'bereich.calendar': 'Kalender',
+    'bereich.calendar': t('Kalender'),
     'bereich.news': sec.news,
     'bereich.gallery': sec.gallery,
     'bereich.points': sec.points,
@@ -87,15 +112,24 @@ const images = (html: string) =>
     (_, name: string) => `src="${BILDER}${name}.jpg?v=${encodeURIComponent(config?.version ?? '')}"`,
   );
 
+/** Seite in der Sprache der App: die Fassung, sonst die deutsche mit untranslated. */
+function localized(s: Seite): Seite {
+  if (fassungen === null) return s;
+  const f = fassungen.seiten[s.slug];
+  return f ? { ...s, titel: f.titel, html: f.html } : { ...s, untranslated: true };
+}
+
 /** Seiten, die zu Rechten, eingeschalteten Bereichen und Variante passen. */
 function visible(): Seite[] {
-  return (handbuch.seiten as Seite[]).filter(
-    (s) =>
-      s.rechte.every((r) => can(r as Capability)) &&
-      (s.einrecht.length === 0 || s.einrecht.some((r) => can(r as Capability))) &&
-      s.bereiche.every((b) => !!config?.features[b as Feature]) &&
-      (s.variante === null || s.variante === config?.variant),
-  );
+  return (handbuch.seiten as Seite[])
+    .map(localized)
+    .filter(
+      (s) =>
+        s.rechte.every((r) => can(r as Capability)) &&
+        (s.einrecht.length === 0 || s.einrecht.some((r) => can(r as Capability))) &&
+        s.bereiche.every((b) => !!config?.features[b as Feature]) &&
+        (s.variante === null || s.variante === config?.variant),
+    );
 }
 
 /**
@@ -134,9 +168,10 @@ export default function Hilfe({ slug }: { slug?: string }) {
     return (
       <article className="hilfe-seite">
         <button className="btn btn-link back" onClick={() => navigate('hilfe')}>
-          ‹ Alle Hilfeseiten
+          ‹ {t('Alle Hilfeseiten')}
         </button>
         <h2 className="news-headline">{fill(seite.titel, map, false)}</h2>
+        <UntranslatedNote untranslated={seite.untranslated ? 'all' : null} source="de" />
         <div className="hilfe-text" ref={text} dangerouslySetInnerHTML={{ __html: images(fill(seite.html, map, true)) }} />
         <ReportButton />
       </article>
@@ -153,18 +188,18 @@ export default function Hilfe({ slug }: { slug?: string }) {
       <input
         type="search"
         className="search"
-        placeholder="Hilfe durchsuchen …"
-        aria-label="Hilfe durchsuchen"
+        placeholder={t('Hilfe durchsuchen …')}
+        aria-label={t('Hilfe durchsuchen')}
         value={suche}
         onChange={(e) => setSuche(e.target.value)}
       />
-      {treffer.length === 0 && <Empty>Nichts gefunden.</Empty>}
+      {treffer.length === 0 && <Empty>{t('Nichts gefunden.')}</Empty>}
       {GRUPPEN.map((g) => {
         const liste = treffer.filter((s) => s.gruppe === g);
         if (liste.length === 0) return null;
         return (
           <section key={g}>
-            <h2 className="section-title">{g}</h2>
+            <h2 className="section-title">{GRUPPEN_TITEL[g] ?? g}</h2>
             <ul className="card-list">
               {liste.map((s) => (
                 <li key={s.slug} className="card row clickable" onClick={() => navigate(`hilfe/${s.slug}`)}>
@@ -180,14 +215,14 @@ export default function Hilfe({ slug }: { slug?: string }) {
       <ReportButton />
       {config?.handbookUrl && (
         <p className="small muted hilfe-web">
-          Das ganze Handbuch, auch für Bereiche, die eure Kompanie nicht nutzt:{' '}
+          {t('Das ganze Handbuch, auch für Bereiche, die eure Kompanie nicht nutzt:')}{' '}
           <a href={config.handbookUrl} target="_blank" rel="noopener noreferrer">
-            Handbuch im Browser öffnen
+            {t('Handbuch im Browser öffnen')}
           </a>
         </p>
       )}
       <p className="small muted hilfe-web">
-        <a href="#/hilfe/lizenzen">Lizenzen</a> der App und der enthaltenen Bausteine anderer Anbieter
+        <a href="#/hilfe/lizenzen">{t('Lizenzen')}</a> {t('der App und der enthaltenen Bausteine anderer Anbieter')}
       </p>
       <LegalLinks className="hilfe-web" />
     </div>

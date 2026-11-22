@@ -40,7 +40,7 @@ const gruppe: Gruppe = async (f) => {
   }
   await form.getByLabel(/^Interner Kalender/).check();
   await form.getByLabel(/^Beim Anlegen neuer Konten wählbar/).check();
-  await form.getByLabel(/^Wer Mitglieder anlegen darf/).check();
+  await form.getByLabel(/^Anwärter-Rolle/).check();
   await ausschnitt('admin-rollen-und-mitglieder-neu', 'form.role-form');
   await form.getByRole('button', { name: 'Abbrechen' }).click();
   await ausschnitt('admin-vorschau-starten', '.role-preview');
@@ -118,6 +118,11 @@ const gruppe: Gruppe = async (f) => {
   await rechtliches.getByLabel('Impressum').fill('https://www.beispiel.de/impressum');
   await rechtliches.getByLabel('Datenschutzerklärung').fill('https://www.beispiel.de/datenschutz');
   await f.foto('admin-rechtliches');
+
+  // Sprachen (Englisch nur angehakt, nicht gespeichert)
+  await f.oeffnen('einstellungen/sprachen');
+  await page.locator('#einstellungen-sprachen').getByLabel('English').check();
+  await f.foto('admin-sprachen');
 
   // Datensicherung
   await f.oeffnen('einstellungen/datensicherung');

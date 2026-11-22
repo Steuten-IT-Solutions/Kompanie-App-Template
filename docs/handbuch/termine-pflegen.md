@@ -32,6 +32,11 @@ Tippe unten auf **{bereich.events}** und dann oben auf **Öffentliche Termine ve
 2. Ändere die Angaben.
 3. Tippe auf **Speichern**. Mit **Abbrechen** bleibt alles, wie es war.
 
+### Einen Termin auch auf Englisch eintragen
+Hat der Admin unter **Einstellungen → Sprachen** Englisch eingeschaltet, trägt ein Admin Titel, Ort und Beschreibung auf Englisch dort im Abschnitt **Übersetzungen** in der Gruppe **Kommende Termine** ein. Im Formular steht dazu nur ein Hinweis mit Link dorthin. Die Gruppe zeigt Termine ab heute; vergangene fallen weg.
+
+Wer die App auf Englisch nutzt, sieht den Termin in dieser Fassung, auch in der Benachrichtigung. Was leer bleibt, erscheint auf Deutsch, mit dem Hinweis *Teilweise nur auf Deutsch verfügbar* beim aufgeklappten Termin. Datum, Uhrzeit und Link gelten für alle Sprachen. Hier im Formular bearbeitest du immer die deutsche Fassung, auch wenn du die App selbst auf Englisch benutzt.
+
 ### Einen Termin löschen
 1. Tippe beim Termin auf **Löschen**.
 2. Bestätige die Rückfrage. Der Termin ist sofort weg.

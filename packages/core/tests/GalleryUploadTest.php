@@ -87,7 +87,9 @@ final class GalleryUploadTest extends TestCase
         $this->assertSame('server', $settings['gallery']['store']);
         $this->assertTrue($settings['gallery']['configured'], 'eigener Server: ohne Drive nutzbar');
         $this->assertSame(400, $this->call('PATCH', '/admin/settings', ['gallery_source' => 'ftp'])->status);
-        $this->assertSame(400, $this->call('PATCH', '/admin/settings', ['gallery_store' => 'drive'])->status, 'Drive als Ablageort noch nicht');
+        $this->assertSame(400, $this->call('PATCH', '/admin/settings', ['gallery_store' => 'ftp'])->status);
+        // Der Ablageort ergibt sich aus Quelle und Google-Zugang (GalleryDriveTest); ohne Drive bleibt es der Server.
+        $this->assertSame('server', $this->ok('PATCH', '/admin/settings', ['gallery_store' => 'drive'])['gallery']['store']);
 
         $album = $this->ok('POST', '/admin/gallery/albums', ['title' => 'Schützenfest', 'year' => 2026]);
         $this->assertSame('app', $album['source']);
@@ -122,7 +124,7 @@ final class GalleryUploadTest extends TestCase
         $this->assertSame(200, $this->app->gallery()->photoForDelivery($photoId, GalleryService::ORIGINAL, false, false)['status'], 'Original aus der Ablage');
 
         $albums = $this->ok('GET', '/admin/gallery/albums')['albums'];
-        $this->assertSame([['id' => $id, 'title' => 'Schützenfest', 'year' => '2026', 'source' => 'app', 'uploads' => 2, 'drive_photos' => 0]], $albums);
+        $this->assertSame([['id' => $id, 'title' => 'Schützenfest', 'year' => '2026', 'source' => 'app', 'editable' => true, 'uploads' => 2, 'drive_photos' => 0]], $albums);
         $this->assertSame('Sommer', $this->ok('PATCH', "/admin/gallery/albums/{$id}", ['title' => 'Sommer'])['title']);
         $this->assertGreaterThan(0, $this->ok('GET', '/admin/settings')['gallery']['media_bytes']);
         $this->assertStringContainsString('Hochgeladene Bilder belegen', json_encode($this->ok('GET', '/admin/status'), JSON_UNESCAPED_UNICODE));
@@ -184,7 +186,7 @@ final class GalleryUploadTest extends TestCase
         $reviewer = $this->users->add('pruefer', Roles::MEMBER);
         $this->users->current = $this->m;
         $this->assertSame(403, $this->call('PATCH', "/gallery/photos/{$photoId}", ['intern' => false])->status, 'ohne Recht');
-        $this->app->roles()->setOverrides($this->users->find($this->admin), $reviewer, ['review_gallery'], []);
+        $this->app->roles()->setOverrides($this->users->find($this->admin), $reviewer, ['view_submissions', 'review_gallery'], []);
         $this->users->current = $reviewer;
         $this->assertSame(['id' => $photoId, 'intern' => false], $this->ok('PATCH', "/gallery/photos/{$photoId}", ['intern' => false]));
         $gallery->processPending(30);
@@ -233,7 +235,7 @@ final class GalleryUploadTest extends TestCase
         $this->assertSame(403, $this->call('POST', '/gallery/photos/move', ['ids' => [$ids['Offen.jpg']], 'album_id' => $to])->status);
         $this->assertSame(403, $this->call('POST', '/gallery/photos/delete', ['ids' => [$ids['Drei.jpg']]])->status);
         $reviewer = $this->users->add('pruefer', Roles::MEMBER);
-        $this->app->roles()->setOverrides($this->users->find($this->admin), $reviewer, ['review_gallery'], []);
+        $this->app->roles()->setOverrides($this->users->find($this->admin), $reviewer, ['view_submissions', 'review_gallery'], []);
         $this->users->current = $reviewer;
         $this->assertSame(403, $this->call('POST', '/gallery/photos/move', ['ids' => [$ids['Offen.jpg']], 'album_id' => $to])->status, 'Prüfen reicht nicht');
         $this->assertSame(403, $this->call('POST', '/gallery/photos/delete', ['ids' => [$ids['Drei.jpg']]])->status, 'Prüfen reicht nicht');
@@ -266,6 +268,71 @@ final class GalleryUploadTest extends TestCase
         $this->assertCount(1, $this->stored());
         $this->assertSame(404, $this->call('POST', '/gallery/photos/delete', ['ids' => [$ids['Drei.jpg']]])->status, 'schon weg');
         $this->assertSame(['Offen.jpg'], array_column($gallery->album($to, true)['photos'], 'name'));
+    }
+
+    /**
+     * Titelbild wählen: PUT /gallery/albums/{id}/cover mit manage_gallery. Die Übersicht zeigt das gewählte Bild; ein
+     * internes nur Mitgliedern, Gäste sehen weiter ein öffentliches. Kein Video, nur Bilder dieses Albums; null setzt
+     * zurück auf automatisch. Verschoben oder gelöscht gilt wieder die automatische Wahl.
+     */
+    public function testChooseCover(): void
+    {
+        $this->ok('PATCH', '/admin/settings', ['gallery_source' => 'server']);
+        $id = (int) $this->ok('POST', '/admin/gallery/albums', ['title' => 'Fest', 'year' => 2026])['id'];
+        $other = (int) $this->ok('POST', '/admin/gallery/albums', ['title' => 'Anderes', 'year' => 2026])['id'];
+        $this->ok('POST', "/admin/gallery/albums/{$id}/photos", ['file' => $this->file('A.jpg')]);
+        $this->ok('POST', "/admin/gallery/albums/{$id}/photos", ['file' => $this->file('B.jpg')]);
+        $uploads = $this->ok('POST', "/admin/gallery/albums/{$id}/photos", ['file' => $this->file('C.jpg'), 'intern' => true])['uploads'];
+        $this->ok('POST', "/admin/gallery/albums/{$other}/photos", ['file' => $this->file('X.jpg')]);
+        $ids = array_column($uploads, 'id', 'name');
+        $gallery = $this->app->gallery();
+        $gallery->processPending(30);
+        $thumbs = array_column($gallery->album($id, true)['photos'], 'thumb', 'name');
+        $cover = function (bool $member) use ($gallery, $id): ?string {
+            foreach ($gallery->overview($member) as $year) {
+                foreach ($year['albums'] as $al) {
+                    if ($al['id'] === $id) {
+                        return $al['cover'];
+                    }
+                }
+            }
+            return null;
+        };
+        $this->assertSame($thumbs['A.jpg'], $cover(true), 'automatisch: das erste öffentliche');
+        $this->assertNull($gallery->album($id, true)['cover_id']);
+
+        // Ungültige Angaben und Rechte
+        $this->assertSame(400, $this->call('PUT', "/gallery/albums/{$id}/cover", ['photo_id' => '1'])->status, 'keine Zahl');
+        $this->assertSame(404, $this->call('PUT', '/gallery/albums/999/cover', ['photo_id' => $ids['B.jpg']])->status);
+        $this->assertSame(404, $this->call('PUT', "/gallery/albums/{$other}/cover", ['photo_id' => $ids['B.jpg']])->status, 'Bild aus anderem Album');
+        $this->users->current = $this->m;
+        $this->assertSame(403, $this->call('PUT', "/gallery/albums/{$id}/cover", ['photo_id' => $ids['B.jpg']])->status);
+        $manager = $this->users->add('galerie', Roles::MEMBER);
+        $this->app->roles()->setOverrides($this->users->find($this->admin), $manager, ['manage_gallery'], []);
+        $this->users->current = $manager;
+
+        // Gewählt: B für alle
+        $this->assertSame(['id' => $id, 'cover_id' => $ids['B.jpg']], $this->ok('PUT', "/gallery/albums/{$id}/cover", ['photo_id' => $ids['B.jpg']]));
+        $this->assertSame($thumbs['B.jpg'], $cover(true));
+        $this->assertSame($thumbs['B.jpg'], $cover(false));
+        $this->assertSame($ids['B.jpg'], $gallery->album($id, false)['cover_id']);
+
+        // Intern gewählt: Mitglieder sehen es, Gäste weiter ein öffentliches (und nicht seine ID)
+        $this->ok('PUT', "/gallery/albums/{$id}/cover", ['photo_id' => $ids['C.jpg']]);
+        $this->assertSame($thumbs['C.jpg'], $cover(true));
+        $this->assertSame($thumbs['A.jpg'], $cover(false), 'internes Titelbild nie für Gäste');
+        $this->assertNull($gallery->album($id, false)['cover_id']);
+        $this->assertSame($ids['C.jpg'], $gallery->album($id, true)['cover_id']);
+
+        // Verschoben: wieder automatisch
+        $this->ok('POST', '/gallery/photos/move', ['ids' => [$ids['C.jpg']], 'album_id' => $other]);
+        $this->assertSame($thumbs['A.jpg'], $cover(true));
+        $this->assertNull($gallery->album($id, true)['cover_id']);
+
+        // Zurück auf automatisch
+        $this->ok('PUT', "/gallery/albums/{$id}/cover", ['photo_id' => $ids['B.jpg']]);
+        $this->assertSame(['id' => $id, 'cover_id' => null], $this->ok('PUT', "/gallery/albums/{$id}/cover", ['photo_id' => null]));
+        $this->assertSame($thumbs['A.jpg'], $cover(false));
     }
 
     /** @param array<string, mixed> $res */

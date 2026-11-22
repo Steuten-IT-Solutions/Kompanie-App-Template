@@ -1,4 +1,5 @@
 import type { GalleryAlbum, GalleryPhoto } from './api';
+import { t } from './i18n';
 
 // Dateinamen und Laden der Dateien zum Herunterladen (ohne weitere Abhängigkeiten, damit die Tests sie direkt laden).
 
@@ -74,7 +75,7 @@ export async function fetchPhoto(photo: GalleryPhoto, signal?: AbortSignal): Pro
     }
     if (res.status === 200 && (res.headers.get('content-type') ?? '').startsWith('image/')) return res.blob();
   }
-  throw new Error('Das Bild lässt sich gerade nicht laden. Ist es noch nicht fertig aufbereitet, später erneut versuchen.');
+  throw new Error(t('Das Bild lässt sich gerade nicht laden. Ist es noch nicht fertig aufbereitet, später erneut versuchen.'));
 }
 
 const wait = (ms: number, signal?: AbortSignal) =>
@@ -100,7 +101,7 @@ export async function fetchVideo(
   signal?: AbortSignal,
 ): Promise<Blob> {
   const url = photo.video;
-  const failed = () => new Error('Das Video lässt sich gerade nicht laden. Bitte später erneut versuchen.');
+  const failed = () => new Error(t('Das Video lässt sich gerade nicht laden. Bitte später erneut versuchen.'));
   if (!url) throw failed();
   const parts: Blob[] = [];
   let from = 0;

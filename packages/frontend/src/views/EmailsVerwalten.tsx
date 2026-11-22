@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import {
   api,
+  can,
   type BoardMailSummary,
   type MailDetail,
   type MailField,
@@ -18,11 +19,12 @@ import { navigate } from '../router';
 import { ErrorBox, Loading } from '../ui';
 import { confirmAsk } from '../ask';
 import { IconButton } from '../icons';
+import { t, tn } from '../i18n';
 
 /** Entwurf der E-Mail (auf diesem Gerät): geht beim Sprung zur Signatur-Einrichtung und beim Verlassen nicht verloren. */
 const DRAFT_KEY = 'kompanie-mail-draft';
 const FIELDS: MailField[] = ['to', 'cc', 'bcc'];
-const FIELD_LABELS: Record<MailField, string> = { to: 'An', cc: 'Cc', bcc: 'Bcc' };
+const FIELD_LABELS: Record<MailField, string> = { to: t('An'), cc: t('Cc'), bcc: t('Bcc') };
 const EMAIL = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;
 
 interface Draft extends Record<MailField, MailSelection> {
@@ -89,10 +91,10 @@ function withSaved(draft: Draft): Draft {
 }
 
 export function mailSummaryText(mail: BoardMailSummary): string {
-  const parts = [`${mail.sent} von ${mail.recipients} gesendet`];
-  if (mail.pending > 0) parts.push(`${mail.pending} ausstehend`);
-  if (mail.failed > 0) parts.push(`${mail.failed} fehlgeschlagen`);
-  if (mail.cancelled > 0) parts.push(`${mail.cancelled} nicht mehr gesendet`);
+  const parts = [t('{sent} von {total} gesendet', { sent: mail.sent, total: mail.recipients })];
+  if (mail.pending > 0) parts.push(t('{count} ausstehend', { count: mail.pending }));
+  if (mail.failed > 0) parts.push(t('{count} fehlgeschlagen', { count: mail.failed }));
+  if (mail.cancelled > 0) parts.push(t('{count} nicht mehr gesendet', { count: mail.cancelled }));
   return parts.join(', ');
 }
 
@@ -103,8 +105,8 @@ type Suggestion =
 
 /** Erreichbare Empfänger einer Gruppe, z. B. „12 von 14 mit Adresse + 2 Adressen“. */
 function groupCount(g: MailGroup): string {
-  const extra = g.emails.length > 0 ? ` + ${g.emails.length} ${g.emails.length === 1 ? 'Adresse' : 'Adressen'}` : '';
-  return `${g.with_email} von ${g.members} mit Adresse${extra}`;
+  const base = t('{count} von {total} mit Adresse', { count: g.with_email, total: g.members });
+  return g.emails.length > 0 ? `${base} + ${tn('{count} Adresse', '{count} Adressen', g.emails.length)}` : base;
 }
 
 /**
@@ -141,14 +143,19 @@ function RecipientField({
     const groups: Suggestion[] = withGroups
       ? options.groups
           .filter((g) => !value.groups.includes(g.key) && g.label.toLowerCase().includes(q))
-          .map((g) => ({ kind: 'group', key: g.key, label: g.label, hint: `Gruppe · ${groupCount(g)}` }))
+          .map((g) => ({ kind: 'group', key: g.key, label: g.label, hint: t('Gruppe · {count}', { count: groupCount(g) }) }))
       : [];
     const roles: Suggestion[] = options.roles
       .filter((r) => !value.roles.includes(r.key) && r.label.toLowerCase().includes(q))
-      .map((r) => ({ kind: 'role', key: r.key, label: r.label, hint: `Rolle · ${r.with_email} von ${r.members} mit Adresse` }));
+      .map((r) => ({
+        kind: 'role',
+        key: r.key,
+        label: r.label,
+        hint: t('Rolle · {count}', { count: t('{count} von {total} mit Adresse', { count: r.with_email, total: r.members }) }),
+      }));
     const users: Suggestion[] = options.members
       .filter((m) => !value.users.includes(m.id) && m.name.toLowerCase().includes(q))
-      .map((m) => ({ kind: 'user', id: m.id, label: m.name, hint: m.email ? 'Mitglied' : 'ohne Mailadresse' }));
+      .map((m) => ({ kind: 'user', id: m.id, label: m.name, hint: m.email ? t('Mitglied') : t('ohne Mailadresse') }));
     return [...groups, ...roles, ...users].slice(0, 8);
   }, [query, options, value, withGroups]);
 
@@ -174,7 +181,7 @@ function RecipientField({
       onChange({ ...value, emails: [...value.emails, ...add] });
     }
     setQuery(invalid.join(' '));
-    setError(invalid.length > 0 ? `Keine gültige Adresse: ${invalid.join(', ')}` : null);
+    setError(invalid.length > 0 ? t('Keine gültige Adresse: {list}', { list: invalid.join(', ') }) : null);
     return valid.length > 0;
   };
 
@@ -190,7 +197,12 @@ function RecipientField({
       e.preventDefault();
       if (suggestions.length > 0) pick(suggestions[Math.min(active, suggestions.length - 1)]);
       else if (query.includes('@')) takeEmails();
-      else setError(`Keine ${withGroups ? 'Gruppe, keine ' : ''}Rolle und kein Mitglied gefunden. Oder eine Mailadresse eingeben.`);
+      else
+        setError(
+          withGroups
+            ? t('Keine Gruppe, keine Rolle und kein Mitglied gefunden. Oder eine Mailadresse eingeben.')
+            : t('Keine Rolle und kein Mitglied gefunden. Oder eine Mailadresse eingeben.'),
+        );
     } else if (e.key === 'Backspace' && query === '') {
       if (value.emails.length > 0) onChange({ ...value, emails: value.emails.slice(0, -1) });
       else if (value.users.length > 0) onChange({ ...value, users: value.users.slice(0, -1) });
@@ -211,12 +223,12 @@ function RecipientField({
           {value.groups.map((key) => (
             <li key={`g-${key}`} className="mail-chip mail-chip-role mail-chip-group">
               <span>
-                {group(key)?.label ?? 'Gelöschte Gruppe'}
-                <span className="mail-chip-note"> · Gruppe ({group(key)?.with_email ?? 0})</span>
+                {group(key)?.label ?? t('Gelöschte Gruppe')}
+                <span className="mail-chip-note"> · {t('Gruppe ({count})', { count: group(key)?.with_email ?? 0 })}</span>
               </span>
               <button
                 type="button"
-                aria-label={`${group(key)?.label ?? 'Gruppe'} entfernen`}
+                aria-label={t('{name} entfernen', { name: group(key)?.label ?? t('Gruppe') })}
                 onClick={() => onChange({ ...value, groups: value.groups.filter((g) => g !== key) })}
               >
                 ×
@@ -227,11 +239,11 @@ function RecipientField({
             <li key={`r-${key}`} className="mail-chip mail-chip-role">
               <span>
                 {role(key)?.label ?? key}
-                <span className="mail-chip-note"> · Rolle ({role(key)?.with_email ?? 0})</span>
+                <span className="mail-chip-note"> · {t('Rolle ({count})', { count: role(key)?.with_email ?? 0 })}</span>
               </span>
               <button
                 type="button"
-                aria-label={`${role(key)?.label ?? key} entfernen`}
+                aria-label={t('{name} entfernen', { name: role(key)?.label ?? key })}
                 onClick={() => onChange({ ...value, roles: value.roles.filter((r) => r !== key) })}
               >
                 ×
@@ -241,12 +253,12 @@ function RecipientField({
           {value.users.map((uid) => (
             <li key={`u-${uid}`} className={`mail-chip ${member(uid)?.email === false ? 'mail-chip-missing' : ''}`}>
               <span>
-                {member(uid)?.name ?? 'Unbekannt'}
-                {member(uid)?.email === false && <span className="mail-chip-note"> · ohne Adresse</span>}
+                {member(uid)?.name ?? t('Unbekannt')}
+                {member(uid)?.email === false && <span className="mail-chip-note"> · {t('ohne Adresse')}</span>}
               </span>
               <button
                 type="button"
-                aria-label={`${member(uid)?.name ?? 'Mitglied'} entfernen`}
+                aria-label={t('{name} entfernen', { name: member(uid)?.name ?? t('Mitglied') })}
                 onClick={() => onChange({ ...value, users: value.users.filter((u) => u !== uid) })}
               >
                 ×
@@ -258,7 +270,7 @@ function RecipientField({
               <span>{email}</span>
               <button
                 type="button"
-                aria-label={`${email} entfernen`}
+                aria-label={t('{name} entfernen', { name: email })}
                 onClick={() => onChange({ ...value, emails: value.emails.filter((x) => x !== email) })}
               >
                 ×
@@ -272,8 +284,14 @@ function RecipientField({
           type="text"
           className={`mail-recipient-input mail-${field}-input`}
           value={query}
-          placeholder={isEmpty(value) ? (withGroups ? 'Gruppe, Rolle, Mitglied oder Adresse …' : 'Rolle, Mitglied oder Adresse …') : ''}
-          aria-label={`${fieldLabel}: ${withGroups ? 'Gruppe, ' : ''}Rolle, Mitglied oder Adresse`}
+          placeholder={
+            isEmpty(value) ? (withGroups ? t('Gruppe, Rolle, Mitglied oder Adresse …') : t('Rolle, Mitglied oder Adresse …')) : ''
+          }
+          aria-label={
+            withGroups
+              ? t('{field}: Gruppe, Rolle, Mitglied oder Adresse', { field: fieldLabel })
+              : t('{field}: Rolle, Mitglied oder Adresse', { field: fieldLabel })
+          }
           aria-autocomplete="list"
           aria-controls={listId}
           aria-expanded={suggestions.length > 0}
@@ -298,7 +316,7 @@ function RecipientField({
               });
               const rest = parts.filter((p) => !EMAIL.test(p) && p.includes('@'));
               setQuery(rest.join(' '));
-              setError(rest.length > 0 ? `Keine gültige Adresse: ${rest.join(', ')}` : null);
+              setError(rest.length > 0 ? t('Keine gültige Adresse: {list}', { list: rest.join(', ') }) : null);
             }
           }}
         />
@@ -344,31 +362,33 @@ function Compose({ options, onSent, onToast }: { options: MailOptions; onSent: (
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    if (noRecipients) return setError('Bitte mindestens einen Empfänger auswählen.');
-    if (draft.subject.trim() === '') return setError('Bitte einen Betreff eingeben.');
-    if (draft.text.trim() === '') return setError('Bitte einen Text eingeben.');
+    if (noRecipients) return setError(t('Bitte mindestens einen Empfänger auswählen.'));
+    if (draft.subject.trim() === '') return setError(t('Bitte einen Betreff eingeben.'));
+    if (draft.text.trim() === '') return setError(t('Bitte einen Text eingeben.'));
     const selection = { to: draft.to, cc: draft.cc, bcc: draft.bcc };
     setBusy(true);
     try {
       const p = await api.mailPreview(selection);
       if (p.recipients === 0) {
-        setError('Keiner der gewählten Empfänger hat eine Mailadresse.');
+        setError(t('Keiner der gewählten Empfänger hat eine Mailadresse.'));
         return;
       }
       const lines = [
-        `E-Mail „${draft.subject.trim()}“ jetzt an ${p.recipients} Empfänger senden?`,
+        tn('E-Mail „{subject}“ jetzt an {count} Empfänger senden?', 'E-Mail „{subject}“ jetzt an {count} Empfänger senden?', p.recipients, {
+          subject: draft.subject.trim(),
+        }),
         '',
-        `An: ${p.to} · Cc: ${p.cc} · Bcc: ${p.bcc}`,
-        `Absender: ${options.from_name} <${options.from}>`,
+        t('An: {to} · Cc: {cc} · Bcc: {bcc}', { to: p.to, cc: p.cc, bcc: p.bcc }),
+        t('Absender: {name} <{email}>', { name: options.from_name, email: options.from }),
       ];
-      if (draft.attachments.length > 0) lines.push(`Anhänge: ${draft.attachments.map((a) => a.name).join(', ')}`);
-      if (p.skipped.length > 0) lines.push('', `Ohne Mailadresse (bekommen nichts): ${p.skipped.join(', ')}`);
+      if (draft.attachments.length > 0) lines.push(t('Anhänge: {list}', { list: draft.attachments.map((a) => a.name).join(', ') }));
+      if (p.skipped.length > 0) lines.push('', t('Ohne Mailadresse (bekommen nichts): {list}', { list: p.skipped.join(', ') }));
       if (!(await confirmAsk(lines.join('\n')))) return;
       await api.sendMail({ subject: draft.subject, text: draft.text, attachments: draft.attachments.map((a) => a.uid), ...selection });
       saveDraft(null);
       setDraft(emptyDraft());
       setEditorKey((k) => k + 1);
-      onToast('E-Mail wird versendet');
+      onToast(t('E-Mail wird versendet'));
       onSent();
     } catch (err) {
       setError((err as Error).message);
@@ -379,9 +399,9 @@ function Compose({ options, onSent, onToast }: { options: MailOptions; onSent: (
 
   return (
     <form className="form card mail-form" onSubmit={submit}>
-      <h3>E-Mail schreiben</h3>
+      <h3>{t('E-Mail schreiben')}</h3>
       <p className="muted small mail-from">
-        Von: {options.from_name} &lt;{options.from}&gt; · Antworten gehen an diese Adresse.
+        {t('Von: {name} <{email}> · Antworten gehen an diese Adresse.', { name: options.from_name, email: options.from })}
       </p>
       <RecipientField field="to" value={draft.to} options={options} onChange={(to) => update({ to })} />
       {showCopies ? (
@@ -391,11 +411,11 @@ function Compose({ options, onSent, onToast }: { options: MailOptions; onSent: (
         </>
       ) : (
         <button type="button" className="btn btn-link mail-copies-toggle" onClick={() => update({ copies: true })}>
-          Cc und Bcc hinzufügen
+          {t('Cc und Bcc hinzufügen')}
         </button>
       )}
       <label className="field">
-        <span>Betreff</span>
+        <span>{t('Betreff')}</span>
         <input
           type="text"
           className="mail-subject-input"
@@ -406,12 +426,12 @@ function Compose({ options, onSent, onToast }: { options: MailOptions; onSent: (
         />
       </label>
       <div className="field">
-        <span>Text</span>
+        <span>{t('Text')}</span>
         <ComposeEditor
           key={editorKey}
           value={draft.text}
           onChange={(text) => update({ text })}
-          label="Text der E-Mail"
+          label={t('Text der E-Mail')}
           id="mail-new-text"
           returnTo="verwaltung/mail"
           saveDraft={() => saveDraft(draft)}
@@ -429,17 +449,17 @@ function Compose({ options, onSent, onToast }: { options: MailOptions; onSent: (
         type="submit"
         disabled={busy || noRecipients || draft.subject.trim() === '' || draft.text.trim() === ''}
       >
-        {busy ? 'Sendet …' : 'Senden'}
+        {busy ? t('Sendet …') : t('Senden')}
       </button>
     </form>
   );
 }
 
 const STATUS: Record<MailDetail['log'][number]['status'], string> = {
-  pending: 'ausstehend',
-  sent: 'gesendet',
-  failed: 'fehlgeschlagen',
-  cancelled: 'nicht mehr gesendet',
+  pending: t('ausstehend'),
+  sent: t('gesendet'),
+  failed: t('fehlgeschlagen'),
+  cancelled: t('nicht mehr gesendet'),
 };
 
 /** Eine versendete E-Mail: Empfänger wie ausgewählt, Inhalt und Versand je Empfänger. */
@@ -454,7 +474,7 @@ function Detail({ id }: { id: number }) {
   return (
     <div>
       <button type="button" className="btn btn-link back" onClick={() => navigate('verwaltung/mail')}>
-        ‹ E-Mails
+        ‹ {t('E-Mails')}
       </button>
       {error ? (
         <ErrorBox message={error} onRetry={load} />
@@ -463,7 +483,7 @@ function Detail({ id }: { id: number }) {
       ) : (
         <article className="card board-card mail-detail">
           <span className="board-meta">
-            {data.author_name ?? 'Unbekannt'} · {formatShortTime(data.created_at)}
+            {data.author_name ?? t('Unbekannt')} · {formatShortTime(data.created_at)}
           </span>
           <h3 className="board-title">{data.subject}</h3>
           <dl className="mail-selection">
@@ -475,9 +495,9 @@ function Detail({ id }: { id: number }) {
                 <dt>{FIELD_LABELS[f]}:</dt>
                 <dd>
                   {[
-                    ...(data.selection[f].groups ?? []).map((g) => `${g.label} (Gruppe)`),
-                    ...data.selection[f].roles.map((r) => `${r.label} (Rolle)`),
-                    ...data.selection[f].users.map((u) => u.name ?? 'gelöschtes Konto'),
+                    ...(data.selection[f].groups ?? []).map((g) => t('{name} (Gruppe)', { name: g.label })),
+                    ...data.selection[f].roles.map((r) => t('{name} (Rolle)', { name: r.label })),
+                    ...data.selection[f].users.map((u) => u.name ?? t('gelöschtes Konto')),
                     ...data.selection[f].emails,
                   ].join(', ')}
                 </dd>
@@ -486,14 +506,14 @@ function Detail({ id }: { id: number }) {
           </dl>
           <RichTextView html={data.text} className="board-text" />
           <AttachmentList items={data.attachments} />
-          <p className="muted small mail-status">Versand: {mailSummaryText(data.mail)}</p>
+          <p className="muted small mail-status">{t('Versand: {summary}', { summary: mailSummaryText(data.mail) })}</p>
           {data.mail.pending > 0 && (
             <button type="button" className="btn btn-link" onClick={load}>
-              Stand aktualisieren
+              {t('Stand aktualisieren')}
             </button>
           )}
           <details className="board-mail-log">
-            <summary>Versand je Empfänger</summary>
+            <summary>{t('Versand je Empfänger')}</summary>
             <ul>
               {data.log.map((l, i) => (
                 <li key={i} className={`board-mail-${l.status}`}>
@@ -513,9 +533,9 @@ function Detail({ id }: { id: number }) {
 function History({ items, keepDays }: { items: MailListItem[]; keepDays: number }) {
   return (
     <section className="mail-history">
-      <h2 className="board-page-title">Versendete E-Mails</h2>
+      <h2 className="board-page-title">{t('Versendete E-Mails')}</h2>
       {items.length === 0 ? (
-        <p className="muted small">Noch keine.</p>
+        <p className="muted small">{t('Noch keine.')}</p>
       ) : (
         <ul className="card-list mail-history-list">
           {items.map((m) => (
@@ -523,22 +543,28 @@ function History({ items, keepDays }: { items: MailListItem[]; keepDays: number 
               <div className="row-main">
                 <div className="row-title">{m.subject}</div>
                 <div className="row-sub">
-                  {m.author_name ?? 'Unbekannt'} · {formatShortTime(m.created_at)} · {mailSummaryText(m.mail)}
+                  {m.author_name ?? t('Unbekannt')} · {formatShortTime(m.created_at)} · {mailSummaryText(m.mail)}
                 </div>
               </div>
             </li>
           ))}
         </ul>
       )}
-      <p className="muted small">Versendete E-Mails bleiben {keepDays} Tage im Verlauf; danach werden sie samt Protokoll gelöscht.</p>
+      <p className="muted small">
+        {tn(
+          'Versendete E-Mails bleiben {count} Tag im Verlauf; danach werden sie samt Protokoll gelöscht.',
+          'Versendete E-Mails bleiben {count} Tage im Verlauf; danach werden sie samt Protokoll gelöscht.',
+          keepDays,
+        )}
+      </p>
     </section>
   );
 }
 
 /** Wer zu einer Standardgruppe gehört (die App bestimmt es beim Senden). */
 const STANDARD_HINTS: Record<string, string> = {
-  members: 'Alle, deren Rolle „Gehört zur Kompanie“ hat, auch Admins und eigene Rollen wie Spieß; ohne Anwärter.',
-  all: 'Alle Konten außer Gästen, auch Anwärter.',
+  members: t('Alle, deren Rolle „Gehört zur Kompanie“ hat, auch Admins und eigene Rollen wie Spieß; ohne Anwärter.'),
+  all: t('Alle Konten außer Gästen, auch Anwärter.'),
 };
 
 interface GroupDraft {
@@ -585,14 +611,14 @@ function Groups({ onToast }: { onToast: (msg: string) => void }) {
     e.preventDefault();
     if (!edit) return;
     const content = { roles: edit.content.roles, users: edit.content.users, emails: edit.content.emails };
-    if (edit.key === null) void run(() => api.createMailGroup({ label: edit.label, ...content }), 'Gruppe angelegt');
-    else if (edit.standard) void run(() => api.updateMailGroup(edit.key!, { label: edit.label }), 'Gespeichert');
-    else void run(() => api.updateMailGroup(edit.key!, { label: edit.label, ...content }), 'Gespeichert');
+    if (edit.key === null) void run(() => api.createMailGroup({ label: edit.label, ...content }), t('Gruppe angelegt'));
+    else if (edit.standard) void run(() => api.updateMailGroup(edit.key!, { label: edit.label }), t('Gespeichert'));
+    else void run(() => api.updateMailGroup(edit.key!, { label: edit.label, ...content }), t('Gespeichert'));
   };
 
   const back = (
     <button type="button" className="btn btn-link back" onClick={() => navigate('verwaltung/mail')}>
-      ‹ E-Mails
+      ‹ {t('E-Mails')}
     </button>
   );
   if (error)
@@ -606,21 +632,21 @@ function Groups({ onToast }: { onToast: (msg: string) => void }) {
   const describe = (g: MailGroup): string => {
     if (g.standard) return STANDARD_HINTS[g.key] ?? '';
     const roles = g.roles.map((k) => options.roles.find((r) => r.key === k)?.label ?? k);
-    const users = g.users.map((id) => options.members.find((m) => m.id === id)?.name ?? 'Unbekannt');
-    return [...roles.map((r) => `${r} (Rolle)`), ...users, ...g.emails].join(', ') || 'leer';
+    const users = g.users.map((id) => options.members.find((m) => m.id === id)?.name ?? t('Unbekannt'));
+    return [...roles.map((r) => t('{name} (Rolle)', { name: r })), ...users, ...g.emails].join(', ') || t('leer');
   };
 
   return (
     <div className="mail-groups">
       {back}
-      <h2 className="board-page-title">Mailgruppen</h2>
+      <h2 className="board-page-title">{t('Mailgruppen')}</h2>
       <ul className="card-list">
         {options.groups.map((g) => (
           <li key={g.key} className="card row mail-group-item">
             <div className="row-main">
               <div className="row-title">
                 {g.label}
-                {g.standard && <span className="muted small"> · Standardgruppe</span>}
+                {g.standard && <span className="muted small"> · {t('Standardgruppe')}</span>}
               </div>
               <div className="row-sub">{describe(g)}</div>
               <div className="row-sub">{groupCount(g)}</div>
@@ -638,16 +664,17 @@ function Groups({ onToast }: { onToast: (msg: string) => void }) {
                     });
                   }}
                 >
-                  {g.standard ? 'Umbenennen' : 'Bearbeiten'}
+                  {g.standard ? t('Umbenennen') : t('Bearbeiten')}
                 </button>
                 {!g.standard && (
                   <IconButton
                     icon="delete"
-                    label="Löschen"
+                    label={t('Löschen')}
                     variant="danger"
                     disabled={busy}
                     onClick={async () =>
-                      (await confirmAsk(`Mailgruppe „${g.label}“ löschen?`)) && void run(() => api.deleteMailGroup(g.key), 'Gelöscht')
+                      (await confirmAsk(t('Mailgruppe „{name}“ löschen?', { name: g.label }))) &&
+                      void run(() => api.deleteMailGroup(g.key), t('Gelöscht'))
                     }
                   />
                 )}
@@ -663,16 +690,16 @@ function Groups({ onToast }: { onToast: (msg: string) => void }) {
       )}
       {edit ? (
         <form className="form card mail-group-form" onSubmit={save}>
-          <h3>{edit.key === null ? 'Neue Mailgruppe' : edit.standard ? 'Standardgruppe umbenennen' : 'Mailgruppe bearbeiten'}</h3>
+          <h3>{edit.key === null ? t('Neue Mailgruppe') : edit.standard ? t('Standardgruppe umbenennen') : t('Mailgruppe bearbeiten')}</h3>
           <label className="field">
-            <span>Bezeichnung</span>
+            <span>{t('Bezeichnung')}</span>
             <input
               type="text"
               className="mail-group-label"
               maxLength={60}
               value={edit.label}
               onChange={(e) => setEdit({ ...edit, label: e.target.value })}
-              placeholder="z. B. Vorstand"
+              placeholder={t('z. B. Vorstand')}
               required
             />
           </label>
@@ -681,7 +708,7 @@ function Groups({ onToast }: { onToast: (msg: string) => void }) {
           ) : (
             <RecipientField
               field="to"
-              label="Mitglieder der Gruppe"
+              label={t('Mitglieder der Gruppe')}
               withGroups={false}
               value={edit.content}
               options={options}
@@ -691,10 +718,10 @@ function Groups({ onToast }: { onToast: (msg: string) => void }) {
           {formError && <p className="form-error small">{formError}</p>}
           <div className="row-actions">
             <button className="btn" type="submit" disabled={busy || edit.label.trim() === ''}>
-              Speichern
+              {t('Speichern')}
             </button>
             <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => setEdit(null)}>
-              Abbrechen
+              {t('Abbrechen')}
             </button>
           </div>
         </form>
@@ -707,7 +734,7 @@ function Groups({ onToast }: { onToast: (msg: string) => void }) {
             setEdit({ key: null, standard: false, label: '', content: emptySelection() });
           }}
         >
-          Neue Mailgruppe
+          {t('Neue Mailgruppe')}
         </button>
       )}
     </div>
@@ -720,15 +747,17 @@ function Groups({ onToast }: { onToast: (msg: string) => void }) {
  * E-Mail, verwaltung/mail/gruppen die Mailgruppen.
  */
 export function MailAdmin({ path, onToast }: { path: string[]; onToast: (msg: string) => void }) {
+  // Nur sehen (view_mail): Verlauf mit Versandprotokoll; schreiben und Mailgruppen mit send_mail
+  const send = can('send_mail');
   const detail = path[0] && /^\d+$/.test(path[0]) ? Number(path[0]) : null;
-  const groups = path[0] === 'gruppen';
+  const groups = send && path[0] === 'gruppen';
   const [options, setOptions] = useState<MailOptions | null>(null);
   const [history, setHistory] = useState<{ items: MailListItem[]; keep_days: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = () => {
     setError(null);
-    Promise.all([api.mailOptions(), api.mails()]).then(
+    Promise.all([send ? api.mailOptions() : Promise.resolve(null), api.mails()]).then(
       ([o, h]) => {
         setOptions(o);
         setHistory(h);
@@ -743,19 +772,22 @@ export function MailAdmin({ path, onToast }: { path: string[]; onToast: (msg: st
   if (detail !== null) return <Detail id={detail} />;
   if (groups) return <Groups onToast={onToast} />;
   if (error) return <ErrorBox message={error} onRetry={load} />;
-  if (!options || !history) return <Loading />;
+  if ((send && !options) || !history) return <Loading />;
   return (
     <div className="mail-page">
-      {options.available ? (
-        <Compose options={options} onSent={() => api.mails().then(setHistory, () => undefined)} onToast={onToast} />
-      ) : (
-        <div className="card mail-unavailable">
-          <p>{options.reason ?? 'Der Mailversand ist noch nicht eingerichtet.'}</p>
-        </div>
+      {options &&
+        (options.available ? (
+          <Compose options={options} onSent={() => api.mails().then(setHistory, () => undefined)} onToast={onToast} />
+        ) : (
+          <div className="card mail-unavailable">
+            <p>{options.reason ?? t('Der Mailversand ist noch nicht eingerichtet.')}</p>
+          </div>
+        ))}
+      {options && (
+        <button type="button" className="btn btn-link mail-groups-link" onClick={() => navigate('verwaltung/mail/gruppen')}>
+          {t('Mailgruppen verwalten ({count})', { count: options.groups.length })}
+        </button>
       )}
-      <button type="button" className="btn btn-link mail-groups-link" onClick={() => navigate('verwaltung/mail/gruppen')}>
-        Mailgruppen verwalten ({options.groups.length})
-      </button>
       <History items={history.items} keepDays={history.keep_days} />
     </div>
   );

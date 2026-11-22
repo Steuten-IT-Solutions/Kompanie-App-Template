@@ -33,12 +33,41 @@ export const isView = (c: Capability): boolean => VIEW.includes(c);
 const OWN_DATA: Capability[] = ['view_own_points', 'view_own_penalties', 'view_own_rank', 'view_own_attendance'];
 
 /**
+ * Schreibrecht → Leserecht, das es voraussetzt (wie Capability::READ_OF im Kern): Rechte in Lesen und Schreiben
+ * aufgeteilt; das Leserecht setzt seinerseits „Gehört zur Kompanie“ voraus.
+ */
+export const READ_OF: Partial<Record<Capability, Capability>> = {
+  manage_personal: 'view_personal',
+  manage_points: 'view_points',
+  manage_penalties: 'view_penalties',
+  manage_ranks: 'view_promotions',
+  manage_titles: 'view_titles',
+  manage_attendance: 'view_attendance',
+  manage_calendar: 'view_responses',
+  manage_inventory: 'view_inventory',
+  manage_lists: 'view_lists',
+  send_mail: 'view_mail',
+  manage_passive: 'view_passive',
+  review_gallery: 'view_submissions',
+  review_reports: 'view_reports',
+  create_users: 'view_accounts',
+  promote_users: 'view_accounts',
+  manage_documents: 'view_restricted_documents',
+  manage_polls: 'view_poll_results',
+  post_board: 'view_board_history',
+  manage_companies: 'view_company_members',
+};
+
+/**
  * Recht, das dieses voraussetzt (wie Capability::requires im Kern): eigene Daten und alles zum Verwalten nur mit
- * „Gehört zur Kompanie“ (member); persönliche Angaben pflegt nur, wer sie sieht (manage_personal → view_personal).
+ * „Gehört zur Kompanie“ (member); Schreiben nur mit dem passenden Lesen (READ_OF, z. B. manage_personal →
+ * view_personal); zu- und absagen nur mit dem internen Kalender.
  */
 export function requires(c: Capability): Capability | null {
   if (OWN_DATA.includes(c)) return 'member';
-  if (c === 'manage_personal') return 'view_personal';
+  if (c === 'respond_calendar') return 'calendar';
+  const read = READ_OF[c];
+  if (read) return read;
   return isView(c) || c === 'member' ? null : 'member';
 }
 
@@ -114,6 +143,7 @@ const ORDER: Capability[] = [
   'view_own_rank',
   'view_own_attendance',
   'calendar',
+  'respond_calendar',
   'view_gallery_internal',
   'view_birthdays',
   'vote_polls',
@@ -125,33 +155,78 @@ const ORDER: Capability[] = [
   'view_ranks',
   'view_catalog',
   'manage_events',
+  'view_responses',
   'manage_calendar',
   'manage_news',
+  'view_restricted_documents',
   'manage_documents',
+  'view_board_history',
   'post_board',
+  'view_poll_results',
   'manage_polls',
+  'view_lists',
   'manage_lists',
+  'view_mail',
   'send_mail',
   'manage_sponsors',
+  'view_company_members',
   'manage_companies',
   'submit_gallery',
+  'view_submissions',
   'review_gallery',
   'manage_gallery',
   'manage_pages',
+  'manage_website',
+  'view_points',
   'manage_points',
+  'view_penalties',
   'manage_penalties',
+  'view_promotions',
   'manage_ranks',
+  'view_titles',
   'manage_titles',
+  'view_attendance',
   'manage_attendance',
   'manage_offices',
+  'view_inventory',
   'manage_inventory',
   'view_personal',
   'manage_personal',
+  'view_accounts',
   'create_users',
+  'manage_former',
+  'view_passive',
+  'manage_passive',
   'promote_users',
+  'view_reports',
   'review_reports',
   'view_changes',
 ];
 
 /** Rechte in der Reihenfolge der Gruppen (wie der Kern sie speichert). */
 export const orderedCaps = (set: ReadonlySet<Capability>): Capability[] => ORDER.filter((c) => set.has(c));
+
+/** Eine Zeile im Rechtebaum: ein einzelnes Recht oder ein Bereich mit Leserecht und Schreibrecht. */
+export type RightsRow<T extends { key: Capability; area?: string }> =
+  | { kind: 'single'; item: T }
+  | { kind: 'pair'; area: string; read: T; write: T };
+
+/**
+ * Zeilen einer Gruppe im Rechtebaum (rightsTree.tsx): Ein Leserecht mit Bereichsnamen (area), dem sein Schreibrecht folgt
+ * (READ_OF), wird eine Zeile mit den Haken „Lesen“ und „Schreiben“ (Entscheidung vom 17.11.2026); alle anderen Rechte
+ * bleiben einzeln.
+ */
+export function rightsRows<T extends { key: Capability; area?: string }>(items: T[]): RightsRow<T>[] {
+  const rows: RightsRow<T>[] = [];
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    const next = items[i + 1];
+    if (item.area && next && READ_OF[next.key] === item.key) {
+      rows.push({ kind: 'pair', area: item.area, read: item, write: next });
+      i++;
+    } else {
+      rows.push({ kind: 'single', item });
+    }
+  }
+  return rows;
+}

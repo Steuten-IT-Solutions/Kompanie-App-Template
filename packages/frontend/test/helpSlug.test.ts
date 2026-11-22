@@ -28,6 +28,7 @@ const ALL_FEATURES = [
   'mail',
   'sponsors',
   'companies',
+  'passive',
 ];
 /** Admin mit allen Rechten und allen Bereichen. */
 const admin: HelpContext = { boardWriter: true, can: () => true, features: Object.fromEntries(ALL_FEATURES.map((f) => [f, true])) };
@@ -83,6 +84,7 @@ const PATHS = [
   ['meins', 'strafen'],
   ['meins', 'dienstgrad'],
   ['meins', 'anwesenheit'],
+  ['meins', 'passive'],
   ['meins', 'konto'],
   ['meins', 'konto', 'signatur'],
   ['meins', 'aemter'],
@@ -112,6 +114,8 @@ const PATHS = [
   ['verwaltung', 'ehemalige', 'import'],
   ['verwaltung', 'ehemalige', 'neu'],
   ['verwaltung', 'anfragen'],
+  ['verwaltung', 'passive'],
+  ['verwaltung', 'bericht'],
   ...['mitglied', 'ehemalige'].flatMap((base) =>
     ['uebersicht', 'konto', 'punkte', 'strafen', 'dienstgrad', 'titel', 'aemter', 'geburtstag', 'eintritt', 'austritt'].map((s) => [
       'verwaltung',
@@ -170,6 +174,14 @@ test('Termine: passend zu Kalender, öffentlichen Terminen und Geburtstagen', ()
   assert.equal(helpSlug(['termine'], withRights(['calendar'], ['events', 'calendar'])), 'kalender');
   assert.equal(helpSlug(['termine'], withRights(['member', 'calendar'], ['calendar'])), 'kalender');
   assert.equal(helpSlug(['termine'], withRights(['member'], ['birthdays'])), 'geburtstage');
+});
+
+test('Passive: Verwaltung und Meins → Meine Passiven', () => {
+  assert.equal(helpSlug(['verwaltung', 'passive'], admin), 'passive-verwalten');
+  const caretaker = withRights(['member'], ['passive']);
+  assert.equal(helpSlug(['meins', 'passive'], caretaker), 'meine-passiven');
+  assert.ok(sees('meine-passiven', caretaker));
+  assert.ok(!sees('passive-verwalten', caretaker));
 });
 
 test('Meins: ohne Unterseite die Übersicht, sonst die Seite zur Unterseite', () => {
@@ -231,6 +243,7 @@ test('Eine eigene Seite je Bildschirm', () => {
 test('Mitgliederliste und Seite eines Mitglieds: für jede Aufgabe, die sie öffnet, sichtbar', () => {
   const cases: [string, string][] = [
     ['create_users', ''],
+    ['manage_former', ''],
     ['promote_users', ''],
     ['manage_points', 'points'],
     ['manage_penalties', 'penalties'],
@@ -255,8 +268,9 @@ test('Mitgliederliste und Seite eines Mitglieds: für jede Aufgabe, die sie öff
     helpSlug(['verwaltung', 'mitglied', '7', 'geburtstag'], withRights(['manage_points'], ['points', 'birthdays'])),
     'mitglied-uebersicht',
   );
-  assert.equal(helpSlug(['verwaltung', 'ehemalige'], withRights(['create_users'])), 'ehemalige-mitglieder');
-  assert.equal(helpSlug(['verwaltung', 'ehemalige', 'import'], withRights(['create_users'])), 'ehemalige-mitglieder');
+  assert.equal(helpSlug(['verwaltung', 'ehemalige'], withRights(['manage_former'])), 'ehemalige-mitglieder');
+  assert.equal(helpSlug(['verwaltung', 'ehemalige', 'import'], withRights(['manage_former'])), 'ehemalige-mitglieder');
+  assert.equal(helpSlug(['verwaltung', 'ehemalige', 'neu'], withRights(['manage_former'])), 'ehemalige-anlegen');
 });
 
 test('Schwarzes Brett: lesen oder schreiben', () => {

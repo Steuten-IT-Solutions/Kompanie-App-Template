@@ -6,6 +6,7 @@ namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\App;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Infra\RemoteNewsSource;
 use KompanieApp\Core\Push\PushService;
 
@@ -43,6 +44,8 @@ final class SettingsService
                 'connected' => $drive->oauth() !== null,
                 'email' => $drive->oauthEmail(),
                 'calendar_access' => $drive->calendarAccess(),
+                // Voller Drive-Zugriff (Galerie schreiben); ältere Verbindungen nur lesen
+                'write_access' => $drive->writeAccess(),
                 'service_account_email' => $drive->clientEmail(),
                 'last_result' => $a->googleConnect()->lastResult(),
             ],
@@ -56,6 +59,10 @@ final class SettingsService
                 'google_api_key_set' => trim((string) $s->get('google_api_key', '')) !== '',
                 'calendar_ids' => (string) $s->get('calendar_ids', ''),
                 'cache_minutes' => max(1, (int) $s->get('calendar_cache_minutes', 15)),
+                // Zu- und Absagen eingeschaltet (Vorgabe aus); Erinnerung an alle ohne Rückmeldung (Push), Vorlauf in Tagen
+                'responses' => $a->eventResponses()->enabled(),
+                'response_reminder' => $a->eventResponses()->reminderSettings()['enabled'],
+                'response_reminder_days' => $a->eventResponses()->reminderSettings()['days'],
             ],
             'gallery' => [
                 'configured' => $a->gallery()->isConfigured(),
@@ -64,6 +71,8 @@ final class SettingsService
                 'source' => $a->gallery()->sourceType(),
                 'store' => $a->gallery()->store(),
                 'media_bytes' => $a->gallery()->mediaBytes(),
+                // Ablage in Google Drive: aktiv, neu verbinden nötig, Dateien, die noch auf dem Server warten, letzter Fehler
+                'drive' => $a->galleryDrive()->status(),
                 'downloads' => $a->gallery()->downloadsEnabled(),
                 // Einreichen von Bildern und Videos durch Mitglieder erlaubt (Haken, Vorgabe bei Neuinstallation: aus)
                 'submissions' => $a->gallerySubmissions()->enabled(),
@@ -82,6 +91,11 @@ final class SettingsService
                 'sources' => $a->newsService()->sources(),
             ],
             'legal' => $this->legal(),
+            // Sprachen (Plan „Mehrsprachigkeit“): eingeschaltete und mögliche; Deutsch ist immer an
+            'languages' => [
+                'enabled' => $a->languages()->enabled(),
+                'available' => I18n::LOCALES,
+            ],
         ];
         return $out;
     }
@@ -114,21 +128,21 @@ final class SettingsService
         $newsBefore = $a->newsService()->sourceType();
         $calendarBefore = $a->calendar()->source();
         foreach ($in as $key => $value) {
-            if (!is_string($value) && !($key === 'calendar_cache_minutes' && is_int($value))) {
-                throw ApiError::invalid('Ungültiger Wert für ' . $key . '.');
+            if (!is_string($value) && !(in_array($key, ['calendar_cache_minutes', 'calendar_response_reminder_days'], true) && is_int($value))) {
+                throw ApiError::invalid(I18n::t('Ungültiger Wert für {key}.', ['key' => $key]));
             }
         }
 
         $set = [];
         if (array_key_exists('calendar_source', $in)) {
             if (!in_array($in['calendar_source'], CalendarService::SOURCES, true)) {
-                throw ApiError::invalid('Unbekannte Quelle für den Kalender.');
+                throw ApiError::invalid(I18n::t('Unbekannte Quelle für den Kalender.'));
             }
             $set[CalendarService::SOURCE_SETTING] = $in['calendar_source'];
         }
         if (array_key_exists('calendar_ics_url', $in)) {
             $url = (string) preg_replace('#^webcal://#i', 'https://', trim($in['calendar_ics_url']));
-            $set['calendar_ics_url'] = Input::url($url, 'Bitte die iCal-Adresse des Kalenders einfügen (beginnt mit https://).');
+            $set['calendar_ics_url'] = Input::url($url, I18n::t('Bitte die iCal-Adresse des Kalenders einfügen (beginnt mit https://).'));
             // Ohne gewählte Quelle (ältere Fassungen der App): Die iCal-Adresse soll gelten. Mit Auswahl bleiben die
             // Kalender-IDs für ein Zurückwechseln erhalten.
             if ($set['calendar_ics_url'] !== '' && !array_key_exists('calendar_ids', $in) && !array_key_exists('calendar_source', $in)) {
@@ -139,7 +153,7 @@ final class SettingsService
         if (array_key_exists('google_api_key', $in)) {
             $key = Text::line($in['google_api_key'], 200);
             if ($key !== '' && !preg_match('/^[A-Za-z0-9_-]+$/', $key)) {
-                throw ApiError::invalid('Der API-Schlüssel enthält ungültige Zeichen.');
+                throw ApiError::invalid(I18n::t('Der API-Schlüssel enthält ungültige Zeichen.'));
             }
             $set['google_api_key'] = $key;
         }
@@ -147,7 +161,7 @@ final class SettingsService
             $ids = array_filter(array_map('trim', explode(',', Text::line($in['calendar_ids'], 1000))));
             foreach ($ids as $id) {
                 if (!preg_match('/^[A-Za-z0-9._@%+-]+$/', $id)) {
-                    throw ApiError::invalid('Ungültige Kalender-ID: ' . $id);
+                    throw ApiError::invalid(I18n::t('Ungültige Kalender-ID: {id}', ['id' => $id]));
                 }
             }
             $set['calendar_ids'] = implode(',', $ids);
@@ -155,10 +169,13 @@ final class SettingsService
         if (array_key_exists('calendar_cache_minutes', $in)) {
             $min = Input::integer($in['calendar_cache_minutes']);
             if ($min === null || $min < 1 || $min > 1440) {
-                throw ApiError::invalid('Der Zwischenspeicher muss zwischen 1 und 1440 Minuten liegen.');
+                throw ApiError::invalid(I18n::t('Der Zwischenspeicher muss zwischen 1 und 1440 Minuten liegen.'));
             }
             $set['calendar_cache_minutes'] = $min;
         }
+        $set += EventResponseService::validEnabled($in['calendar_responses'] ?? null);
+        $set += LanguageService::validEnabled($in['languages'] ?? null);
+        $set += EventResponseService::validReminder($in['calendar_response_reminder'] ?? null, $in['calendar_response_reminder_days'] ?? null);
         $serviceAccount = null;
         if (array_key_exists('drive_service_account', $in) && trim($in['drive_service_account']) !== '') {
             try {
@@ -168,56 +185,56 @@ final class SettingsService
             }
         }
         if (array_key_exists('drive_oauth', $in) && $in['drive_oauth'] !== '') {
-            throw ApiError::invalid('Eine Verbindung zu Google lässt sich hier nur trennen (leerer Wert). Verbinden: POST /admin/google/connect.');
+            throw ApiError::invalid(I18n::t('Eine Verbindung zu Google lässt sich hier nur trennen (leerer Wert). Verbinden: POST /admin/google/connect.'));
         }
         $root = null;
         if (array_key_exists('gallery_root', $in)) {
             $root = DriveClient::parseFolderId($in['gallery_root']);
             if (trim($in['gallery_root']) !== '' && $root === '') {
-                throw ApiError::invalid('Der Galerie-Ordner wurde nicht erkannt. Bitte den Link zum Ordner aus Google Drive einfügen.');
+                throw ApiError::invalid(I18n::t('Der Galerie-Ordner wurde nicht erkannt. Bitte den Link zum Ordner aus Google Drive einfügen.'));
             }
         }
         $gallerySource = null;
         if (array_key_exists('gallery_source', $in)) {
             if (!in_array($in['gallery_source'], GalleryService::SOURCES, true)) {
-                throw ApiError::invalid('Unbekannte Quelle für die Galerie.');
+                throw ApiError::invalid(I18n::t('Unbekannte Quelle für die Galerie.'));
             }
             $gallerySource = (string) $in['gallery_source'];
         }
         if (array_key_exists('gallery_store', $in) && !in_array($in['gallery_store'], GalleryService::STORES, true)) {
-            throw ApiError::invalid('Unbekannter Ablageort für hochgeladene Bilder.');
+            throw ApiError::invalid(I18n::t('Unbekannter Ablageort für hochgeladene Bilder.'));
         }
         $downloads = null;
         if (array_key_exists('gallery_downloads', $in)) {
             if (!in_array($in['gallery_downloads'], ['0', '1'], true)) {
-                throw ApiError::invalid('Ungültiger Wert für gallery_downloads (0 oder 1).');
+                throw ApiError::invalid(I18n::t('Ungültiger Wert für gallery_downloads (0 oder 1).'));
             }
             $downloads = $in['gallery_downloads'] === '1';
         }
         $submissions = null;
         if (array_key_exists('gallery_submissions', $in)) {
             if (!in_array($in['gallery_submissions'], ['0', '1'], true)) {
-                throw ApiError::invalid('Ungültiger Wert für gallery_submissions (0 oder 1).');
+                throw ApiError::invalid(I18n::t('Ungültiger Wert für gallery_submissions (0 oder 1).'));
             }
             $submissions = $in['gallery_submissions'] === '1';
         }
         if (array_key_exists('news_source', $in)) {
             if (!in_array($in['news_source'], $a->newsService()->sources(), true)) {
-                throw ApiError::invalid('Unbekannte Quelle für Neuigkeiten.');
+                throw ApiError::invalid(I18n::t('Unbekannte Quelle für Neuigkeiten.'));
             }
             $set['news_source'] = $in['news_source'];
         }
         if ($news && array_key_exists('news_url', $in)) {
-            $set['news_url'] = Input::url($in['news_url'], 'Bitte die Adresse der Webseite bzw. des Feeds angeben (beginnt mit https://).');
+            $set['news_url'] = Input::url($in['news_url'], I18n::t('Bitte die Adresse der Webseite bzw. des Feeds angeben (beginnt mit https://).'));
         }
         if (array_key_exists('legal_imprint_url', $in)) {
-            $set[self::IMPRINT_SETTING] = Input::url($in['legal_imprint_url'], 'Bitte die Adresse des Impressums angeben (beginnt mit https://).');
+            $set[self::IMPRINT_SETTING] = Input::url($in['legal_imprint_url'], I18n::t('Bitte die Adresse des Impressums angeben (beginnt mit https://).'));
         }
         if (array_key_exists('legal_privacy_url', $in)) {
-            $set[self::PRIVACY_SETTING] = Input::url($in['legal_privacy_url'], 'Bitte die Adresse der Datenschutzerklärung angeben (beginnt mit https://).');
+            $set[self::PRIVACY_SETTING] = Input::url($in['legal_privacy_url'], I18n::t('Bitte die Adresse der Datenschutzerklärung angeben (beginnt mit https://).'));
         }
         if (in_array($set['news_source'] ?? 'none', ['wordpress', 'rss'], true) && ($set['news_url'] ?? ($news ? $a->news->url() : '')) === '') {
-            throw ApiError::invalid('Bitte die Adresse der Webseite bzw. des Feeds angeben.');
+            throw ApiError::invalid(I18n::t('Bitte die Adresse der Webseite bzw. des Feeds angeben.'));
         }
 
         // Speichern
@@ -310,10 +327,10 @@ final class SettingsService
             return ['count' => count($this->app->newsService()->page(1, 10)['items'])];
         }
         if (!$this->app->news instanceof RemoteNewsSource) {
-            throw ApiError::notFound('Die Neuigkeiten kommen hier aus den Beiträgen der Webseite.');
+            throw ApiError::notFound(I18n::t('Die Neuigkeiten kommen hier aus den Beiträgen der Webseite.'));
         }
         if (!$this->app->news->available()) {
-            throw new ApiError(503, 'not_configured', 'Es ist noch keine Quelle für Neuigkeiten eingestellt.');
+            throw new ApiError(503, 'not_configured', I18n::t('Es ist noch keine Quelle für Neuigkeiten eingestellt.'));
         }
         return ['count' => $this->app->news->test()];
     }
@@ -328,7 +345,7 @@ final class SettingsService
     {
         $g = $this->app->gallery();
         if (!$g->isConfigured()) {
-            throw new ApiError(503, 'not_configured', 'Die Bilder sind noch nicht eingerichtet.');
+            throw new ApiError(503, 'not_configured', I18n::t('Die Bilder sind noch nicht eingerichtet.'));
         }
         if (function_exists('set_time_limit')) {
             @set_time_limit(120);

@@ -1,7 +1,23 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { devices, expect, test, type Locator, type Page, type Request } from '@playwright/test';
+import { devices, expect, test as base, type Browser, type Locator, type Page, type Request } from '@playwright/test';
 import { strToU8, zipSync } from 'fflate';
 import { askCancel, askOk, autoAsk } from './ask';
+import { quietPushHint } from './pushHintQuiet';
+
+// Jeder Test: Fenster „Nichts mehr verpassen“ als iPhone ausblenden (pushHintQuiet.ts).
+/** Eigene Seite in einem neuen Browser-Kontext (zweite Person), ebenfalls ohne das Fenster. */
+async function quietPage(browser: Browser): Promise<Page> {
+  const p = await browser.newPage();
+  await quietPushHint(p);
+  return p;
+}
+
+const test = base.extend({
+  context: async ({ context }, use) => {
+    await quietPushHint(context);
+    await use(context);
+  },
+});
 
 // E2E-Tests gegen eine Test-Instanz mit der Beispielkonfiguration (config/kompanie.example.json):
 // Der Bereich Strafen heißt dort „Kasse“. Die Testdaten legen die eigene Rolle „Spieß“ an (Punkte, Kasse, Termine). Die App liegt unter /app/.
@@ -26,6 +42,49 @@ async function adminMenu(page: Page, name: string) {
   await tiles.waitFor();
   if (SETUP.includes(name) && (await setup.count()) > 0) await setup.click();
   await tiles.getByRole('button', { name, exact: true }).click();
+}
+
+/**
+ * Einstellungen → Sprachen → Übersetzungen: einen Namen auf Englisch eintragen ('' löscht ihn) und speichern. Erwartet
+ * eine eingeschaltete englische Sprache. $source ist der Name der Basissprache (links in der Zeile).
+ */
+/** Abschnitt einer Art unter Übersetzungen aufklappen (bleibt offen, wenn er es schon ist). */
+async function openTranslationGroup(card: Locator, group: string) {
+  const details = card.locator('details.translation-group', {
+    has: card.page().locator('summary .row-title').getByText(group, { exact: true }),
+  });
+  if (!(await details.evaluate((d: HTMLDetailsElement) => d.open))) await details.locator('summary').click();
+}
+
+async function translateName(page: Page, group: string, source: string, text: string) {
+  await page.goto('/app/#/einstellungen/sprachen');
+  const card = page.locator('#einstellungen-uebersetzungen');
+  await openTranslationGroup(card, group);
+  const field = card.getByLabel(`${source} auf English`, { exact: true });
+  await field.fill(text);
+  await card.getByRole('button', { name: /^Speichern/ }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+  return field;
+}
+
+/**
+ * Einstellungen → Sprachen → Übersetzungen: Felder von Inhalten auf Englisch eintragen und einmal speichern. $fields:
+ * Teil der Beschriftung („Titel von „…““) => Text.
+ */
+async function translateContent(page: Page, group: string, fields: Record<string, string>) {
+  await openLanguages(page);
+  const card = page.locator('#einstellungen-uebersetzungen');
+  await openTranslationGroup(card, group);
+  for (const [label, text] of Object.entries(fields)) await card.getByLabel(label).fill(text);
+  await card.getByRole('button', { name: /^Speichern/ }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+  return card;
+}
+
+/** Einstellungen → Sprachen öffnen; ist sie schon offen, neu laden (dieselbe Adresse noch einmal öffnen hieße „Zurück“). */
+async function openLanguages(page: Page) {
+  if (page.url().endsWith('#/einstellungen/sprachen')) await page.reload();
+  else await page.goto('/app/#/einstellungen/sprachen');
 }
 
 /** „Intern“ (Tab unten) öffnen und dort den Knopf eines Bereichs wählen (Mitglieder oder Dokumente). */
@@ -132,6 +191,17 @@ async function login(page: Page, user: string, password = PASSWORD) {
   await expect(page.locator('.tabbar').getByRole('button', { name: 'Meins' })).toBeVisible();
 }
 
+/**
+ * „+ Block einfügen“ (bzw. „+ Block darunter einfügen“) in `scope` antippen und im Fenster die Blockart `type` wählen.
+ * Die Kacheln tragen die Blockart in data-kind, weil der Name (z. B. Sponsoren) aus der Konfiguration kommen kann.
+ */
+async function insertBlock(scope: Locator, label: string, type: string) {
+  await scope.getByRole('button', { name: label, exact: true }).click();
+  const dialog = scope.page().getByRole('dialog', { name: 'Block einfügen' });
+  await dialog.locator(`.block-kind[data-kind="${type}"]`).click();
+  await expect(dialog).toHaveCount(0);
+}
+
 async function shot(page: Page, name: string) {
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/${name}.png` });
 }
@@ -219,6 +289,58 @@ test('Mitglied sieht Termine, aber keine Verwaltung', async ({ page }) => {
   // Direkter Aufruf der Verwaltung fällt auf die erste Ansicht zurück.
   await page.goto('/app/#/verwaltung');
   await expect(page.locator('.topbar-title')).toHaveText('Termine');
+});
+
+test('Mehrere Terminarten am Termin ankreuzen (aufklappbar), je Art ein Schild', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const api = (path: string, method: string, body?: unknown) =>
+    page.evaluate(
+      async ([path, method, body]) => {
+        const cfg = window.KOMPANIE_CONFIG!;
+        const res = await fetch(cfg.apiBase + path, {
+          method,
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        return { status: res.status, data: (await res.json()) as { id?: string; kinds?: string[] }[] };
+      },
+      [path, method, body] as const,
+    );
+  expect((await api('admin/event-kinds', 'PUT', { kinds: ['Versammlung', 'Arbeitsdienst'], hidden: [] })).status).toBe(200);
+  try {
+    await page.goto('/app/');
+    await page.locator('.tabbar').getByRole('button', { name: 'Termine' }).click();
+    await page.getByText('Vereinsabend').click();
+    const card = page.locator('.card.event.open');
+    const checks = card.getByRole('group', { name: 'Terminarten' });
+    const toggle = card.getByRole('button', { name: 'Terminarten' });
+    // Eingeklappt: nur die gewählten Arten (noch keine)
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(checks).toHaveCount(0);
+    await expect(card.locator('.event-kind-summary')).toHaveText('keine');
+    await toggle.click();
+    await checks.getByLabel('Versammlung').check();
+    await expect(card.locator('.badge.event-kind')).toHaveText(['Versammlung']);
+    await checks.getByLabel('Arbeitsdienst').check();
+    await expect(card.locator('.badge.event-kind')).toHaveText(['Versammlung', 'Arbeitsdienst']);
+    await shot(page, 'termin-mehrere-arten');
+    await toggle.click();
+    await expect(card.locator('.event-kind-summary')).toHaveText('Versammlung, Arbeitsdienst');
+    await shot(page, 'termin-mehrere-arten-zu');
+    // Gespeichert: nach dem Neuladen beide angehakt; Haken heraus entfernt nur diese Art
+    await page.reload();
+    await page.getByText('Vereinsabend').click();
+    await toggle.click();
+    await expect(checks.getByLabel('Arbeitsdienst')).toBeChecked();
+    await checks.getByLabel('Versammlung').uncheck();
+    await expect(card.locator('.badge.event-kind')).toHaveText(['Arbeitsdienst']);
+  } finally {
+    for (const e of (await api('calendar', 'GET')).data) {
+      if (e.kinds && e.kinds.length > 0) await api(`calendar/${encodeURIComponent(e.id!)}/kind`, 'PUT', { kinds: [] });
+    }
+    expect((await api('admin/event-kinds', 'PUT', { kinds: [], hidden: [] })).status).toBe(200);
+  }
 });
 
 test('Verwalter legt Katalog an, vergibt Punkte und Kassen-Einträge', async ({ page }) => {
@@ -343,6 +465,41 @@ test('Mitglied: Punkte-Kachel vergibt Punkte nur an diese Person, Einträge im s
   await sheet.getByRole('button', { name: 'Schließen' }).click();
   await expect(sheet).toHaveCount(0);
   await expect(page.locator('.member-stats .stat', { hasText: 'Punkte' }).locator('.stat-value')).toHaveText(String(before));
+});
+
+test('Punkte offline: Antwort geht verloren, die App sendet später dieselbe Buchung, gebucht wird nur einmal', async ({ page }) => {
+  await login(page, 'verwalter');
+  await adminMenu(page, 'Mitglieder');
+  await page.locator('.row', { hasText: 'Mitglied1' }).click();
+  await page.locator('.member-stats .stat-button', { hasText: 'Punkte' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Punkte' });
+  const reason = `E2E verloren ${Date.now().toString(36)}`;
+  // Die Buchung kommt beim Server an, die Antwort aber nicht bei der App (Funkloch nach dem Senden).
+  let lost = 0;
+  const points = (url: URL) => decodeURIComponent(url.href).includes('/points');
+  await page.route(points, async (route) => {
+    if (route.request().method() !== 'POST') return route.continue();
+    lost++;
+    await route.fetch();
+    await route.abort('internetdisconnected');
+  });
+  await sheet.getByLabel('Punkte', { exact: true }).fill('2');
+  await sheet.getByLabel('Grund').fill(reason);
+  await sheet.getByRole('button', { name: 'Punkte vergeben' }).click();
+  await expect(page.locator('.toast')).toHaveText(/Keine Verbindung – auf dem Gerät gespeichert/);
+  await expect(sheet.getByRole('status').filter({ hasText: '1 Buchung noch nicht übertragen' })).toBeVisible();
+  await expect(sheet.getByLabel('Grund')).toHaveValue('');
+  expect(lost).toBe(1);
+  // Wieder online: Die App sendet die Buchung mit derselben Kennung, der Server bucht nicht noch einmal.
+  await page.unroute(points);
+  await page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await expect(page.locator('.toast')).toHaveText('Offline vorgemerkte Punkte und Strafen übertragen');
+  await expect(sheet.getByRole('status').filter({ hasText: 'noch nicht übertragen' })).toHaveCount(0);
+  await expect(sheet.locator('.row', { hasText: reason })).toHaveCount(1);
+  // Wieder stornieren, damit die Summen anderer Tests stimmen
+  await sheet.locator('.row', { hasText: reason }).getByRole('button', { name: 'Stornieren' }).click();
+  await askOk(page);
+  await expect(page.locator('.toast')).toHaveText('Storniert');
 });
 
 test('Mitgliederliste: Zurück aus einem Mitglied steht wieder an derselben Stelle', async ({ page }) => {
@@ -980,15 +1137,16 @@ test('Fotos: beim Anlegen mitgeben (einzeln und mehrere), in Liste und Details, 
     const held = new Promise<void>((resolve) => (release = resolve));
     return { held, release };
   };
+  // Über den Kontext: Fotos lädt der Service Worker (Bilder-Speicher), seine Anfragen sieht page.route nicht.
   const heldBig = hold();
   const heldOriginal = hold();
   const bigPhoto = /[?&]s=1024(&|$)/;
   const originalPhoto = /[?&]s=4096(&|$)/;
-  await page.route(bigPhoto, async (route) => {
+  await page.context().route(bigPhoto, async (route) => {
     await heldBig.held;
     await route.continue();
   });
-  await page.route(originalPhoto, async (route) => {
+  await page.context().route(originalPhoto, async (route) => {
     await heldOriginal.held;
     await route.continue();
   });
@@ -1002,8 +1160,8 @@ test('Fotos: beim Anlegen mitgeben (einzeln und mehrere), in Liste und Details, 
   await expect(zoom.locator('img')).toHaveAttribute('src', bigPhoto);
   heldOriginal.release();
   await expect(zoom.locator('img')).toHaveAttribute('src', originalPhoto);
-  await page.unroute(bigPhoto);
-  await page.unroute(originalPhoto);
+  await page.context().unroute(bigPhoto);
+  await page.context().unroute(originalPhoto);
   await page.keyboard.press('Escape');
   await expect(zoom).toHaveCount(0);
   await page.getByRole('button', { name: /vergrößern/ }).click();
@@ -1065,7 +1223,7 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
     await chooseRights(rollen, CANDIDATE_RIGHTS);
     await expect(rollen.getByLabel(/^Gehört zur Kompanie/)).not.toBeChecked();
     await rollen.getByLabel(/^Beim Anlegen neuer Konten wählbar/).check();
-    await rollen.getByLabel(/^Wer Mitglieder anlegen darf, nimmt/).check();
+    await rollen.getByLabel(/^Anwärter-Rolle/).check();
     await rollen.getByRole('button', { name: 'Anlegen' }).click();
     await expect(page.locator('.toast')).toHaveText('Rolle angelegt');
   }
@@ -1135,6 +1293,79 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
   await expect(page.locator('.meins-menu')).toBeVisible();
 });
 
+test('Aufnahme: Voraussetzung mit UND/ODER und Gruppen an der Anwärter-Rolle', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const api = (path: string, method: string, body?: unknown) =>
+    page.evaluate(
+      async ([path, method, body]) => {
+        const cfg = window.KOMPANIE_CONFIG!;
+        const res = await fetch(cfg.apiBase + path, {
+          method,
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        return { status: res.status, data: (await res.json()) as { key?: string; label?: string }[] };
+      },
+      [path, method, body] as const,
+    );
+  expect((await api('admin/event-kinds', 'PUT', { kinds: ['Versammlung', 'Arbeitsdienst'], hidden: [] })).status).toBe(200);
+  const key = (await api('admin/roles', 'GET')).data.find((r) => r.label === 'Anwärter')?.key;
+  expect(key).toBeTruthy();
+  try {
+    expect((await api(`admin/roles/${key}`, 'PATCH', { admission_rule: null })).status).toBe(200);
+    await page.goto('/app/');
+    await adminMenu(page, 'Einstellungen');
+    await page
+      .locator('.settings-link')
+      .filter({ has: page.getByText('Rollen', { exact: true }) })
+      .click();
+    const rollen = page.locator('#einstellungen-rollen');
+    await rollen.getByRole('button', { name: 'Anwärter bearbeiten', exact: true }).click();
+    const editor = rollen.locator('.rule-editor');
+    await expect(editor.locator('.rule-sentence')).toHaveText('Ohne Voraussetzung');
+
+    // 12 Monate UND (6 Versammlungen ODER 10 Arbeitsdienste)
+    await editor.getByRole('button', { name: '+ Dauer' }).click();
+    await editor.getByLabel('Mindestens so viele Monate als Anwärter').fill('12');
+    await editor.getByRole('button', { name: '+ Gruppe' }).click();
+    const group = editor.locator('.rule-group .rule-group');
+    await expect(group.getByRole('button', { name: 'Eine reicht' })).toHaveAttribute('aria-pressed', 'true');
+    await group.getByLabel('Mindestens so viele Teilnahmen („anwesend“)').fill('6');
+    await group.getByRole('button', { name: '+ Teilnahmen' }).click();
+    await group.getByLabel('Mindestens so viele Teilnahmen („anwesend“)').nth(1).fill('10');
+    await group.getByLabel('an Terminen der Art').nth(1).selectOption('Arbeitsdienst');
+    const sentence = 'Voraussetzung: 12 Monate als Anwärter und (6 Teilnahmen an „Versammlung“ oder 10 Teilnahmen an „Arbeitsdienst“)';
+    await expect(editor.locator('.rule-sentence')).toHaveText(sentence);
+    await shotsNarrowAndWide(page, 'aufnahme-regeln');
+    await rollen.getByRole('button', { name: 'Speichern', exact: true }).click();
+    await expect(page.locator('.toast')).toHaveText('Rolle gespeichert');
+
+    // Gespeichert als Baum; beim nächsten Öffnen wieder da
+    const saved = (await api('admin/roles', 'GET')).data.find((r) => r.key === key) as { admission_rule?: unknown };
+    expect(saved.admission_rule).toEqual({
+      type: 'group',
+      op: 'and',
+      items: [
+        { type: 'duration', months: 12 },
+        {
+          type: 'group',
+          op: 'or',
+          items: [
+            { type: 'attendance', kind: 'Versammlung', count: 6 },
+            { type: 'attendance', kind: 'Arbeitsdienst', count: 10 },
+          ],
+        },
+      ],
+    });
+    await rollen.getByRole('button', { name: 'Anwärter bearbeiten', exact: true }).click();
+    await expect(rollen.locator('.rule-editor .rule-sentence')).toHaveText(sentence);
+  } finally {
+    await api(`admin/roles/${key}`, 'PATCH', { admission_rule: null });
+    expect((await api('admin/event-kinds', 'PUT', { kinds: [], hidden: [] })).status).toBe(200);
+  }
+});
+
 /** Navigation per API zurücksetzen (Standardnavigation, ohne eigene Namen und Startseiten), falls ein Test mittendrin scheitert. */
 async function resetNavigation(page: Page) {
   await page.evaluate(async () => {
@@ -1143,7 +1374,7 @@ async function resetNavigation(page: Page) {
       method: 'PUT',
       headers: { [cfg.csrf.header]: cfg.csrf.token, 'Content-Type': 'application/json' },
       credentials: 'same-origin',
-      body: JSON.stringify({ navigation: null, names: {}, start: {}, show_labels: true }),
+      body: JSON.stringify({ navigation: null, guest_navigation: null, names: {}, start: {}, show_labels: true }),
     });
   });
 }
@@ -1213,6 +1444,65 @@ test('Navigation einrichten (Issue #277): Untermenü umbenennen, Termine hineins
   }
 });
 
+test('Eigene Leiste für Gäste: Mitglieder unten statt unter „Intern“, Angemeldete behalten ihre Leiste', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  try {
+    await adminMenu(page, 'Einstellungen');
+    await page
+      .locator('.settings-link')
+      .filter({ has: page.getByText('Navigation', { exact: true }) })
+      .click();
+    const card = page.locator('#einstellungen-navigation');
+    // Eigene Navigation für alle: Punktekatalog raus, sonst wie der Standard (Mitglieder unter „Intern“).
+    await card.getByLabel('Platz von Punktekatalog').selectOption({ label: 'Nicht in der Navigation' });
+    await card.getByRole('button', { name: 'Navigation speichern' }).click();
+    await expect(page.getByText('Navigation gespeichert')).toBeVisible();
+
+    await card.getByRole('button', { name: 'Für Gäste', exact: true }).click();
+    await expect(card.getByRole('button', { name: 'Für Gäste', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await expect(card.getByText('Gäste sehen dieselbe Leiste wie Angemeldete', { exact: false })).toBeVisible();
+    await card.getByLabel('Eigene Leiste für Gäste').check();
+    // Der Entwurf beginnt als Kopie, Mitglieder stehen schon unten. Zur Auswahl steht nur, was Gäste sehen dürfen:
+    // Dokumente und Punktekatalog hat die Rolle Gast nicht.
+    await expect(card.getByLabel('Platz von Mitglieder')).toHaveValue('main');
+    await expect(card.getByLabel('Platz von Dokumente')).toHaveCount(0);
+    await expect(card.getByLabel('Platz von Punktekatalog')).toHaveCount(0);
+    await expect(card.getByText('Nicht zur Auswahl, weil Gäste sie nicht sehen dürfen', { exact: false })).toContainText('Dokumente');
+    expect((await smallestStackGap(card)).gap).toBeGreaterThanOrEqual(12);
+    await card.getByRole('combobox', { name: /^Für Gäste/ }).selectOption({ label: 'Mitglieder' });
+    // Auf die Antwort warten: Der Hinweis „Navigation gespeichert“ vom ersten Speichern steht noch da. Ohne das konnte die
+    // Seite für Gäste schon die neue Leiste, aber noch nicht die Startseite haben (der Server speichert nacheinander).
+    const saved = page.waitForResponse((r) => r.request().method() === 'PUT' && decodeURIComponent(r.url()).includes('/navigation'));
+    await card.getByRole('button', { name: 'Navigation speichern' }).click();
+    expect((await saved).ok()).toBe(true);
+
+    // Admin (angemeldet): weiter „Intern“, Mitglieder nicht unten.
+    const tabbar = page.locator('.tabbar');
+    await expect(tabbar.getByRole('button', { name: 'Intern' })).toBeVisible();
+    await expect(tabbar.getByRole('button', { name: 'Mitglieder' })).toHaveCount(0);
+
+    // Gast ohne Anmeldung: Mitglieder unten und als Startseite. Ohne Abmelden über die App weiß der Service Worker nichts
+    // vom Wechsel und zeigte zuerst die gespeicherte Seite des Admins; sie neu zu laden, verhindert evtl. die Grenze von
+    // drei Neuladungen je Minute (pageReload.ts). Wie auf einem neuen Gerät: ohne gespeicherte Seiten.
+    await page.evaluate(async () => {
+      for (const key of await caches.keys()) await caches.delete(key);
+    });
+    await page.context().clearCookies();
+    await page.goto('/app/');
+    await expect(tabbar.getByRole('button', { name: 'Mitglieder' })).toHaveAttribute('aria-current', 'page');
+    // Ohne Adresse leitet die App nur um, wenn die Startseite nicht schon der erste Punkt der Leiste ist (startRedirect in
+    // App.tsx); sonst bleibt die Adresse ohne #/….
+    const first = (
+      (await tabbar.getByRole('button').first().getAttribute('aria-label')) ?? (await tabbar.getByRole('button').first().innerText())
+    ).trim();
+    await expect(page).toHaveURL(first === 'Mitglieder' ? /\/app\/$/ : /#\/mitglieder$/);
+    await shot(page, '41-navigation-gaeste');
+  } finally {
+    await login(page, 'admin', ADMIN_PASSWORD).catch(() => undefined);
+    await resetNavigation(page).catch(() => undefined);
+  }
+});
+
 test('Navigation (Issue #362): Galerie umbenennen mit eigenem Symbol, Startseite für Gäste, nur Symbole', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
   try {
@@ -1227,7 +1517,7 @@ test('Navigation (Issue #362): Galerie umbenennen mit eigenem Symbol, Startseite
     // Erst das Symbol: Mit dem neuen Namen heißt auch die Zeile anders („Platz von Fotos“).
     await row.getByLabel('Symbol').selectOption({ label: 'Kamera' });
     await row.getByLabel('Eigener Name (leer = Standard)').fill('Fotos');
-    await card.getByLabel('Ohne Anmeldung').selectOption({ label: 'Fotos' });
+    await card.getByRole('combobox', { name: /^Für Gäste/ }).selectOption({ label: 'Fotos' });
     await card.getByRole('button', { name: 'Navigation speichern' }).click();
     await expect(page.getByText('Navigation gespeichert')).toBeVisible();
     // Unverändert aus der Standardnavigation: Sie bleibt, nur mit dem neuen Namen.
@@ -1289,7 +1579,7 @@ test('Intern: Knöpfe für Mitglieder, Dokumente, Brett, Dienstgrade und Punktek
   await expect(page.locator('.topbar-title')).toHaveText('Intern');
   const tiles = page.getByRole('navigation', { name: 'Intern' });
   // Unten höchstens fünf Punkte (mit Intern): Sponsoren passen nicht mehr und stehen vorn unter Intern.
-  await expect(tiles.getByRole('button')).toHaveText([
+  await expect(tiles.getByRole('listitem').getByRole('button')).toHaveText([
     'Sponsoren',
     'Mitglieder',
     'Dokumente',
@@ -1616,6 +1906,46 @@ test('Ämter: Haken „Ehrung“ an der Amtszeit, einzelnes Jahr ohne Ehrung (Is
   await expect(page.locator('.toast')).toHaveText('Amt gelöscht');
 });
 
+test('Nicht gespeicherte Eingaben: Rückfrage vor dem Verlassen, mit Tab und mit „Zurück“', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Ämter');
+  const field = page.locator('form', { hasText: 'Neues Amt' }).getByLabel('Bezeichnung');
+  await field.fill('Nur getippt');
+  const ask = page.locator('.ask-dialog');
+
+  // Tab unten: Rückfrage, Abbrechen bleibt mit der Eingabe auf der Seite
+  await page.locator('.tabbar').getByRole('button', { name: 'Meins' }).click();
+  await expect(ask).toContainText('noch nicht gespeichert');
+  await askCancel(page);
+  await expect(page).toHaveURL(/#\/verwaltung\/aemter/);
+  await expect(field).toHaveValue('Nur getippt');
+
+  // „Zurück“: ebenso, Bleiben und dann Verlassen
+  await page.goBack();
+  await expect(ask).toContainText('noch nicht gespeichert');
+  await askCancel(page);
+  await expect(page).toHaveURL(/#\/verwaltung\/aemter/);
+  await expect(field).toHaveValue('Nur getippt');
+  await page.goBack();
+  await askOk(page);
+  await expect(page).toHaveURL(/#\/verwaltung\/einrichtungen$/);
+
+  // Nach dem Speichern keine Rückfrage
+  await page.locator('.admin-tiles').getByRole('button', { name: 'Ämter', exact: true }).click();
+  const office = `Ohne Rückfrage ${Date.now() % 1000000}`;
+  await field.fill(office);
+  await page.locator('form', { hasText: 'Neues Amt' }).getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Amt angelegt');
+  await page.locator('.tabbar').getByRole('button', { name: 'Meins' }).click();
+  await expect(page).toHaveURL(/#\/meins/);
+  await expect(ask).toHaveCount(0);
+  await page.goto('/app/#/verwaltung/aemter');
+  await page.getByRole('button', { name: office, exact: true }).click();
+  await page.getByRole('button', { name: 'Amt löschen' }).click();
+  await askOk(page);
+  await expect(page.locator('.toast')).toHaveText('Amt gelöscht');
+});
+
 test('Ämter: gemeinsame Amtszeiten einer Gruppe mit Gruppenbild, öffentlich als Karte (Issue #282)', async ({ page }) => {
   const n = Date.now() % 1000000;
   const group = `Königshaus ${n}`;
@@ -1663,6 +1993,18 @@ test('Ämter: gemeinsame Amtszeiten einer Gruppe mit Gruppenbild, öffentlich al
   await expect(page.locator('.toast')).toHaveText('Gemeinsame Amtszeit angelegt');
   await expect(admin.locator('li.card')).toContainText(`${offices[0]}: ${holders[0]}`);
   await expect(admin.locator('li.card')).toContainText(`${offices[1]}: ${holders[1]}`);
+  // Eine frühere gemeinsame Amtszeit: steht öffentlich eingeklappt da
+  await admin.getByRole('button', { name: 'Neue gemeinsame Amtszeit' }).click();
+  const earlier = admin.locator('form.joint-term-form');
+  await earlier.getByLabel('Von (Jahr)', { exact: true }).fill('2020');
+  await earlier.getByLabel('Bis (leer: bis heute)').fill('2022');
+  const former = `Clara ${n}`;
+  const firstSet = earlier.locator('fieldset', { hasText: offices[0] });
+  await firstSet.getByRole('button', { name: 'Person hinzufügen' }).click();
+  await firstSet.getByLabel('Name', { exact: true }).fill(former);
+  await earlier.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gemeinsame Amtszeit angelegt');
+  await expect(admin.locator('li.card')).toHaveCount(2);
 
   // Einzahl des ersten Amts: steht auf der Karte statt seiner Bezeichnung
   const officeSingular = `König ${n}`;
@@ -1687,7 +2029,7 @@ test('Ämter: gemeinsame Amtszeiten einer Gruppe mit Gruppenbild, öffentlich al
   // Öffentlich: eine Karte je gemeinsame Amtszeit mit Bild und den Personen je Amt
   await page.goto('/app/#/mitglieder/aemter');
   await expect(page.locator('.office-group h2', { hasText: group })).toBeVisible();
-  const card = page.locator('.joint-term', { hasText: singular });
+  const card = page.locator('.joint-term', { hasText: `${singular} seit 2023` });
   await expect(card.locator('.joint-term-title')).toContainText(`${singular} seit 2023`);
   await expect(card.locator('.joint-term-title')).toContainText('aktuell');
   await expect(card.locator('img.joint-term-image')).toBeVisible();
@@ -1695,12 +2037,36 @@ test('Ämter: gemeinsame Amtszeiten einer Gruppe mit Gruppenbild, öffentlich al
   await expect(card.locator('.joint-term-offices > div', { hasText: officeSingular }).locator('dd')).toContainText(holders[0]);
   await expect(card.locator('.joint-term-offices dt', { hasText: offices[0] })).toHaveCount(0);
   await expect(card.locator('.joint-term-offices > div', { hasText: offices[1] }).locator('dd')).toContainText(holders[1]);
+  // Die laufende ist aufgeklappt, die frühere zu: nur Jahre und Namen, ein Tipp auf den Kopf klappt sie auf und zu
+  const current = card;
+  await expect(current.locator('.joint-term-head')).toHaveAttribute('aria-expanded', 'true');
+  const past = page.locator('.joint-term', { hasText: `${singular} 2020–2022` });
+  const pastHead = past.locator('.joint-term-head');
+  await expect(pastHead).toHaveAttribute('aria-expanded', 'false');
+  await expect(pastHead).toContainText(former);
+  await expect(past.locator('.joint-term-offices')).toHaveCount(0);
+  await pastHead.click();
+  await expect(pastHead).toHaveAttribute('aria-expanded', 'true');
+  await expect(past.locator('.joint-term-offices > div', { hasText: officeSingular }).locator('dd')).toContainText(former);
+  await current.locator('.joint-term-head').click();
+  await expect(current.locator('.joint-term-offices')).toHaveCount(0);
+  // „Alle aufklappen“ öffnet auch die gemeinsamen Amtszeiten, „Alle zuklappen“ schließt sie
+  await page.getByRole('button', { name: 'Alle aufklappen' }).click();
+  await expect(current.locator('.joint-term-head')).toHaveAttribute('aria-expanded', 'true');
+  await expect(pastHead).toHaveAttribute('aria-expanded', 'true');
+  await page.getByRole('button', { name: 'Alle zuklappen' }).click();
+  await expect(current.locator('.joint-term-head')).toHaveAttribute('aria-expanded', 'false');
+  await expect(pastHead).toHaveAttribute('aria-expanded', 'false');
 
-  // Aufräumen: gemeinsame Amtszeit, Ämter und Gruppe löschen
+  // Aufräumen: gemeinsame Amtszeiten, Ämter und Gruppe löschen
   await page.goto('/app/#/verwaltung/aemter');
-  await page.locator('.office-admin-group', { hasText: group }).locator('.joint-admin').getByRole('button', { name: 'Löschen' }).click();
-  await askOk(page);
-  await expect(page.locator('.toast')).toHaveText('Gelöscht');
+  const jointAdmin = page.locator('.office-admin-group', { hasText: group }).locator('.joint-admin');
+  for (let left = 2; left > 0; left--) {
+    await jointAdmin.getByRole('button', { name: 'Löschen' }).first().click();
+    await askOk(page);
+    await expect(page.locator('.toast')).toHaveText('Gelöscht');
+    await expect(jointAdmin.locator('li.card')).toHaveCount(left - 1);
+  }
   for (const office of offices) {
     await page.getByRole('button', { name: office, exact: true }).click();
     await page.getByRole('button', { name: 'Amt löschen' }).click();
@@ -1872,10 +2238,19 @@ test('Galerie: Knöpfe zum Herunterladen für ein Bild und das Album als ZIP, nu
 
     await page.goto(`/app/#/galerie/${albumId}`);
     const zipButton = page.getByRole('button', { name: 'Album herunterladen (1 Bild, ZIP)' });
-    // Runder Icon-Knopf neben dem Titel wie in der Großansicht: Anzahl nur im Namen und Tooltip, nicht als Text
+    // Runder Icon-Knopf in der Reihe direkt neben Einreichen: Anzahl nur im Namen und Tooltip, nicht als Text
     await expect(zipButton).toHaveText('');
     await expect(zipButton).toHaveAttribute('title', 'Album herunterladen (1 Bild, ZIP)');
-    await expect(page.locator('.album-head h2 + .album-download-btn svg')).toBeVisible();
+    await expect(page.locator('.gallery-actions .album-download-btn svg')).toBeVisible();
+    const row = page.locator('.gallery-actions > button');
+    const names = await row.evaluateAll((els) => els.map((el) => el.getAttribute('aria-label')));
+    const at = names.indexOf('Album herunterladen (1 Bild, ZIP)');
+    // Reihenfolge: Einreichen (nur mit Haken „Einreichen erlauben“), Herunterladen, Album bearbeiten
+    expect(names.slice(0, at)).toEqual(
+      names.includes('Bilder und Videos in dieses Album einreichen') ? ['Bilder und Videos in dieses Album einreichen'] : [],
+    );
+    expect(names[at + 1]).toBe('Album bearbeiten');
+    await expect(page.getByText(/WLAN/)).toHaveCount(0);
     const [zip] = await Promise.all([page.waitForEvent('download'), zipButton.click()]);
     expect(zip.suggestedFilename()).toBe(`${title} 2026.zip`);
     const bytes = readFileSync((await zip.path())!);
@@ -2035,6 +2410,134 @@ test('Galerie verwalten: Bilder auswählen, verschieben und löschen, Alben ins 
   }
 });
 
+test('Galerie: Link auf ein Bild aus der Großansicht teilen, öffnet das Bild; intern nur nach Anmeldung', async ({ page }) => {
+  const title = `Bildlink ${Date.now() % 1000000}`;
+  // Teilen-Menü des Geräts nachgestellt: Was die App teilt, landet in window.__shared.
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'share', {
+      configurable: true,
+      value: async (data: ShareData) => {
+        (window as unknown as { __shared: ShareData }).__shared = data;
+      },
+    });
+  });
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const api = (path: string, method: string, body?: unknown) =>
+    page.evaluate(
+      async ([path, method, body]) => {
+        const cfg = window.KOMPANIE_CONFIG!;
+        const res = await fetch(cfg.apiBase + path, {
+          method,
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        return { status: res.status, data: (await res.json()) as { id?: number; photos?: { id: number }[] } };
+      },
+      [path, method, body] as const,
+    );
+  const albumId = (await api('admin/gallery/albums', 'POST', { title, year: 2026 })).data.id!;
+  for (const name of ['a-eins.png', 'b-zwei.png']) {
+    expect(
+      (await api(`admin/gallery/albums/${albumId}/photos`, 'POST', { file: { name, data: PNG.buffer.toString('base64') } })).status,
+    ).toBe(201);
+  }
+  try {
+    const second = (await api(`gallery/${albumId}`, 'GET')).data.photos![1].id;
+    await page.goto(`/app/#/galerie/${albumId}`);
+    await page.getByRole('button', { name: 'Bild 2 öffnen' }).click();
+    const share = page.locator('.lightbox .lb-share');
+    await expect(share).toHaveAttribute('title', 'Link zu diesem Bild teilen');
+    await expect(share).toHaveAccessibleName('Link zu diesem Bild teilen');
+    await share.click();
+    const sharedData = () => page.evaluate(() => (window as unknown as { __shared?: ShareData }).__shared ?? null);
+    await expect.poll(sharedData).not.toBeNull();
+    const shared = (await sharedData())!;
+    expect(shared.url).toMatch(new RegExp(`/app/#/galerie/${albumId}/bild/${second}$`));
+    expect(shared.title).toContain(title);
+
+    // Der Link öffnet das Bild groß; die Adresse wird die des Albums, Schließen führt ins Album.
+    await page.goto('/app/#/galerie');
+    await page.goto(shared.url!);
+    await expect(page.locator('.lb-count')).toContainText('2 / 2');
+    await expect(page).toHaveURL(new RegExp(`#/galerie/${albumId}$`));
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.lightbox')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Bild 2 öffnen' })).toBeVisible();
+
+    // Intern: Gäste sehen das Bild nicht, nur den Hinweis mit Anmelden
+    expect((await api(`gallery/photos/${second}`, 'PATCH', { intern: true })).status).toBe(200);
+    page.on('console', (m) => console.log('CONSOLE', m.type(), m.text()));
+    page.on('pageerror', (e) => console.log('PAGEERROR', e.message, e.stack));
+    await page.context().clearCookies();
+    await page.goto('/app/');
+    await page.goto(shared.url!);
+    await expect(page.locator('.login-first')).toContainText('nur für angemeldete Mitglieder');
+    await expect(page.locator('.lightbox')).toHaveCount(0);
+    await expect(page).toHaveURL(new RegExp(`#/galerie/${albumId}/bild/${second}$`));
+  } finally {
+    await login(page, 'admin', ADMIN_PASSWORD);
+    expect((await api(`admin/gallery/albums/${albumId}`, 'DELETE')).status).toBe(200);
+  }
+});
+
+test('Galerie verwalten: Titelbild eines Albums in der Großansicht wählen und zurück auf automatisch', async ({ page }) => {
+  const title = `Titelbild ${Date.now() % 1000000}`;
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const api = (path: string, method: string, body?: unknown) =>
+    page.evaluate(
+      async ([path, method, body]) => {
+        const cfg = window.KOMPANIE_CONFIG!;
+        const res = await fetch(cfg.apiBase + path, {
+          method,
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        return { status: res.status, data: (await res.json()) as { id?: number; photos?: { thumb: string }[] } };
+      },
+      [path, method, body] as const,
+    );
+  const albumId = (await api('admin/gallery/albums', 'POST', { title, year: 2026 })).data.id!;
+  for (const name of ['a-eins.png', 'b-zwei.png']) {
+    expect(
+      (await api(`admin/gallery/albums/${albumId}/photos`, 'POST', { file: { name, data: PNG.buffer.toString('base64') } })).status,
+    ).toBe(201);
+  }
+  try {
+    // Titelbild der Übersicht im Vergleich zu den Bildern des Albums (beide zur selben Zeit abgefragt: Adressen ändern
+    // sich, sobald ein Bild aufbereitet ist): 0 = erstes, 1 = zweites
+    const coverIndex = async () => {
+      const overview = (await api('gallery', 'GET')).data as unknown as { years: { albums: { id: number; cover: string }[] }[] };
+      const cover = overview.years.flatMap((y) => y.albums).find((a) => a.id === albumId)?.cover;
+      return (await api(`gallery/${albumId}`, 'GET')).data.photos!.findIndex((p) => p.thumb === cover);
+    };
+    await expect.poll(coverIndex).toBe(0);
+    await page.goto('/app/#/galerie');
+    await expect(page.locator('.album-card', { hasText: title }).locator('.album-cover img')).toBeVisible();
+
+    await page.goto(`/app/#/galerie/${albumId}`);
+    await page.getByRole('button', { name: 'Bild 2 öffnen' }).click();
+    const coverButton = page.locator('.lb-count').getByRole('button', { name: 'Als Titelbild des Albums verwenden' });
+    await expect(coverButton).toHaveAttribute('title', 'Als Titelbild des Albums verwenden');
+    await coverButton.click();
+    await expect(page.locator('.toast')).toHaveText('Titelbild gewählt');
+    await expect(page.locator('.lb-count')).toContainText('Titelbild');
+    await expect(page.locator('.lb-count').getByRole('button', { name: 'Titelbild wieder automatisch wählen' })).toBeVisible();
+    await expect.poll(coverIndex).toBe(1);
+
+    // Noch einmal getippt: wieder automatisch
+    await page.goto(`/app/#/galerie/${albumId}`);
+    await page.getByRole('button', { name: 'Bild 2 öffnen' }).click();
+    await page.locator('.lb-count').getByRole('button', { name: 'Titelbild wieder automatisch wählen' }).click();
+    await expect(page.locator('.toast')).toHaveText('Titelbild wieder automatisch');
+    await expect(page.locator('.lb-count').getByRole('button', { name: 'Als Titelbild des Albums verwenden' })).toBeVisible();
+    await expect.poll(coverIndex).toBe(0);
+  } finally {
+    expect((await api(`admin/gallery/albums/${albumId}`, 'DELETE')).status).toBe(200);
+  }
+});
+
 test('Galerie: Bilder einreichen, prüfen, freigeben und ablehnen (Issue #286)', async ({ page }) => {
   const n = Date.now() % 1000000;
   const title = `Einreichung ${n}`;
@@ -2108,6 +2611,14 @@ test('Galerie: Bilder einreichen, prüfen, freigeben und ablehnen (Issue #286)',
   await expect(page.locator('.gallery-upload', { hasText: 'zweites.jpg' })).toContainText('nicht freigegeben: Unscharf');
   await expect(page.locator('.gallery-upload', { hasText: 'foto.jpg' }).filter({ hasText: title })).toContainText('freigegeben');
 
+  // Aus dem Album heraus einreichen: das Album ist schon gewählt, „‹ Zum Album“ führt zurück
+  await page.goto(`/app/#/galerie/${albumId}`);
+  await page.getByRole('button', { name: 'Bilder und Videos in dieses Album einreichen' }).click();
+  await expect(page).toHaveURL(new RegExp(`#/galerie/einreichen/${albumId}$`));
+  await expect(page.locator('form', { hasText: 'Bilder und Videos einreichen' }).getByLabel('Album')).toHaveValue(String(albumId));
+  await page.getByRole('button', { name: '‹ Zum Album' }).click();
+  await expect(page).toHaveURL(new RegExp(`#/galerie/${albumId}$`));
+
   // Ausgeschaltet: kein Knopf mehr, das Formular sagt es; eigene Einreichungen bleiben sichtbar
   await page.goto('/app/#/einstellungen/galerie');
   await page.getByLabel(/Einreichen von Bildern und Videos durch Mitglieder erlauben/).uncheck();
@@ -2116,6 +2627,9 @@ test('Galerie: Bilder einreichen, prüfen, freigeben und ablehnen (Issue #286)',
   await page.goto('/app/#/galerie');
   await expect(page.getByRole('button', { name: 'Einreichungen prüfen' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Bilder und Videos einreichen' })).toHaveCount(0);
+  await page.goto(`/app/#/galerie/${albumId}`);
+  await expect(page.getByRole('heading', { name: new RegExp(title) })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Bilder und Videos in dieses Album einreichen' })).toHaveCount(0);
   await page.goto('/app/#/galerie/einreichen');
   await expect(page.getByText('Das Einreichen ist zurzeit ausgeschaltet.')).toBeVisible();
   await expect(page.locator('.gallery-upload', { hasText: 'zweites.jpg' })).toContainText('nicht freigegeben: Unscharf');
@@ -2180,6 +2694,10 @@ test('Ehemalig eintragen: Vorschau der endenden Ämter, danach enden sie mit dem
   await sheet.getByRole('button', { name: 'Als ehemalig eintragen', exact: true }).click();
   await expect(page.locator('.toast')).toContainText('ist jetzt als ehemalig eingetragen');
   await expect(page.locator('.toast')).toContainText('beendet: 2');
+  // Das Fenster bleibt offen (jetzt zum Bearbeiten); erst schließen: Ein Seitenwechsel bei offenem Fenster schließt
+  // sonst nur das Fenster (backClose.ts), und die Seite bleibt beim Mitglied
+  await sheet.getByRole('button', { name: 'Schließen' }).click();
+  await expect(sheet).toBeHidden();
 
   // Öffentlicher Zeitstrahl: beendet statt „seit“; der Partner bleibt im Amt
   await page.goto('/app/#/mitglieder/aemter');
@@ -2298,6 +2816,83 @@ test('Querformat: Navigation links, Listen und Formulare zweispaltig, nichts scr
       return !!bar && bar.width === 390 && bar.y > 700;
     })
     .toBe(true);
+});
+
+test('Computer: Inhalt über die ganze Breite, Formulare mit mehr Feldern je Zeile, Ziehlisten begrenzt', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const noSideScroll = () => expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  const box = async (selector: string) => (await page.locator(selector).first().boundingBox())!;
+  // Mitgliederliste: Inhalt fast so breit wie das Fenster, mindestens vier Karten nebeneinander
+  await page.goto('/app/#/verwaltung/mitglieder');
+  await expect(page.locator('main [data-loading]')).toHaveCount(0);
+  await expect.poll(async () => (await box('.content')).width).toBeGreaterThan(1300);
+  const rows = page.locator('.card-list .member-row');
+  await expect(rows.nth(3)).toBeVisible();
+  const ys = await Promise.all([0, 1, 2, 3].map(async (i) => (await rows.nth(i).boundingBox())!.y));
+  expect(Math.max(...ys) - Math.min(...ys)).toBeLessThan(2);
+  await noSideScroll();
+  // Formular über die ganze Breite mit mindestens vier Spalten
+  await page.goto('/app/#/verwaltung/neu');
+  const form = page.locator('form.form').first();
+  await expect(form).toBeVisible();
+  await expect.poll(() => form.evaluate((e) => getComputedStyle(e).gridTemplateColumns.split(' ').length)).toBeGreaterThanOrEqual(4);
+  expect((await form.boundingBox())!.width).toBeGreaterThan(1300);
+  await noSideScroll();
+  // Liste zum Ziehen (Rollen): höchstens 960 px, mittig
+  await page.goto('/app/#/einstellungen/rollen');
+  const list = page.locator('.card-list:has(.drag-handle)').first();
+  await expect(list).toBeVisible();
+  const l = (await list.boundingBox())!;
+  expect(l.width).toBeLessThanOrEqual(960);
+  const c = await box('.content');
+  expect(Math.abs(l.x + l.width / 2 - (c.x + c.width / 2))).toBeLessThan(2);
+  await noSideScroll();
+  // Haken-Liste (Bereiche) in mehreren Spalten
+  await page.goto('/app/#/einstellungen/bereiche');
+  const features = page.locator('.feature-list').first();
+  await expect(features).toBeVisible();
+  await expect.poll(() => features.evaluate((e) => getComputedStyle(e).gridTemplateColumns.split(' ').length)).toBeGreaterThanOrEqual(3);
+  await noSideScroll();
+  await page.goto('/app/#/einstellungen/rollen');
+  await shot(page, '1f-computer');
+});
+
+test('Computer: eigenes Profil und Mitglied in der Verwaltung zweispaltig', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  for (const route of ['/app/#/meins', '/app/#/verwaltung/mitglieder']) {
+    await page.goto(route);
+    await expect(page.locator('main [data-loading]')).toHaveCount(0);
+    if (route.includes('verwaltung')) await page.locator('.card-list li').first().click();
+    const cols = page.locator('.member-col');
+    await expect(cols).toHaveCount(2);
+    const [a, b] = await Promise.all([cols.nth(0).boundingBox(), cols.nth(1).boundingBox()]);
+    expect(b!.x).toBeGreaterThan(a!.x + a!.width - 1);
+    expect(Math.abs(a!.y - b!.y)).toBeLessThan(2);
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  }
+  // Handy hochkant: keine Spalten
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect.poll(() => page.locator('.member-columns').evaluate((e) => getComputedStyle(e).display)).toBe('contents');
+});
+
+test('Computer: Leiste mit den Bereichen senkrecht am linken Rand', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/app/#/meins');
+  const bar = page.locator('.tabbar');
+  await expect(bar).toBeVisible();
+  const r = (await bar.boundingBox())!;
+  expect(r.x).toBe(0);
+  expect(r.width).toBeLessThan(120);
+  expect(r.height).toBeGreaterThan(600);
+  const c = (await page.locator('.content').first().boundingBox())!;
+  expect(c.x).toBeGreaterThanOrEqual(r.x + r.width - 1);
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  // Handy hochkant: Leiste wieder unten
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect.poll(async () => (await bar.boundingBox())!.y).toBeGreaterThan(700);
 });
 
 test('Ämter: Jahresübersicht, eine Spalte je Amt, auch auf dem Handy, gemerkt (Issue #112)', async ({ page }) => {
@@ -2856,6 +3451,26 @@ async function fakePush(page: Page) {
   });
 }
 
+test('iPhone im Browser-Tab: Fenster nach der Anmeldung führt zu „App installieren“', async ({ page }) => {
+  await page.goto('/app/');
+  await page.evaluate(() => {
+    localStorage.setItem('e2e-keep-push-hint', '1');
+    localStorage.removeItem('kompanie-push-hint-later');
+    localStorage.removeItem('kompanie-push-hint-round');
+  });
+  await login(page, 'mitglied1');
+  const hint = page.getByRole('dialog', { name: 'Nichts mehr verpassen' });
+  await expect(hint).toContainText('nur in der installierten App');
+  await hint.getByRole('button', { name: 'App installieren' }).click();
+  await expect(page).toHaveURL(/#\/installieren$/);
+  await expect(hint).toHaveCount(0);
+  // Einmal je Runde: nach dem Neustart nicht wieder
+  await page.goto('/app/');
+  await page.reload();
+  await expect(page.locator('.tabbar').getByRole('button', { name: 'Meins' })).toBeVisible();
+  await expect(hint).toHaveCount(0);
+});
+
 test('Benachrichtigungen auf dem iPhone: erst die App installieren', async ({ page }) => {
   await page.context().clearCookies();
   await page.goto('/app/');
@@ -2918,8 +3533,15 @@ test.describe('Android', () => {
     await page.getByRole('button', { name: 'Benachrichtigungen ausschalten' }).click();
     await expect(page.getByRole('button', { name: 'Benachrichtigungen einschalten' })).toBeVisible();
 
-    // Mitglied: eigene Punkte und Kasse, Schalter für Beträge
+    // Mitglied: eigene Punkte und Kasse, Schalter für Beträge. Erlaubt, aber ausgeschaltet: Nach dem Update fragt das
+    // Fenster einmal (pushHint.ts, Runde), danach nicht mehr.
     await login(page, 'mitglied1');
+    const once = page.getByRole('dialog', { name: 'Nichts mehr verpassen' });
+    await once.getByRole('button', { name: 'Nicht jetzt' }).click();
+    await expect(once).toHaveCount(0);
+    await page.reload();
+    await expect(page.locator('.tabbar').getByRole('button', { name: 'Meins' })).toBeVisible();
+    await expect(once).toHaveCount(0);
     await openKonto(page);
     await page.getByRole('button', { name: 'Benachrichtigungen einstellen' }).click();
     await expect(page.getByLabel('Punkte: neue Einträge')).toBeChecked();
@@ -2957,19 +3579,29 @@ test.describe('Android', () => {
     expect(await status()).toBeNull();
   });
 
-  test('Startseite: Hinweis schaltet Benachrichtigungen mit allen Arten ein, „Nicht jetzt“ blendet ihn aus', async ({ page }) => {
+  test('Nach der Anmeldung: Fenster schaltet Benachrichtigungen mit allen Arten ein, „Nicht jetzt“ blendet es aus', async ({ page }) => {
     await fakePush(page);
     await login(page, 'mitglied1');
     await page.evaluate(() => navigator.serviceWorker.ready);
-    const hint = page.locator('.push-hint');
-    await expect(hint).toContainText('Nichts mehr verpassen');
+    const hint = page.getByRole('dialog', { name: 'Nichts mehr verpassen' });
+    await expect(hint).toBeVisible();
     await hint.getByRole('button', { name: 'Nicht jetzt' }).click();
     await expect(hint).toHaveCount(0);
     await page.reload();
     await expect(page.locator('.tabbar').getByRole('button', { name: 'Meins' })).toBeVisible();
     await expect(hint).toHaveCount(0);
 
+    // Auch auf einer anderen Seite als der Startseite (z. B. nach einem geteilten Link); ✕ zählt wie „Nicht jetzt“.
     await page.evaluate(() => localStorage.removeItem('kompanie-push-hint-later'));
+    await page.goto('/app/#/news');
+    await page.reload();
+    await expect(hint).toBeVisible();
+    await hint.getByRole('button', { name: 'Schließen' }).click();
+    await expect(hint).toHaveCount(0);
+    expect(await page.evaluate(() => localStorage.getItem('kompanie-push-hint-later'))).not.toBeNull();
+
+    await page.evaluate(() => localStorage.removeItem('kompanie-push-hint-later'));
+    await page.goto('/app/');
     await page.reload();
     await hint.getByRole('button', { name: 'Benachrichtigungen einschalten' }).click();
     await expect(page.getByText('Benachrichtigungen sind an')).toBeVisible();
@@ -3433,9 +4065,21 @@ test('Zusatzrollen: Mitglied bekommt „Termine verwalten“ dazu, hat die Recht
   await openKonto(page);
   await expect(page.locator('.account-card').first()).toContainText('Rollen: Mitglied, Termine verwalten');
 
+  // Vorschau als Person (Grundrolle und Zusatzrolle zusammen): Banner mit Namen und Rollen, Beenden führt zurück.
   await login(page, 'admin', ADMIN_PASSWORD);
   await adminMenu(page, 'Mitglieder');
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
+  await memberAccount(page);
+  await page.getByRole('button', { name: /^App als .*Mitglied2.* ansehen$/ }).click();
+  const banner = page.locator('.preview-banner');
+  await expect(banner).toHaveText(/Vorschau als .*Mitglied2.* \(Mitglied, Termine verwalten\) – nur ansehen/);
+  await expect(page.getByRole('button', { name: 'Meins' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Öffentliche Termine verwalten' })).toBeVisible();
+  await expect(page.locator('.tabbar').getByRole('button', { name: MANAGER })).toHaveCount(0);
+  await banner.getByRole('button', { name: 'Beenden' }).click();
+  await expect(banner).toHaveCount(0);
+  await expect(page.locator('.member-account')).toBeVisible();
+
   await memberAccount(page);
   await page.locator('.extra-roles').getByLabel('Termine verwalten').uncheck();
   await expect(page.locator('.toast')).toHaveText('Zusatzrolle entfernt: Termine verwalten');
@@ -3845,6 +4489,54 @@ test.describe('Android', () => {
     expect(await page.evaluate(() => (window as unknown as { __prompted: number }).__prompted)).toBe(1);
     await expect(page.locator('.install-hint').getByRole('button', { name: "So geht's" })).toBeVisible();
   });
+
+  test('Anleitung in Chrome: Hinweis aufs Warten, bis Chrome den Installieren-Knopf freigibt', async ({ page }) => {
+    await page.goto('/app/#/installieren');
+    await expect(page.locator('.install-wait')).toContainText('30 Sekunden');
+    await page.evaluate(() => {
+      const ev = new Event('beforeinstallprompt', { cancelable: true }) as Event & Record<string, unknown>;
+      ev.prompt = () => Promise.resolve();
+      ev.userChoice = Promise.resolve({ outcome: 'dismissed' });
+      window.dispatchEvent(ev);
+    });
+    await expect(page.locator('.install-intro').getByRole('button', { name: 'App installieren' })).toBeVisible();
+    await expect(page.locator('.install-wait')).toHaveCount(0);
+  });
+
+  // Andere Browser als Chrome: Hinweis mit Grund (androidBrowser.ts), Weg zu Chrome und Schritte im eigenen Browser.
+  for (const [name, ua, expected] of [
+    ['Firefox', 'Mozilla/5.0 (Android 14; Mobile; rv:145.0) Gecko/145.0 Firefox/145.0', 'Firefox legt nur eine Verknüpfung'],
+    [
+      'Samsung Internet',
+      'Mozilla/5.0 (Linux; Android 14; SM-S921B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/27.0 Chrome/125.0.0.0 Mobile Safari/537.36',
+      'Ab Android 14 blockiert Google Play Protect',
+    ],
+    [
+      'eingebauter Browser',
+      'Mozilla/5.0 (Linux; Android 14; Pixel 8 Build/AP2A; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/158.0.0.0 Mobile Safari/537.36',
+      'können keine Apps installieren und keine Benachrichtigungen zeigen',
+    ],
+  ] as const) {
+    test(`Anleitung in ${name}: Hinweis mit Grund und Weg zu Chrome`, async ({ browser }) => {
+      const context = await browser.newContext({ ...pixel, userAgent: ua, locale: 'de-DE' });
+      const page = await context.newPage();
+      await page.goto('/app/#/installieren');
+      await expect(page.locator('.install-warn')).toContainText(expected);
+      if (name === 'Firefox') {
+        await expect(page.locator('.install-warn')).toContainText('Automatisch hinzufügen');
+        await expect(page.locator('.install-warn').getByRole('link', { name: 'In Chrome öffnen' })).toHaveAttribute(
+          'href',
+          /^intent:\/\/.+package=com\.android\.chrome;S\.browser_fallback_url=https%3A%2F%2Fplay\.google\.com%2F.+;end$/,
+        );
+        await expect(page.locator('.install-warn').getByRole('link', { name: 'Chrome herunterladen' })).toHaveAttribute(
+          'href',
+          'https://play.google.com/store/apps/details?id=com.android.chrome',
+        );
+      }
+      await expect(page.locator('.install-trouble')).toContainText('Xiaomi');
+      await context.close();
+    });
+  }
 });
 
 test('Angemeldet bleiben ist vorausgewählt und hält rund 400 Tage', async ({ page }) => {
@@ -4015,7 +4707,7 @@ test('Impressum und Datenschutz: Admin trägt die Links ein, alle sehen sie (Anm
   await expect(status.locator('.status-item.status-ok', { hasText: 'Impressum und Datenschutz' })).toBeVisible();
 
   // Ohne Anmeldung: in der Hilfe und (eigenständig) auf der Anmeldeseite, in einem neuen Fenster.
-  const guest = await browser.newPage();
+  const guest = await quietPage(browser);
   await guest.goto('/app/#/hilfe');
   const hilfe = guest.locator('.legal-links');
   await expect(hilfe.getByRole('link', { name: 'Impressum' })).toHaveAttribute('href', imprint);
@@ -4034,6 +4726,740 @@ test('Impressum und Datenschutz: Admin trägt die Links ein, alle sehen sie (Anm
   await expect(page.locator('.toast')).toHaveText('Gespeichert');
   await openKonto(page);
   await expect(page.locator('.account-legal')).toHaveCount(0);
+});
+
+test('Sprachen: Admin schaltet Englisch ein, Flagge oben, Wahl gilt am Konto, zurück auf Deutsch', async ({ page, browser }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.goto('/app/#/einstellungen');
+  // Nur Deutsch: keine Flagge
+  await expect(page.locator('.settings-link', { hasText: 'Sprachen' })).toBeVisible();
+  await expect(page.locator('.topbar-lang')).toHaveCount(0);
+  await page.goto('/app/#/einstellungen/sprachen');
+  const form = page.locator('.settings-section', { hasText: 'Sprachen' });
+  await expect(form.getByLabel('Deutsch')).toBeDisabled();
+  await form.getByLabel('English').check();
+  await form.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+
+  // Flagge in der Kopfzeile, Auswahl mit den Namen der Sprachen
+  const flag = page.getByRole('button', { name: 'Sprache: Deutsch' });
+  await expect(flag).toHaveAttribute('aria-haspopup', 'menu');
+  await flag.click();
+  await expect(flag).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByRole('menuitemradio', { name: 'Deutsch' })).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByRole('menuitemradio', { name: 'English' })).toHaveAttribute('lang', 'en');
+  // Escape schließt
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('menu')).toHaveCount(0);
+  await flag.click();
+  await page.getByRole('menuitemradio', { name: 'English' }).click();
+
+  // Nach dem Neuladen auf Englisch, auch Meldungen des Servers
+  await expect(page.getByRole('button', { name: 'Language: English' })).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await expect(page.locator('.topbar-title')).toHaveText('Settings');
+  await page.goto('/app/#/einstellungen/rechtliches');
+  const legal = page.locator('.settings-section', { hasText: 'Legal notice and privacy' });
+  await legal.getByLabel('Legal notice').fill('javascript:alert(1)');
+  await legal.getByLabel('Legal notice').evaluate((el) => el.setAttribute('type', 'text'));
+  await legal.getByRole('button', { name: 'Save' }).click();
+  await expect(legal.locator('.form-error')).toContainText('address of the legal notice');
+
+  // Am Konto gespeichert: gilt auch ohne die Wahl am Gerät
+  await page.evaluate(() => localStorage.removeItem('kompanie-locale'));
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+
+  // Gäste wählen am Gerät; ohne Wahl gilt Deutsch (Browser auf Deutsch)
+  const guest = await quietPage(browser);
+  await guest.goto('/app/#/hilfe');
+  await expect(guest.getByRole('button', { name: 'Sprache: Deutsch' })).toBeVisible();
+  await guest.close();
+
+  // Zurück unter Meins → Konto
+  await page.goto('/app/#/meins');
+  const menu = page.locator('.meins-menu');
+  if (await menu.count()) {
+    await menu.locator('.admin-menu-toggle').click();
+    await menu.locator('.admin-menu-list').getByRole('button', { name: 'Account', exact: true }).click();
+  }
+  const card = page.locator('.account-card', { hasText: 'Language' });
+  await expect(card.getByRole('button', { name: 'English' })).toHaveAttribute('aria-pressed', 'true');
+  await card.getByRole('button', { name: 'Deutsch' }).click();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'de');
+  await expect(page.getByRole('button', { name: 'Sprache: Deutsch' })).toBeVisible();
+
+  // Übersetzungen: eigener englischer Name für die Galerie, der deutsche bleibt; ohne Eintrag grau die Vorgabe
+  await page.goto('/app/#/einstellungen/sprachen');
+  const translations = page.locator('#einstellungen-uebersetzungen');
+  await openTranslationGroup(translations, 'Bereiche der Navigation');
+  await expect(translations.getByLabel('Galerie auf English', { exact: true })).toHaveAttribute('placeholder', 'Gallery');
+  await translateName(page, 'Bereiche der Navigation', 'Galerie', 'Photos');
+  // Gäste mit Englisch am Gerät sehen den englischen Namen, auf Deutsch bleibt „Galerie“
+  const visitor = await quietPage(browser);
+  await visitor.goto('/app/#/galerie');
+  await expect(visitor.locator('.tabbar')).toContainText('Galerie');
+  await visitor.evaluate(() => localStorage.setItem('kompanie-locale', 'en'));
+  await visitor.reload();
+  await expect(visitor.locator('.tabbar')).toContainText('Photos');
+  await visitor.close();
+  // Den englischen Namen wieder löschen; danach fehlt nichts mehr, was nicht schon die Vorgabe hätte
+  await page.reload();
+  await expect(await translateName(page, 'Bereiche der Navigation', 'Galerie', '')).toHaveValue('');
+
+  // Aufräumen: nur Deutsch, die Flagge verschwindet (erst die Meldung vom Speichern oben abwarten)
+  await page.goto('/app/#/einstellungen/sprachen');
+  await expect(page.locator('.toast')).toHaveCount(0);
+  await form.getByLabel('English').uncheck();
+  await form.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+  await page.reload();
+  await expect(page.locator('.topbar-lang')).toHaveCount(0);
+});
+
+test('Sprachen: englischer Name eines Dienstgrads unter Übersetzungen, Ansicht auf Englisch zeigt ihn', async ({ page }) => {
+  const stamp = String(Date.now()).slice(-6);
+  const german = `Feldwebel ${stamp}`;
+  const english = `Sergeant ${stamp}`;
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.goto('/app/#/einstellungen/sprachen');
+  const form = page.locator('.settings-section', { hasText: 'Sprachen' });
+  await form.getByLabel('English').check();
+  await form.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+
+  // Neu angelegt wird immer mit dem deutschen Namen
+  await adminMenu(page, 'Dienstgrade');
+  await page.getByLabel('Bezeichnung').fill(german);
+  await page.getByRole('button', { name: 'Anlegen' }).click();
+  const row = page.locator('.card-list > li', { hasText: german });
+  await expect(row).toBeVisible();
+
+  // Übersetzungen: englischer Name, die Verwaltung zeigt weiter den deutschen
+  const field = await translateName(page, 'Dienstgrade', german, english);
+  await expect(field).toHaveValue(english);
+  await expect(field).toHaveAttribute('placeholder', german);
+  await adminMenu(page, 'Dienstgrade');
+  await expect(page.locator('.card-list .row-title', { hasText: german })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Einstellungen → Sprachen' })).toBeVisible();
+
+  // Mitglied1 bekommt den Dienstgrad
+  await adminMenu(page, 'Mitglieder');
+  await page.locator('.row', { hasText: 'Mitglied1' }).click();
+  const id = Number(page.url().split('/').pop());
+  await page.goto(`/app/#/verwaltung/mitglied/${id}/dienstgrad`);
+  await page.getByLabel('Neuer Dienstgrad').selectOption({ label: german });
+  await page.getByRole('button', { name: 'Dienstgrad ändern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Dienstgrad geändert');
+
+  // Auf Englisch: der englische Name an der Seite des Mitglieds, im Verlauf und in der Liste der Dienstgrade
+  await page.goto(`/app/#/verwaltung/mitglied/${id}`);
+  await page.getByRole('button', { name: 'Sprache: Deutsch' }).click();
+  await page.getByRole('menuitemradio', { name: 'English' }).click();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await expect(page.locator('.member-rank-badge')).toContainText(english);
+  await page.goto(`/app/#/verwaltung/mitglied/${id}/dienstgrad`);
+  await expect(page.locator('.member-rank strong')).toHaveText(english);
+  await expect(page.locator('.member-rank .card-list')).toContainText(english);
+  await page.goto('/app/#/dienstgrade');
+  await expect(page.locator('.rank-list')).toContainText(english);
+
+  // Aufräumen: zurück auf Deutsch, Dienstgrad abnehmen und löschen, nur Deutsch
+  await page.goto(`/app/#/verwaltung/mitglied/${id}`);
+  await page.getByRole('button', { name: 'Language: English' }).click();
+  await page.getByRole('menuitemradio', { name: 'Deutsch' }).click();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'de');
+  await page.goto(`/app/#/verwaltung/mitglied/${id}/dienstgrad`);
+  await expect(page.locator('.member-rank strong')).toHaveText(german);
+  await page.getByLabel('Neuer Dienstgrad').selectOption({ label: 'Kein Dienstgrad' });
+  await page.getByRole('button', { name: 'Dienstgrad ändern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Dienstgrad geändert');
+  await page.goto('/app/#/verwaltung/dienstgrade');
+  await page.locator('.card-list > li', { hasText: german }).getByRole('button', { name: 'Löschen' }).click();
+  await askOk(page);
+  await expect(page.locator('.toast')).toHaveText('Gelöscht');
+  await page.goto('/app/#/einstellungen/sprachen');
+  await form.getByLabel('English').uncheck();
+  await form.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+});
+
+test('Sprachen: englischer Name eines Amts unter Übersetzungen, Gäste auf Englisch sehen ihn', async ({ page, browser }) => {
+  const id = Date.now() % 1000000;
+  const office = `Schriftführer ${id}`;
+  const english = `Secretary ${id}`;
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const api = (path: string, method: string, body?: unknown) =>
+    page.evaluate(
+      async ([path, method, body]) => {
+        const cfg = window.KOMPANIE_CONFIG!;
+        const res = await fetch(cfg.apiBase + path, {
+          method,
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        return { status: res.status, data: (await res.json()) as { id?: number } };
+      },
+      [path, method, body] as const,
+    );
+  expect((await api('admin/settings', 'PATCH', { languages: 'de,en' })).status).toBe(200);
+  const created = await api('offices', 'POST', { title: office, group_id: null });
+  expect(created.status).toBe(201);
+  const officeId = created.data.id!;
+  try {
+    expect(
+      (await api(`offices/${officeId}/terms`, 'POST', { kind: 'period', start_year: 2020, holders: [{ name: `Sabine Schreiber ${id}` }] }))
+        .status,
+    ).toBe(201);
+    await page.goto('/app/#/einstellungen/sprachen');
+    await page.reload();
+    await translateName(page, 'Ämter', office, english);
+    // In der Verwaltung bleibt der deutsche Name
+    await page.goto(`/app/#/verwaltung/aemter/${officeId}`);
+    await expect(page.locator('form', { hasText: 'Amt bearbeiten' }).getByLabel('Bezeichnung')).toHaveValue(office);
+
+    // Gäste auf Englisch sehen den englischen Namen im Zeitstrahl, auf Deutsch den deutschen
+    const visitor = await quietPage(browser);
+    await visitor.goto('/app/#/mitglieder/aemter');
+    await expect(visitor.locator('.office-title', { hasText: office })).toBeVisible();
+    await visitor.evaluate(() => localStorage.setItem('kompanie-locale', 'en'));
+    await visitor.reload();
+    await expect(visitor.locator('.office-title', { hasText: english })).toBeVisible();
+    await expect(visitor.locator('.office-title', { hasText: office })).toHaveCount(0);
+    await visitor.close();
+  } finally {
+    expect((await api(`offices/${officeId}`, 'DELETE')).status).toBe(200);
+    expect((await api('admin/settings', 'PATCH', { languages: 'de' })).status).toBe(200);
+  }
+});
+
+test('Sprachen: englische Namen für eine Terminart und ein Untermenü, Mitglied mit Englisch am Gerät sieht sie', async ({
+  page,
+  browser,
+}) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const api = (path: string, method: string, body?: unknown) =>
+    page.evaluate(
+      async ([path, method, body]) => {
+        const cfg = window.KOMPANIE_CONFIG!;
+        const res = await fetch(cfg.apiBase + path, {
+          method,
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        return { status: res.status, data: (await res.json()) as { id?: string; title?: string; kinds?: string[] }[] };
+      },
+      [path, method, body] as const,
+    );
+  expect((await api('admin/settings', 'PATCH', { languages: 'de,en' })).status).toBe(200);
+  expect((await api('admin/event-kinds', 'PUT', { kinds: ['Versammlung'], hidden: [] })).status).toBe(200);
+  const evening = (await api('calendar', 'GET')).data.find((e) => e.title === 'Vereinsabend');
+  expect((await api(`calendar/${encodeURIComponent(evening!.id!)}/kind`, 'PUT', { kinds: ['Versammlung'] })).status).toBe(200);
+  try {
+    // Terminart unter Übersetzungen (neu laden: die eingeschaltete Sprache kommt mit der Konfiguration)
+    await page.goto('/app/#/einstellungen/sprachen');
+    await page.reload();
+    await translateName(page, 'Terminarten', 'Versammlung', 'Meeting');
+
+    // Untermenü: „Intern“ in „Verein“ umbenennen (eigene Navigation), dann unter Übersetzungen „Club“
+    await page.goto('/app/#/einstellungen/navigation');
+    const navCard = page.locator('#einstellungen-navigation');
+    await navCard.getByLabel('Name des Untermenüs').fill('Verein');
+    await navCard.getByLabel('Platz von Termine').selectOption({ label: 'Im Untermenü „Verein“' });
+    await navCard.getByRole('button', { name: 'Navigation speichern' }).click();
+    await expect(page.getByText('Navigation gespeichert')).toBeVisible();
+    await expect(navCard.getByText('Zurzeit gilt eure eigene Navigation.')).toBeVisible();
+    await translateName(page, 'Untermenüs', 'Verein', 'Club');
+    // Auf Deutsch bleibt alles beim deutschen Namen
+    await page.reload();
+    await expect(page.locator('.tabbar').getByRole('button', { name: 'Verein' })).toBeVisible();
+
+    // Mitglied ohne Sprache am Konto, Englisch am Gerät
+    const member = await quietPage(browser);
+    await login(member, 'mitglied1');
+    await member.evaluate(() => localStorage.setItem('kompanie-locale', 'en'));
+    await member.reload();
+    await expect(member.locator('html')).toHaveAttribute('lang', 'en');
+    const tabbar = member.locator('.tabbar');
+    await expect(tabbar.getByRole('button', { name: 'Verein' })).toHaveCount(0);
+    await tabbar.getByRole('button', { name: 'Club' }).click();
+    await expect(member.locator('.topbar-title')).toHaveText('Club');
+    await member.getByRole('navigation', { name: 'Club' }).getByRole('button', { name: 'Events', exact: true }).click();
+    await expect(member.locator('.card.event', { hasText: 'Vereinsabend' }).locator('.badge.event-kind')).toHaveText(['Meeting']);
+    await member.close();
+  } finally {
+    await page.goto('/app/');
+    for (const e of (await api('calendar', 'GET')).data) {
+      if (e.kinds && e.kinds.length > 0) await api(`calendar/${encodeURIComponent(e.id!)}/kind`, 'PUT', { kinds: [] });
+    }
+    await api('admin/event-kinds', 'PUT', { kinds: [], hidden: [] });
+    await api('admin/translations', 'PUT', {
+      locale: 'en',
+      items: [
+        { kind: 'event_kind', ref: 'Versammlung', text: '' },
+        { kind: 'menu', ref: 'Verein', text: '' },
+      ],
+    });
+    await resetNavigation(page).catch(() => undefined);
+    await page.evaluate(() => localStorage.removeItem('kompanie-edit-locale'));
+    await api('admin/settings', 'PATCH', { languages: 'de' });
+  }
+});
+
+test('Sprachen: eigene Seite zentral auf Englisch übersetzen, Gäste auf Englisch lesen sie, sonst Hinweis „Nur auf Deutsch“', async ({
+  page,
+  browser,
+}) => {
+  const id = Date.now() % 1000000;
+  const german = `Anfahrt ${id}`;
+  const english = `Directions ${id}`;
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const api = (path: string, method: string, body?: unknown) =>
+    page.evaluate(
+      async ([path, method, body]) => {
+        const cfg = window.KOMPANIE_CONFIG!;
+        const res = await fetch(cfg.apiBase + path, {
+          method,
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        return { status: res.status, data: (await res.json()) as { id?: number } };
+      },
+      [path, method, body] as const,
+    );
+  expect((await api('admin/settings', 'PATCH', { languages: 'de,en' })).status).toBe(200);
+  const created = await api('pages', 'POST', {
+    title: german,
+    audience: 'public',
+    blocks: [
+      { id: 't1', type: 'text', html: '<p>Über die Brücke und dann links.</p>' },
+      { id: 'n1', type: 'notice', title: 'Parken', text: 'Am Markt ist Platz.', tone: 'info' },
+    ],
+  });
+  expect(created.status).toBe(201);
+  const pageId = created.data.id!;
+  try {
+    // Gäste auf Englisch sehen vorerst die deutsche Seite mit Hinweis
+    const visitor = await quietPage(browser);
+    await visitor.goto('/app/');
+    await visitor.evaluate(() => localStorage.setItem('kompanie-locale', 'en'));
+    await visitor.goto(`/app/#/seiten/${pageId}`);
+    await visitor.reload();
+    await expect(visitor.locator('html')).toHaveAttribute('lang', 'en');
+    await expect(visitor.locator('.page-article')).toContainText('Über die Brücke');
+    await expect(visitor.locator('.untranslated-note')).toHaveText('Only available in German');
+
+    // Unter Seiten nur noch der Hinweis auf die zentrale Stelle
+    await page.goto('/app/#/verwaltung/seiten');
+    await page.reload();
+    await expect(page.getByRole('link', { name: 'Einstellungen → Sprachen' })).toBeVisible();
+    await expect(page.locator('.edit-lang')).toHaveCount(0);
+
+    // Zentral unter Übersetzungen: Titel und Texte, Aufbau bleibt
+    await openLanguages(page);
+    const card = page.locator('#einstellungen-uebersetzungen');
+    await openTranslationGroup(card, 'Seiten');
+    const row = card.locator('.translation-blocks', { hasText: german });
+    await expect(row).toContainText('0 von 4 übersetzt');
+    await row.getByRole('button', { name: `„${german}“ übersetzen` }).click();
+    const edit = row.locator('form.blocks-translation');
+    await expect(edit.getByLabel('Titel auf English')).toHaveAttribute('placeholder', german);
+    await edit.getByLabel('Titel auf English').fill(english);
+    await edit.getByRole('textbox', { name: 'Text', exact: true }).first().fill('Over the bridge, then left.');
+    await expect(edit.locator('textarea')).toHaveAttribute('placeholder', 'Am Markt ist Platz.');
+    await edit.locator('textarea').fill('There is room at the market.');
+    await edit.getByRole('button', { name: 'Speichern' }).click();
+    await expect(page.locator('.toast')).toHaveText('Gespeichert');
+    await expect(row).toContainText('3 von 4 übersetzt');
+
+    // Rest übersetzen: die Überschrift des Hinweises
+    await row.getByRole('button', { name: `„${german}“ übersetzen` }).click();
+    await expect(edit.getByLabel('Titel auf English')).toHaveValue(english);
+    await edit.getByLabel('Überschrift').fill('Parking');
+    await edit.getByRole('button', { name: 'Speichern' }).click();
+    await expect(page.locator('.toast')).toHaveText('Gespeichert');
+    await expect(row).toContainText('4 von 4 übersetzt');
+
+    await visitor.goto(`/app/#/seiten/${pageId}`);
+    await visitor.reload();
+    await expect(visitor.locator('.page-article')).toContainText('Over the bridge, then left.');
+    await expect(visitor.locator('.page-article')).toContainText('There is room at the market.');
+    await expect(visitor.locator('.page-article')).toContainText('Parking');
+    await expect(visitor.locator('.untranslated-note')).toHaveCount(0);
+    await expect(visitor.locator('.tabbar').getByRole('button', { name: english })).toBeVisible();
+    // Auf Deutsch bleibt alles deutsch
+    await visitor.evaluate(() => localStorage.setItem('kompanie-locale', 'de'));
+    await visitor.reload();
+    await expect(visitor.locator('.page-article')).toContainText('Über die Brücke');
+    await visitor.close();
+  } finally {
+    expect((await api(`pages/${pageId}`, 'DELETE')).status).toBe(200);
+    expect((await api('admin/settings', 'PATCH', { languages: 'de' })).status).toBe(200);
+  }
+});
+
+test('Sprachen: News aus der App auf Englisch schreiben, Gäste auf Englisch lesen sie', async ({ page, browser }) => {
+  const id = Date.now() % 1000000;
+  const german = `Schützenfest ${id}`;
+  const english = `Shooting festival ${id}`;
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const api = (path: string, method: string, body?: unknown) =>
+    page.evaluate(
+      async ([path, method, body]) => {
+        const cfg = window.KOMPANIE_CONFIG!;
+        const res = await fetch(cfg.apiBase + path, {
+          method,
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        return { status: res.status, data: (await res.json()) as { id?: string; news?: { source: string } } };
+      },
+      [path, method, body] as const,
+    );
+  const before = (await api('admin/settings', 'GET')).data.news!.source;
+  expect((await api('admin/settings', 'PATCH', { languages: 'de,en', news_source: 'app' })).status).toBe(200);
+  const created = await api('news', 'POST', { title: german, blocks: [{ id: 't1', type: 'text', html: '<p>Am Samstag feiern wir.</p>' }] });
+  expect(created.status).toBe(201);
+  const newsId = created.data.id!;
+  try {
+    await page.goto(`/app/#/news/${newsId}`);
+    await page.reload();
+    await page.getByRole('button', { name: 'Bearbeiten' }).click();
+    await page.locator('.edit-lang').getByRole('button', { name: 'English' }).click();
+    const form = page.locator('form.news-editor');
+    await expect(form.getByLabel('Titel', { exact: true })).toHaveAttribute('placeholder', german);
+    await form.getByLabel('Titel', { exact: true }).fill(english);
+    await form.getByRole('textbox', { name: 'Text', exact: true }).fill('We celebrate on Saturday.');
+    await form.getByRole('button', { name: 'Speichern' }).click();
+    await expect(page.locator('.toast')).toHaveText('Gespeichert');
+    // Auf Deutsch bleibt der deutsche Beitrag, auch beim Bearbeiten
+    await expect(page.locator('.news-headline')).toHaveText(german);
+    await page.getByRole('button', { name: 'Bearbeiten' }).click();
+    await page.locator('.edit-lang').getByRole('button', { name: 'Deutsch' }).click();
+    await expect(page.locator('form.news-editor').getByLabel('Titel', { exact: true })).toHaveValue(german);
+    await page.locator('form.news-editor').getByRole('button', { name: 'Abbrechen' }).click();
+
+    const visitor = await quietPage(browser);
+    await visitor.goto('/app/');
+    await visitor.evaluate(() => localStorage.setItem('kompanie-locale', 'en'));
+    await visitor.goto('/app/#/news');
+    await visitor.reload();
+    await expect(visitor.locator('.news-card', { hasText: english })).toBeVisible();
+    await visitor.locator('.news-card', { hasText: english }).click();
+    await expect(visitor.locator('.news-headline')).toHaveText(english);
+    await expect(visitor.locator('.news-content')).toContainText('We celebrate on Saturday.');
+    await expect(visitor.locator('.untranslated-note')).toHaveCount(0);
+    await visitor.close();
+  } finally {
+    expect((await api(`news/${newsId}`, 'DELETE')).status).toBe(200);
+    expect((await api('admin/settings', 'PATCH', { languages: 'de', news_source: before })).status).toBe(200);
+  }
+});
+
+test('Sprachen: Nachricht am Brett auch auf Englisch schreiben, Gäste auf Englisch sehen sie', async ({ page, browser }) => {
+  const id = Date.now().toString(36);
+  const german = `Training fällt aus ${id}`;
+  const english = `No practice ${id}`;
+  const dialogs: string[] = [];
+  autoAsk(page, dialogs);
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const settings = (body: unknown) =>
+    page.evaluate(async (body) => {
+      const cfg = window.KOMPANIE_CONFIG!;
+      const res = await fetch(cfg.apiBase + 'admin/settings', {
+        method: 'PATCH',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+        body: JSON.stringify(body),
+      });
+      return res.status;
+    }, body);
+  expect(await settings({ languages: 'de,en' })).toBe(200);
+  try {
+    await page.goto('/app/#/brett');
+    await page.reload();
+    const form = page.locator('.board-form');
+    await form.getByLabel('Titel', { exact: true }).fill(german);
+    await form.getByLabel('Text der Nachricht').fill('Die Halle ist gesperrt.');
+    await form.getByLabel('Sichtbar für').selectOption('public');
+    const tr = form.locator('.board-translation');
+    await tr.getByText('Auf English schreiben (freiwillig)').click();
+    await expect(tr.getByLabel('Titel auf English')).toHaveAttribute('placeholder', german);
+    await tr.getByLabel('Titel auf English').fill(english);
+    await tr.getByRole('textbox', { name: 'Text', exact: true }).fill('The hall is closed.');
+    await form.getByRole('button', { name: 'Veröffentlichen' }).click();
+    const card = page.locator('.board-card', { hasText: german });
+    await expect(card).toBeVisible();
+    await expect(card).toContainText('Die Halle ist gesperrt.');
+
+    // Beim Bearbeiten: deutsche Fassung oben, englische im Abschnitt darunter
+    const editing = page.locator(`.board-card[data-focus-id="${await card.getAttribute('data-focus-id')}"]`);
+    await editing.getByRole('button', { name: 'Bearbeiten' }).click();
+    await expect(editing.getByLabel('Titel', { exact: true })).toHaveValue(german);
+    await expect(editing.getByLabel('Titel auf English')).toHaveValue(english);
+    await editing.getByRole('button', { name: 'Abbrechen' }).click();
+
+    // Auch zentral unter Übersetzungen, mit Stand (Titel und Text übersetzt)
+    await openLanguages(page);
+    const translations = page.locator('#einstellungen-uebersetzungen');
+    await openTranslationGroup(translations, 'Schwarzes Brett');
+    const row = translations.locator('.translation-blocks', { hasText: german });
+    await expect(row).toContainText('2 von 2 übersetzt');
+    await row.getByRole('button', { name: `„${german}“ übersetzen` }).click();
+    await expect(row.getByLabel('Titel auf English')).toHaveValue(english);
+    await row.getByRole('button', { name: 'Abbrechen' }).click();
+    await page.goto('/app/#/brett');
+
+    const visitor = await quietPage(browser);
+    await visitor.goto('/app/');
+    await visitor.evaluate(() => localStorage.setItem('kompanie-locale', 'en'));
+    await visitor.goto('/app/#/brett');
+    await visitor.reload();
+    await expect(visitor.locator('html')).toHaveAttribute('lang', 'en');
+    const own = visitor.locator('.board-card', { hasText: english });
+    await expect(own).toContainText('The hall is closed.');
+    await expect(own.locator('.untranslated-note')).toHaveCount(0);
+    await visitor.goto('/app/#/termine');
+    await expect(visitor.locator('.board-banner')).toContainText(english);
+    await visitor.close();
+  } finally {
+    const card = page.locator('.board-card', { hasText: german });
+    if ((await card.count()) > 0) {
+      await card.getByRole('button', { name: 'Löschen' }).click();
+      await expect(card).toHaveCount(0);
+    }
+    expect(await settings({ languages: 'de' })).toBe(200);
+  }
+});
+
+test('Sprachen: öffentlichen Termin und Umfrage zentral unter Übersetzungen auf Englisch eintragen', async ({ page, browser }) => {
+  const id = Date.now().toString(36);
+  const german = `Schützenfest ${id}`;
+  const english = `Shooting fair ${id}`;
+  const question = `Grillfest ${id}?`;
+  const dialogs: string[] = [];
+  autoAsk(page, dialogs);
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const api = (path: string, method: string, body?: unknown) =>
+    page.evaluate(
+      async ({ path, method, body }) => {
+        const cfg = window.KOMPANIE_CONFIG!;
+        const res = await fetch(cfg.apiBase + path, {
+          method,
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        return { status: res.status, data: (await res.json().catch(() => null)) as { id?: number }[] | null };
+      },
+      { path, method, body },
+    );
+  expect((await api('admin/settings', 'PATCH', { languages: 'de,en' })).status).toBe(200);
+  try {
+    await page.goto('/app/#/termine/verwalten');
+    await page.reload();
+    await page.getByRole('button', { name: '+ Öffentlichen Termin anlegen' }).click();
+    const form = page.locator('.event-form');
+    const d = new Date(Date.now() + 12 * 86400000);
+    await form.getByLabel('Titel', { exact: true }).fill(german);
+    await form
+      .getByLabel('Datum', { exact: true })
+      .fill(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+    await form.getByLabel('Ort', { exact: true }).fill('Festzelt');
+    await form.getByRole('button', { name: 'Speichern' }).click();
+    await expect(page.locator('.toast')).toHaveText('Termin angelegt');
+    // Im Formular nur noch der Hinweis auf die zentrale Stelle
+    await page.locator('.row', { hasText: german }).getByRole('button', { name: 'Bearbeiten' }).click();
+    await expect(form.getByRole('link', { name: 'Einstellungen → Sprachen' })).toBeVisible();
+    await expect(form.getByText('Auf English schreiben (freiwillig)')).toHaveCount(0);
+    await form.getByRole('button', { name: 'Abbrechen' }).click();
+
+    // Umfrage auf Deutsch anlegen
+    await page.goto('/app/#/umfragen/verwalten');
+    const poll = page.locator('.poll-form');
+    await poll.getByLabel('Frage', { exact: true }).fill(question);
+    await poll.getByLabel('Möglichkeit 1', { exact: true }).fill('Ja');
+    await poll.getByLabel('Möglichkeit 2', { exact: true }).fill('Nein');
+    await poll.getByRole('button', { name: 'Veröffentlichen' }).click();
+    await expect(page.getByText(question).first()).toBeVisible();
+
+    // Englisch zentral unter Übersetzungen: Termin (Titel) und Umfrage (Frage, eine Möglichkeit) mit einem Speichern
+    await page.goto('/app/#/einstellungen/sprachen');
+    const card = page.locator('#einstellungen-uebersetzungen');
+    await openTranslationGroup(card, 'Kommende Termine');
+    await expect(card.getByLabel(`Ort von „${german}`)).toHaveAttribute('placeholder', 'Festzelt');
+    await card.getByLabel(`Titel von „${german}`).fill(english);
+    await openTranslationGroup(card, 'Laufende Umfragen');
+    await expect(card.getByLabel(`Antwort 2 von „${question}`)).toHaveAttribute('placeholder', 'Nein');
+    await card.getByLabel(`Frage von „${question}`).fill('Barbecue?');
+    await card.getByLabel(`Antwort 1 von „${question}`).fill('Yes');
+    await card.getByRole('button', { name: 'Speichern (3)' }).click();
+    await expect(page.locator('.toast')).toHaveText('Gespeichert');
+    await page.reload();
+    await openTranslationGroup(card, 'Kommende Termine');
+    await expect(card.getByLabel(`Titel von „${german}`)).toHaveValue(english);
+
+    const visitor = await quietPage(browser);
+    await visitor.goto('/app/');
+    await visitor.evaluate(() => localStorage.setItem('kompanie-locale', 'en'));
+    await visitor.goto('/app/#/termine');
+    await visitor.reload();
+    await expect(visitor.locator('html')).toHaveAttribute('lang', 'en');
+    const ev = visitor.locator('.event', { hasText: english });
+    await expect(ev).toContainText('Festzelt');
+    await ev.locator('button').first().click();
+    await expect(ev.locator('.untranslated-note')).toContainText('Partly only available in German');
+    await visitor.close();
+
+    // Mitglied auf Englisch: Frage und Möglichkeiten der Fassung, fehlende deutsch
+    const polls = (await api('polls', 'GET')).data ?? [];
+    const pollId = (polls as { id: number; title: string }[]).find((p) => p.title === question)?.id;
+    expect(pollId).toBeTruthy();
+    const en = await page.evaluate(async (pollId) => {
+      const cfg = window.KOMPANIE_CONFIG!;
+      // Mit dem CSRF-Kopf: WordPress meldet die Sitzung sonst nicht an (REST-Nonce)
+      const res = await fetch(cfg.apiBase + `polls/${pollId}`, {
+        credentials: 'same-origin',
+        headers: { 'X-Kompanie-Lang': 'en', [cfg.csrf.header]: cfg.csrf.token },
+      });
+      return (await res.json()) as { title: string; options: { title: string }[]; source?: { title: string } };
+    }, pollId);
+    expect([en.title, en.options.map((o) => o.title), en.source?.title]).toEqual(['Barbecue?', ['Yes', 'Nein'], question]);
+  } finally {
+    const events = ((await api('events?source=1', 'GET')).data ?? []) as { id: number; title: string }[];
+    for (const e of events.filter((e) => e.title === german)) expect((await api(`events/${e.id}`, 'DELETE')).status).toBe(200);
+    const polls = ((await api('polls', 'GET')).data ?? []) as { id: number; title: string }[];
+    for (const p of polls.filter((p) => p.title === question)) expect((await api(`polls/${p.id}`, 'DELETE')).status).toBe(200);
+    expect((await api('admin/settings', 'PATCH', { languages: 'de' })).status).toBe(200);
+  }
+});
+
+test('Sprachen: Dokument, Kategorie und Album zentral mit englischem Namen', async ({ page }) => {
+  const id = Date.now().toString(36);
+  const pdf = Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n');
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const api = (path: string, method: string, body?: unknown) =>
+    page.evaluate(
+      async ({ path, method, body }) => {
+        const cfg = window.KOMPANIE_CONFIG!;
+        const res = await fetch(cfg.apiBase + path, {
+          method,
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        return { status: res.status, data: (await res.json().catch(() => null)) as Record<string, unknown> | null };
+      },
+      { path, method, body },
+    );
+  expect((await api('admin/settings', 'PATCH', { languages: 'de,en' })).status).toBe(200);
+  let albumId = 0;
+  try {
+    await page.goto('/app/#/dokumente/verwalten');
+    await page.reload();
+    await page.getByLabel('Neue Kategorie').fill(`Satzungen ${id}`);
+    await page.getByRole('button', { name: 'Kategorie hinzufügen' }).click();
+    await expect(page.locator('.toast')).toHaveText('Kategorie angelegt');
+    await expect(
+      page.locator('.doc-categories li', { hasText: `Satzungen ${id}` }).getByRole('button', { name: 'Auf English' }),
+    ).toHaveCount(0);
+
+    await page.getByLabel('Datei').setInputFiles({ name: 'satzung.pdf', mimeType: 'application/pdf', buffer: pdf });
+    const upload = page.locator('form', { has: page.getByRole('button', { name: 'Hochladen' }) });
+    await upload.getByLabel('Titel', { exact: true }).fill(`Satzung ${id}`);
+    await upload.getByLabel('Kategorie', { exact: true }).selectOption({ label: `Satzungen ${id}` });
+    await upload.getByRole('button', { name: 'Hochladen' }).click();
+    await expect(page.locator('.toast')).toHaveText(`„Satzung ${id}“ hochgeladen`);
+
+    const album = await api('admin/gallery/albums', 'POST', { title: `Kirmes ${id}`, year: 2026 });
+    albumId = Number(album.data?.id);
+    expect(albumId).toBeGreaterThan(0);
+
+    // Englische Namen zentral unter Übersetzungen
+    await translateContent(page, 'Kategorien der Dokumente', { [`Bezeichnung von „Satzungen ${id}`]: `Statutes ${id}` });
+    await translateContent(page, 'Dokumente', { [`Titel von „Satzung ${id}`]: `Constitution ${id}` });
+    await translateContent(page, 'Alben der Galerie', { [`Titel von „Kirmes ${id}`]: `Fair ${id}` });
+    const albumRes = await page.evaluate(async (albumId) => {
+      const cfg = window.KOMPANIE_CONFIG!;
+      const res = await fetch(cfg.apiBase + `admin/gallery/albums/${albumId}`, {
+        credentials: 'same-origin',
+        headers: { [cfg.csrf.header]: cfg.csrf.token },
+      });
+      return (await res.json()) as { title: string; translations?: Record<string, { title: string }> };
+    }, albumId);
+    expect([albumRes.title, albumRes.translations?.en?.title]).toEqual([`Kirmes ${id}`, `Fair ${id}`]);
+
+    // Auf Englisch (Sprache der Anfrage; das Konto des Admins kann auf Deutsch stehen): englische Namen
+    const english = await page.evaluate(async () => {
+      const cfg = window.KOMPANIE_CONFIG!;
+      const res = await fetch(cfg.apiBase + 'documents', {
+        credentials: 'same-origin',
+        headers: { 'X-Kompanie-Lang': 'en', [cfg.csrf.header]: cfg.csrf.token },
+      });
+      return (await res.json()) as { documents: { title: string }[]; categories: { title: string }[] };
+    });
+    expect(english.documents.map((d) => d.title)).toContain(`Constitution ${id}`);
+    expect(english.categories.map((c) => c.title)).toContain(`Statutes ${id}`);
+  } finally {
+    const docs = (await api('documents?source=1', 'GET')).data as {
+      documents: { id: number; title: string }[];
+      categories: { id: number; title: string }[];
+    } | null;
+    for (const d of docs?.documents.filter((d) => d.title === `Satzung ${id}`) ?? [])
+      expect((await api(`documents/${d.id}`, 'DELETE')).status).toBe(200);
+    for (const c of docs?.categories.filter((c) => c.title === `Satzungen ${id}`) ?? [])
+      expect((await api(`document-categories/${c.id}`, 'DELETE')).status).toBe(200);
+    if (albumId > 0) expect((await api(`admin/gallery/albums/${albumId}`, 'DELETE')).status).toBe(200);
+    expect((await api('admin/settings', 'PATCH', { languages: 'de' })).status).toBe(200);
+  }
+});
+
+test('Sprachen: Handbuch auf Englisch, auch die Seiten für Admins', async ({ page, browser }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const api = (path: string, method: string, body?: unknown) =>
+    page.evaluate(
+      async ([path, method, body]) => {
+        const cfg = window.KOMPANIE_CONFIG!;
+        const res = await fetch(cfg.apiBase + path, {
+          method,
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        return res.status;
+      },
+      [path, method, body] as const,
+    );
+  expect(await api('admin/settings', 'PATCH', { languages: 'de,en' })).toBe(200);
+  try {
+    // Gäste auf Englisch: übersetzte Seite und Verzeichnis auf Englisch
+    const visitor = await quietPage(browser);
+    await visitor.goto('/app/#/hilfe/anmelden');
+    await expect(visitor.locator('.hilfe-seite h2.news-headline')).toHaveText('Anmelden');
+    await visitor.evaluate(() => localStorage.setItem('kompanie-locale', 'en'));
+    await visitor.reload();
+    await expect(visitor.locator('.hilfe-seite h2.news-headline')).toHaveText('Log in');
+    await expect(visitor.locator('.hilfe-text')).toContainText('Stay logged in');
+    await expect(visitor.locator('.untranslated-note')).toHaveCount(0);
+    await visitor.goto('/app/#/hilfe');
+    await expect(visitor.locator('.hilfe .row-title', { hasText: 'Get the app on your phone' })).toBeVisible();
+    await visitor.close();
+
+    // Seite für Admins (Admin mit Englisch am Konto): seit alle Seiten eine Fassung haben, ebenfalls englisch ohne Hinweis
+    expect(await api('me/locale', 'PUT', { locale: 'en' })).toBe(200);
+    await page.goto('/app/#/hilfe/admin-sprachen');
+    await page.reload();
+    await expect(page.locator('.hilfe-seite h2.news-headline')).toHaveText('Languages');
+    await expect(page.locator('.hilfe-text')).toContainText('Switch on English');
+    await expect(page.locator('.hilfe-seite .untranslated-note')).toHaveCount(0);
+  } finally {
+    expect(await api('me/locale', 'PUT', { locale: null })).toBe(200);
+    expect(await api('admin/settings', 'PATCH', { languages: 'de' })).toBe(200);
+  }
 });
 
 test('Was ist neu: Admin sieht das Changelog der gebauten Version, Mitglied nicht', async ({ page }) => {
@@ -4078,6 +5504,65 @@ test('Was ist neu: Admin sieht das Changelog der gebauten Version, Mitglied nich
   await page.goto('/app/#/einstellungen/neuerungen');
   await expect(page.locator('.changelog-text')).toHaveCount(0);
   await expect(page.getByRole('heading', { name: /^Version / })).toHaveCount(0);
+});
+
+test('Neue Version: Hinweis „Neu starten“, neu geladen erst auf Knopfdruck und mit Rückfrage bei offenen Eingaben', async ({ page }) => {
+  // Neuer Build auf dem Server: Den Abruf von sw.js selbst kann Playwright nicht abfangen. Stattdessen hängt die Seite
+  // eine Build-Nummer an die Adresse des Service Workers; eine neue Adresse installiert ihn neu wie ein neuer Build.
+  await page.addInitScript(() => {
+    const register = ServiceWorkerContainer.prototype.register;
+    ServiceWorkerContainer.prototype.register = function (url, options) {
+      const u = new URL(String(url), location.href);
+      u.searchParams.set('e2e-build', localStorage.getItem('e2e-build') ?? '0');
+      return register.call(this, u.href, options);
+    };
+  });
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
+  const hint = page.locator('.update-hint');
+  // Der erste Service Worker ist keine neue Version.
+  await expect(hint).toHaveCount(0);
+
+  let build = 0;
+  const newBuild = async () => {
+    // Die neue Version übernimmt erst, wenn die alte nichts mehr zu tun hat (z. B. Daten im Hintergrund nachladen).
+    await page.waitForLoadState('networkidle');
+    build++;
+    await page.evaluate(async (n) => {
+      localStorage.setItem('e2e-build', String(n));
+      const reg = await navigator.serviceWorker.getRegistration();
+      await navigator.serviceWorker.register(reg!.active!.scriptURL, { scope: reg!.scope });
+    }, build);
+    await expect(hint).toContainText('Die App wurde aktualisiert', { timeout: 15_000 });
+  };
+  await newBuild();
+
+  // Nichts lädt von selbst neu: Die Eingabe bleibt, „Neu starten“ fragt vorher.
+  await adminMenu(page, 'Ämter');
+  const field = page.locator('form', { hasText: 'Neues Amt' }).getByLabel('Bezeichnung');
+  await field.fill('Nur getippt');
+  await page.evaluate(() => ((window as unknown as { vorNeustart: boolean }).vorNeustart = true));
+  await hint.getByRole('button', { name: 'Neu starten' }).click();
+  await expect(page.locator('.ask-dialog')).toContainText('noch nicht gespeichert');
+  await askCancel(page);
+  await expect(field).toHaveValue('Nur getippt');
+  await expect(hint).toBeVisible();
+  await hint.getByRole('button', { name: 'Neu starten' }).click();
+  await askOk(page);
+  await expect.poll(() => page.evaluate(() => (window as unknown as { vorNeustart?: boolean }).vorNeustart ?? false)).toBe(false);
+  await expect(page).toHaveURL(/#\/verwaltung\/aemter/);
+  await expect(field).toHaveValue('');
+  // Neu gestartet läuft die neue Version: kein Hinweis mehr.
+  await expect.poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL ?? '')).toContain('e2e-build=1');
+  await expect(hint).toHaveCount(0);
+
+  // „Später“ blendet den Hinweis aus; eine noch neuere Version zeigt ihn wieder.
+  await newBuild();
+  await hint.getByRole('button', { name: 'Später' }).click();
+  await expect(hint).toHaveCount(0);
+  await newBuild();
 });
 
 test('Offline: App und zuletzt geladene Termine kommen aus dem Speicher', async ({ page }) => {
@@ -4490,6 +5975,14 @@ test('Admin stellt den internen Kalender auf „In der App pflegen“ um, legt e
   await expect(section().getByText('✓ Die Termine werden in der App gepflegt.')).toBeVisible();
   await expect(section().getByLabel('Aktualisieren alle … Minuten')).toHaveCount(0);
   await shot(page, 'kalender-quelle');
+  // Zu- und Absagen sind erst nach dem Einschalten da; die Erinnerung steht darunter.
+  const responses = page.locator('#einstellungen-zu-und-absagen');
+  await expect(responses.getByRole('checkbox', { name: /An Zu- und Absage erinnern/ })).toHaveCount(0);
+  await responses.getByRole('checkbox', { name: /Zu- und Absagen bei Terminen/ }).check();
+  await expect(responses.getByRole('checkbox', { name: /An Zu- und Absage erinnern/ })).toBeChecked();
+  await responses.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+  await page.locator('.toast').waitFor({ state: 'detached' });
 
   await page.goto('/app/#/termine');
   await page.getByRole('button', { name: 'Internen Kalender verwalten' }).click();
@@ -4510,6 +6003,80 @@ test('Admin stellt den internen Kalender auf „In der App pflegen“ um, legt e
   await page.goto('/app/#/termine');
   await expect(page.locator('.event-title', { hasText: 'E2E Vorstandssitzung' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Internen Kalender verwalten' })).toHaveCount(0);
+  // Zu- und absagen direkt unter dem Termin; ein zweiter Tipp nimmt die Antwort zurück.
+  const card = page.locator('.card.event', { hasText: 'E2E Vorstandssitzung' });
+  await card.getByRole('button', { name: 'Zusagen' }).click();
+  await expect(card.getByRole('button', { name: 'Zugesagt' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(card.locator('.event-response-counts')).toHaveText('1 Zusage');
+  await shot(page, 'termin-zusagen');
+  // Aufgeklappt: Der Knopf „Hinweis speichern“ klebt nicht am Feld darüber und nimmt die volle Breite.
+  await card.locator('.event-head').click();
+  const noteBox = card.locator('.event-response-note');
+  await noteBox.getByLabel('Hinweis zu deiner Zusage (optional)').fill('komme später');
+  const saveNote = noteBox.getByRole('button', { name: 'Hinweis speichern' });
+  await expect(saveNote).toBeVisible();
+  expect((await smallestStackGap(noteBox)).gap).toBeGreaterThanOrEqual(12);
+  expect((await saveNote.boundingBox())!.width).toBeCloseTo((await noteBox.boundingBox())!.width, 0);
+  await card.locator('.event-head').click();
+  await card.getByRole('button', { name: 'Zugesagt' }).click();
+  await expect(card.getByRole('button', { name: 'Zusagen' })).toHaveAttribute('aria-pressed', 'false');
+  await expect(card.locator('.event-response-counts')).toHaveCount(0);
+  // Ohne Netz: Die Zusage wird vorgemerkt, übersteht einen Neustart und geht online von selbst raus.
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+  });
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
+  await expect(card).toBeVisible();
+  await page.context().setOffline(true);
+  try {
+    await card.getByRole('button', { name: 'Zusagen' }).click();
+    await expect(card.getByRole('button', { name: 'Zugesagt' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(card.locator('.event-response-counts')).toHaveText('1 Zusage');
+    await expect(card.locator('.event-response-pending')).toContainText('Noch nicht übertragen');
+    await page.reload();
+    await expect(page.locator('.offline')).toBeVisible();
+    await expect(card.getByRole('button', { name: 'Zugesagt' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(card.locator('.event-response-pending')).toBeVisible();
+  } finally {
+    await page.context().setOffline(false);
+  }
+  await expect(page.locator('.toast')).toHaveText('Offline vorgemerkte Zu- und Absagen übertragen');
+  await expect(card.locator('.event-response-pending')).toHaveCount(0);
+  await expect(card.getByRole('button', { name: 'Zugesagt' })).toHaveAttribute('aria-pressed', 'true');
+  // Gegenprobe vom Server, dann wieder zurücknehmen
+  await page.reload();
+  await expect(card.getByRole('button', { name: 'Zugesagt' })).toHaveAttribute('aria-pressed', 'true');
+  await card.getByRole('button', { name: 'Zugesagt' }).click();
+  await expect(card.locator('.event-response-counts')).toHaveCount(0);
+  // Server gestört (503): Die Absage wird vorgemerkt statt nur gemeldet. Lehnt der Server sie beim Nachsenden ab (hier
+  // Frist vorbei, 409), steht oben „Nicht übertragen“, auch nach dem Neuladen, bis man es wegtippt.
+  const ownResponse = (url: URL) => /\/calendar\/[^/]+\/response(?:$|[?&])/.test(decodeURIComponent(url.href));
+  const answer = (status: number, code: string, message: string) => (route: import('@playwright/test').Route) =>
+    route.request().method() === 'GET'
+      ? route.continue()
+      : route.fulfill({ status, contentType: 'application/json', body: JSON.stringify({ code, message }) });
+  await page.route(ownResponse, answer(503, 'unavailable', 'Server gestört'));
+  await card.getByRole('button', { name: 'Absagen' }).click();
+  await expect(card.getByRole('button', { name: 'Abgesagt' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(card.locator('.event-response-pending')).toContainText('Noch nicht übertragen');
+  await page.unroute(ownResponse);
+  await page.route(ownResponse, answer(409, 'responses_closed', 'Für diesen Termin kannst du nicht mehr zu- oder absagen.'));
+  await page.evaluate(() => window.dispatchEvent(new Event('online')));
+  const rejected = page.locator('.offline-rejected');
+  await expect(rejected).toContainText(
+    'Zu- oder Absage zu „E2E Vorstandssitzung“: Für diesen Termin kannst du nicht mehr zu- oder absagen.',
+  );
+  await expect(card.locator('.event-response-pending')).toHaveCount(0);
+  await page.unroute(ownResponse);
+  await page.reload();
+  await expect(rejected).toBeVisible();
+  await rejected.getByRole('button', { name: 'Gelesen' }).click();
+  await expect(rejected).toHaveCount(0);
+  await page.reload();
+  await expect(card).toBeVisible();
+  await expect(rejected).toHaveCount(0);
+  await expect(card.getByRole('button', { name: 'Absagen' })).toHaveAttribute('aria-pressed', 'false');
   await page.context().clearCookies();
   await page.goto('/app/');
   await page.reload();
@@ -4836,7 +6403,7 @@ test('Kompanien (Issue #280): anlegen, Mitglied zuordnen, Gast öffnet die Seite
   await page.locator('.company-member-form').getByLabel('Mitglied1', { exact: true }).check();
   await page.locator('.company-member-form').getByRole('button', { name: 'Speichern' }).click();
   await expect(page.locator('.toast')).toHaveText('Mitglieder gespeichert');
-  await expect(row).toContainText('1 Mitglieder');
+  await expect(row).toContainText('1 Mitglied');
   await shot(page, 'kompanien-verwalten');
 
   try {
@@ -4845,7 +6412,7 @@ test('Kompanien (Issue #280): anlegen, Mitglied zuordnen, Gast öffnet die Seite
     await expect(page.locator('.topbar').getByRole('button', { name: 'Login' })).toBeVisible();
     await page.locator('.tabbar').getByRole('button', { name: 'Kompanien' }).click();
     const card = page.locator('.company-card', { hasText: 'Testkompanie' });
-    await expect(card).toContainText('TK · gegründet 1905 · 1 Mitglieder');
+    await expect(card).toContainText('TK · gegründet 1905 · 1 Mitglied');
     // Suche und Sortierung wie in der Mitgliederliste: zuerst wie festgelegt, dann nach Name, nach Gründung jüngste zuerst
     const names = page.locator('.company-list .company-card .row-title');
     await expect(names).toHaveText(['Testkompanie', 'Alte Garde']);
@@ -4867,7 +6434,7 @@ test('Kompanien (Issue #280): anlegen, Mitglied zuordnen, Gast öffnet die Seite
     await expect(page).toHaveURL(/#\/kompanien\/\d+$/);
     const detail = page.locator('.company-page');
     await expect(detail.getByRole('heading', { name: 'Testkompanie' })).toBeVisible();
-    await expect(detail).toContainText('TK · gegründet 1905 · 1 Mitglieder');
+    await expect(detail).toContainText('TK · gegründet 1905 · 1 Mitglied');
     await expect(detail).toContainText('Gegründet zum Schützenfest.');
     await expect(detail.getByRole('link', { name: 'Webseite' })).toHaveAttribute('href', 'https://kompanie.example/');
     await expect(detail.getByRole('link', { name: 'Webseite' })).toHaveClass(/\bbtn\b/);
@@ -5122,6 +6689,30 @@ test('Eigene Seiten (Issue #287): anlegen öffentlich und nur für Mitglieder, j
   }
 });
 
+test('Block einfügen: Fenster mit allen Blockarten, Zurück und Esc schließen es ohne Block', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Seiten');
+  const form = page.locator('form', { has: page.getByRole('heading', { name: 'Neue Seite' }) });
+  // Eine neue Seite beginnt mit einem Textblock.
+  const blocks = form.locator('.block-edit');
+  await expect(blocks).toHaveCount(1);
+  const open = form.getByRole('button', { name: '+ Block einfügen', exact: true });
+  const dialog = page.getByRole('dialog', { name: 'Block einfügen' });
+  await open.click();
+  await expect(dialog.locator('.block-kind')).toHaveCount(14);
+  await expect(dialog.locator('.block-kind[data-kind="countdown"]')).toContainText('Zählt bis zu einem Datum');
+  await shot(page, 'seiten-block-einfuegen');
+  // „Zurück“ schließt nur das Fenster, die Seite bleibt
+  const url = page.url();
+  await page.goBack();
+  await expect(dialog).toHaveCount(0);
+  expect(page.url()).toBe(url);
+  await open.click();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(blocks).toHaveCount(1);
+});
+
 test('Eigene Seiten aus Blöcken: Countdown einfügen, Block nur für Mitglieder, Gast sieht Countdown ohne den Block', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
   await adminMenu(page, 'Seiten');
@@ -5130,7 +6721,7 @@ test('Eigene Seiten aus Blöcken: Countdown einfügen, Block nur für Mitglieder
   await form.getByLabel('Für wen?').selectOption({ label: 'Alle, auch ohne Anmeldung' });
   await form.getByRole('textbox', { name: 'Text', exact: true }).fill('Herzlich willkommen.');
   // Countdown darunter, ein Jahr im Voraus
-  await form.getByLabel('+ Block darunter einfügen').selectOption('countdown');
+  await insertBlock(form, '+ Block darunter einfügen', 'countdown');
   const next = new Date();
   next.setFullYear(next.getFullYear() + 1);
   const date = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`;
@@ -5141,7 +6732,7 @@ test('Eigene Seiten aus Blöcken: Countdown einfügen, Block nur für Mitglieder
   await form.locator('.block-countdown-fields').scrollIntoViewIfNeeded();
   await shot(page, 'seiten-countdown-bearbeiten');
   // Am Ende ein Text nur für Mitglieder
-  await form.getByLabel('+ Block einfügen', { exact: true }).selectOption('text');
+  await insertBlock(form, '+ Block einfügen', 'text');
   await form.getByLabel('Zielgruppe des Blocks (Text)').last().selectOption('members');
   await form.getByRole('textbox', { name: 'Text', exact: true }).last().fill('Treffpunkt intern.');
   await form.getByRole('button', { name: 'Anlegen' }).click();
@@ -5180,12 +6771,12 @@ test('Eigene Seiten: Knopf mit Link und Nächste Termine, Gast sieht beide', asy
   await form.getByLabel('Titel').fill(title);
   await form.getByLabel('Für wen?').selectOption({ label: 'Alle, auch ohne Anmeldung' });
   await form.getByRole('textbox', { name: 'Text', exact: true }).fill('Sei dabei.');
-  await form.getByLabel('+ Block darunter einfügen').selectOption('button');
+  await insertBlock(form, '+ Block darunter einfügen', 'button');
   await form.getByLabel('Beschriftung').fill('Zu den Terminen');
   await form.locator('.block-button-fields input[inputmode="url"]').fill('#/termine');
-  await form.getByLabel('+ Block einfügen', { exact: true }).selectOption('events');
+  await insertBlock(form, '+ Block einfügen', 'events');
   await form.getByLabel('Überschrift (optional)').fill('Demnächst');
-  await form.getByLabel('Wie viele Einträge').fill('2');
+  await form.getByLabel('Wie viele Termine').fill('2');
   await form.getByRole('button', { name: 'Anlegen' }).click();
   await expect(page.locator('.toast')).toHaveText('Seite angelegt');
   const row = page.locator('.page-admin-list .row', { hasText: title });
@@ -5215,16 +6806,16 @@ test('Eigene Seiten: Hinweis-Kasten, Trennlinie, Ablauf und Zahlen', async ({ pa
   const title = `Hinweise ${Date.now().toString(36)}`;
   await form.getByLabel('Titel').fill(title);
   await form.getByRole('textbox', { name: 'Text', exact: true }).fill('Oben.');
-  await form.getByLabel('+ Block darunter einfügen').selectOption('notice');
+  await insertBlock(form, '+ Block darunter einfügen', 'notice');
   await form.getByLabel('Hinweis', { exact: true }).fill('Halle gesperrt.');
   await form.locator('.block-notice-fields select').selectOption('warning');
-  await form.getByLabel('+ Block einfügen', { exact: true }).selectOption('divider');
-  await form.getByLabel('+ Block einfügen', { exact: true }).selectOption('schedule');
+  await insertBlock(form, '+ Block einfügen', 'divider');
+  await insertBlock(form, '+ Block einfügen', 'schedule');
   await form.getByLabel('Zeit 1').fill('14:00');
   await form.getByLabel('Programmpunkt 1').fill('Treffen');
   await form.getByRole('button', { name: '+ Programmpunkt' }).click();
   await form.getByLabel('Programmpunkt 2').fill('Umzug');
-  await form.getByLabel('+ Block einfügen', { exact: true }).selectOption('facts');
+  await insertBlock(form, '+ Block einfügen', 'facts');
   await form.getByLabel('Wert 1').fill('1848');
   await form.getByLabel('Bezeichnung 1').fill('gegründet');
   await form.getByRole('button', { name: 'Anlegen' }).click();
@@ -5261,7 +6852,7 @@ test('Eigene Seiten: Block Sponsoren zeigt die Sponsoren mit Link', async ({ pag
     const form = page.locator('form', { has: page.getByRole('heading', { name: 'Neue Seite' }) });
     await form.getByLabel('Titel').fill(title);
     await form.getByRole('textbox', { name: 'Text', exact: true }).fill('Oben.');
-    await form.getByLabel('+ Block darunter einfügen').selectOption('sponsors');
+    await insertBlock(form, '+ Block darunter einfügen', 'sponsors');
     await form.locator('.block-edit').last().getByLabel('Überschrift (optional)').fill('Mit Dank an');
     await form.getByRole('button', { name: 'Anlegen' }).click();
     await expect(page.locator('.toast')).toHaveText('Seite angelegt');
@@ -5297,7 +6888,7 @@ test('Eigene Seiten: Karte zur Anfahrt öffnet den Ort in der Karten-App', async
   const title = `Anfahrt ${Date.now().toString(36)}`;
   await form.getByLabel('Titel').fill(title);
   await form.getByRole('textbox', { name: 'Text', exact: true }).fill('Oben.');
-  await form.getByLabel('+ Block darunter einfügen').selectOption('map');
+  await insertBlock(form, '+ Block darunter einfügen', 'map');
   await form.locator('.block-map-fields input').nth(1).fill('Am Markt 1, 12345 Musterstadt');
   await form.getByRole('button', { name: 'Anlegen' }).click();
   await expect(page.locator('.toast')).toHaveText('Seite angelegt');
@@ -5356,6 +6947,12 @@ test('Abzeichen: PNG und SVG hochladen, Mitglied sieht sie in der Liste und in �
   await expect(page.locator('.row', { has: page.getByText('Unteroffizier', { exact: true }) })).not.toContainText(
     'Ohne Bild in Benachrichtigungen',
   );
+  // Beförderungen: Abzeichen beim aktuellen und beim nächsten Dienstgrad (Mitglied2: Gefreiter → Unteroffizier).
+  await adminMenu(page, 'Beförderungen');
+  const promo = page.locator('.promotions .row', { hasText: 'Mitglied2' });
+  await expect(promo.locator('img[alt="Gefreiter"]')).toBeVisible();
+  await expect(promo.locator('img[alt="Unteroffizier"]')).toBeVisible();
+  await expect(promo).toContainText('„Unteroffizier“');
 
   await login(page, 'mitglied2');
   await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
@@ -5443,6 +7040,104 @@ test('Anwesenheit: freie Liste, Status, Punkte aus dem Vorschlag, Mitglied sieht
   await page.locator('.tabbar').getByRole('button', { name: 'Meins' }).click();
   await meinsMenu(page, 'Anwesenheit');
   await expect(page.locator('.my-attendance .row', { hasText: title })).toContainText('anwesend');
+});
+
+test('Anwesenheit: Terminarten der Liste eingeklappt, Häkchen erst auf Tipp', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const api = (path: string, method: string, body?: unknown) =>
+    page.evaluate(
+      async ([path, method, body]) => {
+        const cfg = window.KOMPANIE_CONFIG!;
+        const res = await fetch(cfg.apiBase + path, {
+          method,
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        return res.status;
+      },
+      [path, method, body] as const,
+    );
+  expect(await api('admin/event-kinds', 'PUT', { kinds: ['Versammlung', 'Arbeitsdienst'], hidden: [] })).toBe(200);
+  let listId: number | null = null;
+  try {
+    await page.goto('/app/');
+    await adminMenu(page, 'Anwesenheit');
+    await page
+      .locator('.free-event')
+      .getByLabel('Titel')
+      .fill(`Arten ${Date.now().toString(36)}`);
+    await page.getByRole('button', { name: 'Liste anlegen' }).click();
+    await expect(page).toHaveURL(/#\/verwaltung\/anwesenheit\/\d+$/);
+    listId = Number(/(\d+)$/.exec(page.url())![1]);
+    const checks = page.getByRole('group', { name: 'Terminarten' });
+    const toggle = page.getByRole('button', { name: 'Terminarten' });
+    // Eingeklappt: keine Häkchen, nur die gewählten Arten
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(checks).toHaveCount(0);
+    await expect(page.locator('.event-kind-summary')).toHaveText('keine');
+    await toggle.click();
+    await checks.getByLabel('Versammlung').check();
+    await expect(page.locator('.toast')).toHaveText('Terminarten gespeichert');
+    await toggle.click();
+    await expect(checks).toHaveCount(0);
+    await expect(page.locator('.event-kind-summary')).toHaveText('Versammlung');
+  } finally {
+    if (listId !== null) await api(`attendance/${listId}`, 'DELETE');
+    expect(await api('admin/event-kinds', 'PUT', { kinds: [], hidden: [] })).toBe(200);
+  }
+});
+
+test('Anwesenheit offline: auf dem Gerät gespeichert, nach dem Neustart noch da, online von selbst übertragen', async ({ page }) => {
+  const title = `Offline ${Date.now().toString(36)}`;
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Anwesenheit');
+  await page.locator('.free-event').getByLabel('Titel').fill(title);
+  await page.getByRole('button', { name: 'Liste anlegen' }).click();
+  // Erst die geöffnete Liste: Das Feld „Titel“ der Übersicht hat denselben Text, und solange die Liste nicht angelegt
+  // ist, fragt die App vor dem Neuladen nach (nicht gespeicherte Eingabe).
+  await expect(page).toHaveURL(/#\/verwaltung\/anwesenheit\/\d+$/);
+  await expect(page.locator('.attendance .field').first().locator('input')).toHaveValue(title);
+  const openList = async () => {
+    await adminMenu(page, 'Anwesenheit');
+    await page.locator('.attendance-lists li', { hasText: title }).click();
+    await expect(page.locator('.attendance .field').first().locator('input')).toHaveValue(title);
+  };
+  // Erst ab dem nächsten Laden steuert der Service Worker die Seite und speichert die Liste für offline.
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+  });
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
+  // Übersicht und Liste einmal online laden, damit sie auch offline da sind.
+  await openList();
+
+  await page.context().setOffline(true);
+  try {
+    await page.getByRole('radio', { name: 'Mitglied2: anwesend' }).check();
+    await page.getByRole('button', { name: 'Speichern' }).click();
+    await expect(page.locator('.toast')).toContainText('Auf diesem Gerät gespeichert');
+    await expect(page.locator('.attendance-pending')).toContainText('bei 1 Person');
+    await expect(page.getByRole('button', { name: 'Auf dem Gerät gespeichert' })).toBeDisabled();
+    // Neustart der App ohne Netz: Die Auswahl ist noch da (vorher war sie weg).
+    await page.reload();
+    await expect(page.locator('.offline')).toBeVisible();
+    await openList();
+    await expect(page.getByRole('radio', { name: 'Mitglied2: anwesend' })).toBeChecked();
+    await expect(page.locator('.attendance-pending')).toBeVisible();
+    await page.locator('.attendance .back').click();
+    await expect(page.locator('.attendance-lists li', { hasText: title })).toContainText('Noch nicht übertragen');
+  } finally {
+    await page.context().setOffline(false);
+  }
+  // Wieder online: Die App überträgt von selbst.
+  await expect(page.locator('.toast')).toHaveText('Offline gespeicherte Anwesenheit übertragen');
+  await expect(page.locator('.attendance-lists li', { hasText: title })).not.toContainText('Noch nicht übertragen');
+  // Gegenprobe: Die Warteschlange ist leer, der Haken kommt also vom Server.
+  await page.locator('.attendance-lists li', { hasText: title }).click();
+  await expect(page.getByRole('radio', { name: 'Mitglied2: anwesend' })).toBeChecked();
+  await expect(page.locator('.attendance-pending')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Gespeichert', exact: true })).toBeDisabled();
 });
 
 test('Dokumente: hochladen, Kategorien eingeklappt, PDF anzeigen, Sortierung gemerkt, offline erneut öffnen', async ({ page }) => {
@@ -5725,7 +7420,7 @@ test('Schwarzes Brett: Banner mit Titel auf allen Seiten, ausblenden, „+1 weit
   const first = `Heute kein Training ${id}`;
   const second = `Treffpunkt Schützenhaus ${id}`;
   // Admin schreibt (Recht post_board) über „Verwaltung“ → „Schwarzes Brett“; die Verwaltung bleibt markiert.
-  const admin = await browser.newPage();
+  const admin = await quietPage(browser);
   const dialogs: string[] = [];
   autoAsk(admin, dialogs);
   await login(admin, 'admin', ADMIN_PASSWORD);
@@ -5869,7 +7564,7 @@ test('Schwarzes Brett: öffentliche Nachricht auch ohne Anmeldung, interne nicht
   const id = Date.now().toString(36);
   const open = `Tag der offenen Tür ${id}`;
   const intern = `Nur intern ${id}`;
-  const admin = await browser.newPage();
+  const admin = await quietPage(browser);
   const dialogs: string[] = [];
   autoAsk(admin, dialogs);
   await login(admin, 'admin', ADMIN_PASSWORD);
@@ -5916,20 +7611,20 @@ test('Schwarzes Brett: öffentliche Nachricht auch ohne Anmeldung, interne nicht
 test('Schwarzes Brett aus Blöcken: Countdown und Text nur für Mitglieder, ohne Anmeldung nur der Countdown', async ({ page, browser }) => {
   const id = Date.now().toString(36);
   const title = `Festbeginn ${id}`;
-  const admin = await browser.newPage();
+  const admin = await quietPage(browser);
   autoAsk(admin);
   await login(admin, 'admin', ADMIN_PASSWORD);
   await admin.goto('/app/#/brett');
   const form = admin.locator('.board-form');
   await form.getByLabel('Titel').fill(title);
   await form.getByLabel('Text der Nachricht').fill('Alle sind eingeladen.');
-  await form.getByLabel('+ Block darunter einfügen').selectOption('countdown');
+  await insertBlock(form, '+ Block darunter einfügen', 'countdown');
   const next = new Date();
   next.setFullYear(next.getFullYear() + 1);
   const date = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`;
   await form.getByLabel('Überschrift (optional)').fill('Bis zum Fest');
   await form.locator('.block-countdown-fields input[type="date"]').first().fill(date);
-  await form.getByLabel('+ Block einfügen', { exact: true }).selectOption('text');
+  await insertBlock(form, '+ Block einfügen', 'text');
   await form.getByLabel('Zielgruppe des Blocks (Text)').last().selectOption('members');
   await form.getByLabel('Text der Nachricht').last().fill('Treffpunkt intern.');
   await form.locator('.board-audience').selectOption('public');
@@ -6251,7 +7946,7 @@ test('Anhänge: am Brett anhängen, Mitglied lädt herunter, beim Bearbeiten än
   await shot(page, '33g-brett-anhang');
 
   // Mitglied sieht den Anhang und lädt ihn herunter
-  const member = await browser.newPage();
+  const member = await quietPage(browser);
   await login(member, 'mitglied1');
   await member.locator('.board-banner').getByText(`Mit Anhang ${id}`).click();
   const memberCard = member.locator('.board-card', { hasText: `Mit Anhang ${id}` });
@@ -6311,6 +8006,7 @@ test('Schwarzes Brett: Enddatum in der Ortszeit eines Geräts in New York, gespe
   page,
 }) => {
   const context = await browser.newContext({ ...devices['iPhone 13'], locale: 'de-DE', timezoneId: 'America/New_York' });
+  await quietPushHint(context);
   const ny = await context.newPage();
   autoAsk(ny);
   const title = `Zeitzone ${Date.now().toString(36)}`;
@@ -6343,7 +8039,7 @@ test('Umfragen: anlegen, Mitglied sieht sie im Banner, antwortet, sieht das Erge
 }) => {
   const title = `Grillfest ${Date.now().toString(36)}: Samstag oder Sonntag?`;
   // Admin (Recht manage_polls) legt über „Verwaltung“ → „Umfragen“ an.
-  const admin = await browser.newPage();
+  const admin = await quietPage(browser);
   autoAsk(admin);
   await login(admin, 'admin', ADMIN_PASSWORD);
   await adminMenu(admin, 'Umfragen');
@@ -6427,7 +8123,7 @@ test('Geburtstage: Mitglied trägt seinen ein, ein anderes sieht ihn unter „An
 }) => {
   // In drei Tagen (Zeitzone des Browsers; die der Kompanie verschiebt das höchstens um einen Tag, bleibt also in 7 Tagen).
   const in3 = new Date(Date.now() + 3 * 86400 * 1000);
-  const member = await browser.newPage();
+  const member = await quietPage(browser);
   autoAsk(member);
   await login(member, 'mitglied1');
   await openKonto(member);
@@ -6456,7 +8152,7 @@ test('Geburtstage: Mitglied trägt seinen ein, ein anderes sieht ihn unter „An
   await expect(upcoming.getByRole('button', { name: 'Alle Geburtstage' })).toHaveCount(0);
 
   // Admins stellen den Vorlauf ein: 1 Tag vorher → der Geburtstag in drei Tagen steht (noch) nicht drin.
-  const admin = await browser.newPage();
+  const admin = await quietPage(browser);
   await login(admin, 'admin', ADMIN_PASSWORD);
   await admin.goto('/app/#/einstellungen/geburtstage');
   const days = admin.getByLabel('Anstehende Geburtstage anzeigen');
@@ -6511,7 +8207,7 @@ test('Seite in der Mitgliederliste: Geburtstag und Eintrittsjahr nur, wem das Mi
   await expect(adminCard.getByLabel('Auf meiner Seite', { exact: false })).toHaveCount(0);
 
   // Mitglied2 zeigt den Geburtstag allen (mit Alter) und das Eintrittsjahr nur Mitgliedern.
-  const member = await browser.newPage();
+  const member = await quietPage(browser);
   autoAsk(member);
   await login(member, 'mitglied2');
   await openKonto(member);
@@ -6663,7 +8359,7 @@ test('Wartungsmodus: Admin schaltet mit Begründung ein, Mitglied sieht die Wart
   browser,
 }) => {
   // Mitglied hat die App offen; seine Termine liegen im Speicher des Service Workers.
-  const member = await browser.newPage();
+  const member = await quietPage(browser);
   await login(member, 'mitglied1');
   await expect(member.getByText('Vereinsabend')).toBeVisible();
   const storedApi = () =>
@@ -6834,7 +8530,7 @@ test('Nutzung: Admin sieht aktive Konten, Nutzung je Bereich und den Verlauf ein
   browser,
 }) => {
   // Ein Mitglied nutzt die App (Termine, eigene Punkte).
-  const member = await browser.newPage();
+  const member = await quietPage(browser);
   await login(member, 'mitglied1');
   await expect(member.getByText('Vereinsabend')).toBeVisible();
   await member.close();
@@ -6869,4 +8565,316 @@ test('Nutzung: Admin sieht aktive Konten, Nutzung je Bereich und den Verlauf ein
   await schalter.click();
   await expect(schalter).toBeChecked();
   await expect(members).toBeVisible();
+});
+
+test('Passive: Liste aus einer Tabelle importieren, mit Kopfzeile unter dem Titel und Beitrag je Zahlungsart', async ({ page }) => {
+  const id = Date.now().toString(36);
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.goto('/app/#/einstellungen/bereiche');
+  const bereiche = page.locator('.settings-section', { hasText: 'Bereiche' }).first();
+  const passive = bereiche.getByRole('checkbox', { name: /^Passive/ });
+  if (!(await passive.isChecked())) {
+    await passive.click();
+    await expect(passive).toBeChecked();
+  }
+  await page.goto('/app/#/verwaltung/passive');
+  await page.getByRole('button', { name: 'Tabelle importieren' }).click();
+  await expect(page.getByRole('heading', { name: 'Passive importieren' })).toBeVisible();
+  // Erfundene Daten: Titel über der Kopfzeile, Betrag in der Spalte der Zahlungsart, Datum am Anfang der Spalte „Info“
+  const csv = [
+    ';Stand: 01.11.2026',
+    '',
+    `Nachname;Vorname;Strasse;PLZ;Wohnort;Bar;PayPal;Info;Eintritt;Bemerkung`,
+    `${id};Erika;Musterstr. 3;12345;Musterstadt;25;;;2023;Will keine Post`,
+    `${id};Otto;;;;;25;12.03. per PayPal;vor 2014;`,
+    `${id};Fritz;;;;;;;2099;Kommt erst noch`,
+    ';Summe;;;;25;25;;;',
+  ].join('\n');
+  await page
+    .getByLabel('Datei wählen (Excel .xlsx oder CSV)')
+    .setInputFiles({ name: 'passive.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
+  await page.getByRole('button', { name: 'Vorschau' }).click();
+  await expect(page.getByRole('status')).toContainText('Neu: 3 Passive · davon mit Beitrag');
+  await page.locator('.passive-import-columns').getByLabel('Bezahlt am').selectOption({ label: 'Info' });
+  await page.getByRole('button', { name: 'Vorschau' }).click();
+  await expect(page.locator('.office-import-rows')).toContainText('PayPal, 12.03.2026');
+  await expect(page.getByRole('button', { name: 'Übernehmen' })).toBeDisabled();
+  await page.getByRole('checkbox', { name: 'Zeilen mit Fehler überspringen' }).check();
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/passive-import.png`, fullPage: true });
+  await page.getByRole('button', { name: 'Übernehmen' }).click();
+  await expect(page.locator('.toast')).toContainText('3 Passive angelegt, 2 Zahlungen');
+  // Die Liste zeigt nur die Namen; Antippen öffnet die Karte mit allen Angaben
+  await expect(page.locator('.member-counts')).toContainText('noch nicht dabei');
+  await page.getByLabel('Passiven suchen').fill(id);
+  const erika = page.locator('.passive-list .card', { hasText: `${id}, Erika` });
+  await expect(erika).not.toContainText('Will keine Post');
+  await erika.click();
+  const card = page.locator('.passive-card');
+  await expect(card.getByRole('heading', { name: `Erika ${id}` })).toBeVisible();
+  await expect(card).toContainText('Will keine Post');
+  await expect(card).toContainText('2023');
+  await expect(card.locator('.passive-payments')).toContainText('25,00');
+  // Blättern zum nächsten der Liste (Fritz), dessen Eintritt in der Zukunft liegt: Beitrag nicht offen
+  await card.getByRole('button', { name: 'Nächster Passiver' }).click();
+  await expect(card.getByRole('heading', { name: `Fritz ${id}` })).toBeVisible();
+  await expect(card.locator('.passive-payments')).toContainText('noch nicht dabei');
+  await expect(card.locator('.passive-payments')).not.toContainText('offen');
+  await card.getByRole('button', { name: '‹ Alle Passiven' }).click();
+  await page.getByRole('button', { name: 'Filter nach Beitrag' }).click();
+  await page.getByLabel('Zeigen').selectOption('open');
+  await expect(page.locator('.passive-list .card', { hasText: `${id}, Fritz` })).toHaveCount(0);
+  await page.getByLabel('Zeigen').selectOption('all');
+  await page.locator('.passive-list .card', { hasText: `${id}, Otto` }).click();
+  await expect(page.locator('.passive-card')).toContainText('vor 2014');
+});
+
+test('Anfragen auf einen Zugang: Liste nur mit Namen, Karte je Anfrage zum Blättern, nach dem Freigeben zurück', async ({ page }) => {
+  // Anfragen stellt das Formular nur mit Zeitsperre; hier kommen sie vom Testserver-Ersatz (die API prüfen die HTTP-Tests).
+  const request = (id: number, first: string, last: string, extra: Record<string, unknown> = {}) => ({
+    id,
+    name: `${first} ${last}`,
+    first_name: first,
+    last_name: last,
+    email: `${first.toLowerCase()}@example.org`,
+    username: first.toLowerCase(),
+    username_taken: false,
+    email_taken: false,
+    message: '',
+    created_at: '2026-11-10 08:00:00',
+    email_confirmed: false,
+    expires_at: '2026-12-10 08:00:00',
+    matches: [],
+    ...extra,
+  });
+  let requests = [request(9101, 'Zora', 'Zander'), request(9102, 'Anna', 'Ahrens', { message: 'Ich bin neu dabei.' })];
+  // Mit dem Bereich Kompanien: Anna hat die zweite Kompanie gewählt
+  const companies = [
+    { id: 9201, name: 'Erste Testkompanie', active: true },
+    { id: 9202, name: 'Zweite Testkompanie', active: true },
+  ];
+  requests[1] = { ...requests[1], companies: [{ id: 9202, name: 'Zweite Testkompanie' }], company_choice: 'company' };
+  const approved: number[] = [];
+  await page.addInitScript(() => {
+    // „Zugang beantragen“ an, ohne die Einstellung der Testinstallation zu ändern
+    let value: unknown;
+    Object.defineProperty(window, 'KOMPANIE_CONFIG', {
+      configurable: true,
+      get: () => value,
+      set: (v: Record<string, unknown> | undefined) => {
+        value = v && { ...v, registration: true };
+      },
+    });
+  });
+  // Über den Kontext: Der Service Worker stellt Anfragen selbst, die sieht page.route nicht.
+  await page.context().route('**/registrations', async (route) => {
+    if (route.request().method() !== 'GET') return route.continue();
+    await route.fulfill({ json: { requests, companies, default_role: 'member', email_confirmation: false, no_access_members: [] } });
+  });
+  await page.context().route('**/registrations/*/approve', async (route) => {
+    const id = Number(/registrations\/(\d+)\/approve/.exec(route.request().url())![1]);
+    const r = requests.find((x) => x.id === id)!;
+    approved.push(id);
+    requests = requests.filter((x) => x.id !== id);
+    await route.fulfill({ json: { member: { id: 1, name: r.name }, linked: false, mailed: false } });
+  });
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Anfragen');
+  await expect(page.locator('.member-counts')).toHaveText('2 offene Anfragen');
+  // Nur die Namen, nach Nachnamen sortiert; Nachricht und Formular erst auf der Karte
+  const rows = page.locator('.registration-list .card .row-title');
+  await expect(rows).toHaveText(['Ahrens, Anna', 'Zander, Zora']);
+  await expect(page.getByText('Ich bin neu dabei.')).toHaveCount(0);
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/anfragen-liste.png`, fullPage: true });
+  await page.getByLabel('Anfragen suchen').fill('zora');
+  await expect(rows).toHaveText(['Zander, Zora']);
+  await page.getByLabel('Anfragen suchen').fill('');
+  await rows.filter({ hasText: 'Ahrens, Anna' }).click();
+  const card = page.locator('.registration-card');
+  await expect(card.getByRole('heading', { name: 'Anna Ahrens' })).toBeVisible();
+  await expect(card.locator('.registration-details')).toContainText('Ich bin neu dabei.');
+  await expect(card.locator('.registration-details')).toContainText('anna@example.org');
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/anfrage-karte.png`, fullPage: true });
+  // Kompanie zuordnen: eingeklappt mit der gewählten Kompanie, aufgeklappt alle mit Haken an der gewählten
+  const assign = card.locator('.registration-companies');
+  await expect(assign.locator('.registration-companies-summary')).toHaveText('Zweite Testkompanie');
+  await expect(assign.getByRole('checkbox', { name: 'Erste Testkompanie' })).toBeHidden();
+  await assign.getByRole('button', { name: 'Kompanie zuordnen' }).click();
+  await expect(assign.getByRole('checkbox', { name: 'Zweite Testkompanie' })).toBeChecked();
+  await assign.getByRole('checkbox', { name: 'Erste Testkompanie' }).check();
+  await assign.getByRole('button', { name: 'Kompanie zuordnen' }).click();
+  await expect(assign.locator('.registration-companies-summary')).toHaveText('Erste Testkompanie, Zweite Testkompanie');
+  // Blättern zur nächsten Anfrage der Liste
+  await card.getByRole('button', { name: 'Nächste Anfrage' }).click();
+  await expect(card.getByRole('heading', { name: 'Zora Zander' })).toBeVisible();
+  await expect(card).toContainText('2 / 2');
+  await card.getByRole('button', { name: 'Freigeben', exact: true }).click();
+  await expect(page.locator('.toast')).toContainText('Zora Zander ist freigegeben');
+  expect(approved).toEqual([9101]);
+  // Zurück in der Liste, ohne die freigegebene Anfrage
+  await expect(page.locator('.member-counts')).toHaveText('1 offene Anfrage');
+  await expect(rows).toHaveText(['Ahrens, Anna']);
+});
+
+test('Kacheln anordnen: ziehen, Breite, Tastatur, je Konto gespeichert, Zurück-Taste, zurücksetzen', async ({ page }) => {
+  const grid = page.locator('.admin-tiles');
+  const tile = (id: string) => grid.locator(`li[data-tile="${id}"]`);
+  /** Kacheln in der Reihenfolge im Raster (ohne freie Felder): Kennung@Spalte+Breite/Zeile */
+  const layout = () =>
+    grid.locator('li[data-tile]').evaluateAll((els) =>
+      els.map((e) => {
+        const s = (e as HTMLElement).style;
+        return `${(e as HTMLElement).dataset.tile}@${s.gridColumn.replace(' / span ', '+')}/${s.gridRow}`;
+      }),
+    );
+  const id = (entry: string | undefined) => entry?.split('@')[0] ?? '';
+  const put = () => page.waitForResponse((r) => r.url().includes('/me/tiles') && r.request().method() === 'PUT');
+
+  // Hoch genug, dass Kachel und freies Feld zugleich zu sehen sind (Ziehen ohne Mitscrollen)
+  const size = page.viewportSize()!;
+  await page.setViewportSize({ width: size.width, height: 1600 });
+  await login(page, 'verwalter');
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await expect(tile('mitglieder')).toBeVisible();
+  const before = await layout();
+  expect(before.length).toBeGreaterThan(2);
+  const [first, second] = [id(before[0]), id(before[1])];
+  // Ohne Anordnung: der Reihe nach, zwei Spalten am Handy
+  expect(before.slice(0, 2)).toEqual([`${first}@1+1/1`, `${second}@2+1/1`]);
+  // Der Knopf steht unter den Kacheln, der Bearbeiten-Hinweis darüber
+  const arrangeBox = await page.getByRole('button', { name: 'Kacheln anordnen' }).boundingBox();
+  const gridBox = await grid.boundingBox();
+  expect(arrangeBox!.y).toBeGreaterThanOrEqual(gridBox!.y + gridBox!.height);
+
+  await page.getByRole('button', { name: 'Kacheln anordnen' }).click();
+  const hintBox = await page.locator('.tile-arrange').boundingBox();
+  expect(hintBox!.y + hintBox!.height).toBeLessThanOrEqual((await grid.boundingBox())!.y);
+  // Im Bearbeiten-Modus ist die Kachel selbst nicht bedienbar
+  await expect(tile(first).locator('.tile-body')).toHaveAttribute('inert', '');
+  // Erste Kachel mit der Maus in die freie Zeile unten ziehen
+  const slot = grid.locator('li.tile-slot').last();
+  const to = (await slot.boundingBox())!;
+  const from = (await tile(first).locator('.tile-handle').boundingBox())!;
+  let saved = put();
+  await page.mouse.move(from.x + from.width / 2, from.y + 20);
+  await page.mouse.down();
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 6 });
+  await page.mouse.up();
+  expect((await saved).status()).toBe(200);
+  expect(id((await layout()).at(-1))).toBe(first);
+  // Zweite Kachel breiter: ganze Zeile, breiter geht dann nicht mehr
+  saved = put();
+  await tile(second).locator('.tile-size button').last().click();
+  expect((await saved).status()).toBe(200);
+  expect((await layout())[0]).toBe(`${second}@1+2/1`);
+  await expect(tile(second).locator('.tile-size button').last()).toBeDisabled();
+  // Tastatur: die nächste Kachel (erste der zweiten Zeile) mit Pfeil rechts eine Spalte weiter
+  const third = id((await layout())[1]);
+  saved = put();
+  await tile(third).locator('.tile-handle').focus();
+  await page.keyboard.press('ArrowRight');
+  await saved;
+  expect((await layout()).find((l) => l.startsWith(`${third}@`))).toBe(`${third}@2+1/2`);
+  await expect(tile(third).locator('.tile-handle')).toBeFocused();
+  // Zurück-Taste beendet das Anordnen, die Seite bleibt
+  await page.goBack();
+  await expect(page.getByRole('button', { name: 'Fertig' })).toHaveCount(0);
+  await expect(page).toHaveURL(/#\/verwaltung$/);
+  const arranged = await layout();
+
+  // Bleibt nach dem Neuladen; gilt nur für dieses Konto
+  await page.reload();
+  await expect.poll(layout).toEqual(arranged);
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await expect.poll(async () => (await layout())[0]?.split('@')[1]).toBe('1+1/1');
+
+  // Zurücksetzen: wieder die Vorgabe
+  await login(page, 'verwalter');
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await expect.poll(layout).toEqual(arranged);
+  await page.getByRole('button', { name: 'Kacheln anordnen' }).click();
+  const removed = page.waitForResponse((r) => r.url().includes('/me/tiles') && r.request().method() === 'DELETE');
+  await page.locator('.tile-arrange').getByRole('button', { name: 'Zurücksetzen' }).click();
+  await askOk(page);
+  expect((await removed).status()).toBeLessThan(300);
+  await expect.poll(layout).toEqual(before);
+  await page.getByRole('button', { name: 'Fertig' }).click();
+  await page.reload();
+  await expect.poll(layout).toEqual(before);
+});
+
+test('Kacheln: Admin legt ein Raster als Vorgabe für alle fest, gilt ohne eigene Anordnung, Vorgabe löschen', async ({ page }) => {
+  const grid = page.locator('.admin-tiles');
+  const tile = (id: string) => grid.locator(`li[data-tile="${id}"]`);
+  const placeOf = async (id: string) => {
+    const s = await tile(id).evaluate((e) => (e as HTMLElement).style);
+    return `${s.gridColumn.replace(' / span ', '+')}/${s.gridRow}`;
+  };
+  const response = (method: string, path: string) => page.waitForResponse((r) => r.url().includes(path) && r.request().method() === method);
+
+  await login(page, 'verwalter');
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await expect(tile('mitglieder')).toBeVisible();
+  // Für alle ohne Vorgabe: der Reihe nach, Breite 1; der Verwalter sieht den Knopf für die Vorgabe nicht
+  expect(await placeOf('mitglieder')).toMatch(/\+1\//);
+  await page.getByRole('button', { name: 'Kacheln anordnen' }).click();
+  await expect(page.getByRole('button', { name: 'Als Vorgabe für alle' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Fertig' }).click();
+
+  // Admin: Mitglieder breiter (eigene Anordnung), dann als Vorgabe für alle
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await expect(tile('mitglieder')).toBeVisible();
+  await page.getByRole('button', { name: 'Kacheln anordnen' }).click();
+  let saved = response('PUT', '/me/tiles');
+  await tile('mitglieder').locator('.tile-size button').last().click();
+  await saved;
+  saved = response('PUT', '/admin/tiles');
+  await page.getByRole('button', { name: 'Als Vorgabe für alle' }).click();
+  await askOk(page);
+  expect((await saved).status()).toBe(200);
+  await expect(page.getByRole('button', { name: 'Vorgabe löschen' })).toBeVisible();
+  await page.getByRole('button', { name: 'Fertig' }).click();
+
+  // Verwalter ohne eigene Anordnung bekommt die Vorgabe: Mitglieder zwei Spalten breit
+  await login(page, 'verwalter');
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await expect.poll(() => placeOf('mitglieder')).toBe('1+2/1');
+
+  // Vorgabe löschen: wieder der Reihe nach
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await page.getByRole('button', { name: 'Kacheln anordnen' }).click();
+  const removed = response('DELETE', '/admin/tiles');
+  await page.getByRole('button', { name: 'Vorgabe löschen' }).click();
+  await askOk(page);
+  expect((await removed).status()).toBe(200);
+  await expect(page.getByRole('button', { name: 'Vorgabe löschen' })).toHaveCount(0);
+  const own = response('DELETE', '/me/tiles');
+  await page.locator('.tile-arrange').getByRole('button', { name: 'Zurücksetzen' }).click();
+  await askOk(page);
+  await own;
+  await page.getByRole('button', { name: 'Fertig' }).click();
+  await login(page, 'verwalter');
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await expect(tile('mitglieder')).toBeVisible();
+  await expect.poll(() => placeOf('mitglieder')).toMatch(/\+1\//);
+});
+
+test('Kacheln: am Computer 5 Spalten auf Kachel-Seiten (904 px), andere Seiten über die ganze Breite', async ({ page }) => {
+  const columns = () => page.locator('.admin-tiles').evaluate((e) => getComputedStyle(e).gridTemplateColumns.split(' ').length);
+  const width = () => page.locator('.content').evaluate((e) => e.getBoundingClientRect().width);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await login(page, 'verwalter');
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await expect(page.locator('.admin-tiles li').first()).toBeVisible();
+  await expect.poll(columns).toBe(5);
+  expect(await width()).toBe(904);
+  await page.goto('/app/#/termine');
+  await expect(page.locator('.admin-tiles')).toHaveCount(0);
+  await expect.poll(width).toBeGreaterThan(1150);
+  // Schmaleres Fenster unter 900 px: Inhalt wie bisher 640 px, 3 Spalten
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await page.setViewportSize({ width: 880, height: 800 });
+  await expect.poll(columns).toBe(3);
 });

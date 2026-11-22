@@ -1,27 +1,33 @@
 import { useEffect, useState } from 'react';
 import { api, can, config, type Promotion } from './api';
 import { dataCache } from './dataCache';
-import { dueCount, type NewlyDue } from './promotionCheck';
+import { dueCount, soonCount, type NewlyDue } from './promotionCheck';
 
 /**
- * Zahl der Mitglieder, die zur Beförderung bereit sind, für die Kachel „Beförderungen“. Nur im Speicher; nach
+ * Zahl der Mitglieder, die zur Beförderung bereit sind (und die bald bereit sind), für die Kachel „Beförderungen“. Nur im Speicher; nach
  * einer eigenen Änderung (siehe dataCache.generation) lädt der nächste Aufruf neu.
  */
 let count: number | null = null;
+/** Bald bereit (zweiter Kreis); kommt mit derselben Liste. */
+let soon: number | null = null;
 let loadedAt = -1;
 let pending: Promise<Promotion[] | null> | null = null;
 let pendingAt = -1;
-const listeners = new Set<(n: number | null) => void>();
+const listeners = new Set<(n: PromotionCounts) => void>();
 
-/** Beförderungsübersicht sichtbar: Dienstgrade verwalten, mit den Bereichen Dienstgrade und Punkte. */
-export const promotionsAllowed = (): boolean => !!config?.features.ranks && !!config?.features.points && can('manage_ranks');
+export type PromotionCounts = { due: number | null; soon: number | null };
+const counts = (): PromotionCounts => ({ due: count, soon });
+
+/** Beförderungsübersicht sichtbar: Beförderungen sehen (view_promotions), mit den Bereichen Dienstgrade und Punkte. */
+export const promotionsAllowed = (): boolean => !!config?.features.ranks && !!config?.features.points && can('view_promotions');
 
 /** Zahl aus einer frisch geladenen Beförderungsliste übernehmen. */
 export function notePromotions(list: Promotion[], since = dataCache.generation()) {
   if (since !== dataCache.generation()) return;
   count = dueCount(list);
+  soon = soonCount(list);
   loadedAt = since;
-  listeners.forEach((l) => l(count));
+  listeners.forEach((l) => l(counts()));
 }
 
 /** Beförderungsliste neu laden und die Zahl aktualisieren; null ohne Recht oder bei einem Fehler. */
@@ -71,18 +77,18 @@ export function useReached(): NewlyDue[] {
   return r;
 }
 
-/** Zahl für die Kachel; lädt beim ersten Mal und nach eigenen Änderungen neu. */
-export function usePromotionsDue(): number | null {
+/** Zahlen für die Kachel (bereit, bald bereit); lädt beim ersten Mal und nach eigenen Änderungen neu. */
+export function usePromotionsDue(): PromotionCounts {
   const allowed = promotionsAllowed();
-  const [n, setN] = useState(allowed ? count : null);
+  const [n, setN] = useState<PromotionCounts>(allowed ? counts() : { due: null, soon: null });
   useEffect(() => {
     if (!allowed) return;
     listeners.add(setN);
-    setN(count);
+    setN(counts());
     if (loadedAt !== dataCache.generation()) void refreshPromotions();
     return () => {
       listeners.delete(setN);
     };
   });
-  return allowed ? n : null;
+  return allowed ? n : { due: null, soon: null };
 }

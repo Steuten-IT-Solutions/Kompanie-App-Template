@@ -12,7 +12,7 @@ import {
   type FormerOfficesPreview,
   type FormerReason,
 } from '../api';
-import { BirthdayFields, birthdayString, canEnterBirthdays, emptyBirthday, readBirthday } from '../birthdays';
+import { BirthdayFields, birthdayString, canEnterFormerBirthdays, emptyBirthday, readBirthday } from '../birthdays';
 import brand from '../generated/brand';
 import { editYearOrDate, formatEuro, formatYearOrDate } from '../format';
 import { navigate } from '../router';
@@ -34,6 +34,7 @@ import {
 } from '../memberSort';
 import { sources } from '../viewData';
 import { confirmAsk } from '../ask';
+import { t, tn } from '../i18n';
 
 const sec = brand.labels.sections;
 
@@ -41,22 +42,22 @@ const sec = brand.labels.sections;
 export const FORMER_SORTS: MemberSort[] = ['last-name', 'first-name', 'joined', 'left'];
 
 /** Auswahl beim Eintragen */
-export const REASON_OPTIONS: Record<FormerReason, string> = { left: 'Ausgetreten', deceased: 'Verstorben', other: 'Sonstiges' };
+export const REASON_OPTIONS: Record<FormerReason, string> = { left: t('Ausgetreten'), deceased: t('Verstorben'), other: t('Sonstiges') };
 
 /** In Sätzen: „ausgetreten 2015“, „verstorben 14.03.2024“ */
-const REASON_TEXT: Record<FormerReason, string> = { left: 'ausgetreten', deceased: 'verstorben', other: 'ausgeschieden' };
+const REASON_TEXT: Record<FormerReason, string> = { left: t('ausgetreten'), deceased: t('verstorben'), other: t('ausgeschieden') };
 
 /** Eine Zeile wie „Gründungsmitglied · verstorben 14.03.2024“ bzw. „Eintritt 1990 · ausgetreten 31.12.2015“. */
 export function formerSummary(f: Pick<FormerInfo, 'reason' | 'joined_on' | 'founder' | 'left_on'>): string {
   const parts: string[] = [];
-  if (f.founder) parts.push('Gründungsmitglied');
-  if (f.joined_on) parts.push(`Eintritt ${formatYearOrDate(f.joined_on)}`);
+  if (f.founder) parts.push(t('Gründungsmitglied'));
+  if (f.joined_on) parts.push(t('Eintritt {date}', { date: formatYearOrDate(f.joined_on) }));
   parts.push(REASON_TEXT[f.reason] + (f.left_on ? ` ${formatYearOrDate(f.left_on)}` : ''));
   return parts.join(' · ');
 }
 
 /**
- * Verwaltung → Ehemalige (create_users): ausgetretene, verstorbene und sonst ausgeschiedene Personen mit ihren Daten.
+ * Verwaltung → Ehemalige (manage_former): ausgetretene, verstorbene und sonst ausgeschiedene Personen mit ihren Daten.
  * Antippen öffnet die Seite der Person wie in der Mitgliederliste.
  */
 export function FormerList() {
@@ -97,21 +98,21 @@ export function FormerList() {
       <p className="member-counts small muted" role="status">
         {(Object.keys(REASON_TEXT) as FormerReason[])
           .filter((r) => count(r) > 0)
-          .map((r) => `${count(r)} ${REASON_TEXT[r]}`)
-          .join(' · ') || 'Noch niemand eingetragen.'}
+          .map((r) => t('{count} {reason}', { count: count(r), reason: REASON_TEXT[r] }))
+          .join(' · ') || t('Noch niemand eingetragen.')}
       </p>
       <div className="button-row add-member">
         <button className="btn" onClick={() => navigate('verwaltung/ehemalige/neu')}>
-          + Ehemalige Person anlegen
+          {t('+ Ehemalige Person anlegen')}
         </button>
       </div>
       <input
         className="search"
         type="search"
-        placeholder="Suchen …"
+        placeholder={t('Suchen …')}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        aria-label="Ehemalige suchen"
+        aria-label={t('Ehemalige suchen')}
       />
       <button
         type="button"
@@ -120,9 +121,9 @@ export function FormerList() {
         aria-controls="former-filters"
         onClick={() => setFiltersOpen(!filtersOpen)}
       >
-        Filter und Sortierung
+        {t('Filter und Sortierung')}
         {/* Hinweis am eingeklappten Bereich, damit ein gesetzter Filter nicht übersehen wird (die Sortierung zählt nicht). */}
-        {reason !== '' && <span className="badge badge-role">aktiv</span>}
+        {reason !== '' && <span className="badge badge-role">{t('aktiv')}</span>}
         <span className="member-filters-arrow" aria-hidden="true">
           ›
         </span>
@@ -132,9 +133,9 @@ export function FormerList() {
           className="role-filter"
           value={reason}
           onChange={(e) => setReason(e.target.value as FormerReason | '')}
-          aria-label="Nach Grund filtern"
+          aria-label={t('Nach Grund filtern')}
         >
-          <option value="">Alle Gründe</option>
+          <option value="">{t('Alle Gründe')}</option>
           {(Object.keys(REASON_OPTIONS) as FormerReason[]).map((r) => (
             <option key={r} value={r}>
               {REASON_OPTIONS[r]}
@@ -144,7 +145,7 @@ export function FormerList() {
         <div className="field-row member-sort">
           {/* Kein umschließendes <label>: dessen Text enthielte sonst alle Optionen. */}
           <div className="field">
-            <span id="former-sort-label">Sortierung</span>
+            <span id="former-sort-label">{t('Sortierung')}</span>
             <select
               aria-labelledby="former-sort-label"
               value={order.sort}
@@ -161,12 +162,12 @@ export function FormerList() {
             </select>
           </div>
           <div className="field member-sort-dir">
-            <span id="former-sort-dir-label">Reihenfolge</span>
+            <span id="former-sort-dir-label">{t('Reihenfolge')}</span>
             <button
               type="button"
               className="btn btn-secondary"
               aria-labelledby="former-sort-dir-label former-sort-dir-value"
-              title="Reihenfolge umkehren"
+              title={t('Reihenfolge umkehren')}
               onClick={() => changeOrder({ ...order, dir: order.dir === 'asc' ? 'desc' : 'asc' })}
             >
               <span id="former-sort-dir-value">{dirLabel(order.sort, order.dir)}</span>
@@ -185,7 +186,7 @@ export function FormerList() {
                 {(f.open_cents ?? 0) > 0 && (
                   <>
                     {' · '}
-                    <span className="neg">{formatEuro(f.open_cents ?? 0)} offen</span>
+                    <span className="neg">{t('{amount} offen', { amount: formatEuro(f.open_cents ?? 0) })}</span>
                   </>
                 )}
               </div>
@@ -195,7 +196,7 @@ export function FormerList() {
             </span>
           </li>
         ))}
-        {list.length === 0 && (data ?? []).length > 0 && <Empty>Niemand gefunden.</Empty>}
+        {list.length === 0 && (data ?? []).length > 0 && <Empty>{t('Niemand gefunden.')}</Empty>}
       </ul>
       {can('manage_settings') && <RetentionCard onChanged={reload} />}
     </div>
@@ -222,7 +223,7 @@ function RetentionCard({ onChanged }: { onChanged: () => void }) {
     e.preventDefault();
     const years = f.years.trim() === '' ? 0 : Number(f.years);
     if (!Number.isInteger(years) || years < 0 || years > 50) {
-      setSaveError('Bitte die Frist in ganzen Jahren angeben (0 bis 50; leer oder 0 = aus).');
+      setSaveError(t('Bitte die Frist in ganzen Jahren angeben (0 bis 50; leer oder 0 = aus).'));
       return;
     }
     const data = { years };
@@ -236,8 +237,17 @@ function RetentionCard({ onChanged }: { onChanged: () => void }) {
         const due = preview.due.length;
         const question =
           due > 0
-            ? `Beim nächsten Lauf (spätestens in einem Tag) werden bei ${due} Ehemaligen die persönlichen Angaben endgültig gelöscht: ${names(preview.due)}. Das lässt sich nicht rückgängig machen. Speichern?`
-            : `Bei Ehemaligen ${years} Jahre nach dem Ausscheiden die persönlichen Angaben endgültig löschen? Zurzeit ist niemand fällig. Speichern?`;
+            ? tn(
+                'Beim nächsten Lauf (spätestens in einem Tag) werden bei {count} Ehemaligen die persönlichen Angaben endgültig gelöscht: {names}. Das lässt sich nicht rückgängig machen. Speichern?',
+                'Beim nächsten Lauf (spätestens in einem Tag) werden bei {count} Ehemaligen die persönlichen Angaben endgültig gelöscht: {names}. Das lässt sich nicht rückgängig machen. Speichern?',
+                due,
+                { names: names(preview.due) },
+              )
+            : tn(
+                'Bei Ehemaligen {count} Jahr nach dem Ausscheiden die persönlichen Angaben endgültig löschen? Zurzeit ist niemand fällig. Speichern?',
+                'Bei Ehemaligen {count} Jahre nach dem Ausscheiden die persönlichen Angaben endgültig löschen? Zurzeit ist niemand fällig. Speichern?',
+                years,
+              );
         if (!(await confirmAsk(question))) return;
       }
       setData(await api.setFormerRetention(data)); // auch in den Zwischenspeicher, neu geladen wird wie sonst
@@ -252,9 +262,9 @@ function RetentionCard({ onChanged }: { onChanged: () => void }) {
 
   return (
     <form className="form card settings-section" onSubmit={save} aria-labelledby="former-retention-title">
-      <h3 id="former-retention-title">Aufbewahrungsfrist</h3>
+      <h3 id="former-retention-title">{t('Aufbewahrungsfrist')}</h3>
       <label className="field">
-        <span>Jahre nach dem Ausscheiden</span>
+        <span>{t('Jahre nach dem Ausscheiden')}</span>
         <input
           type="number"
           inputMode="numeric"
@@ -266,8 +276,10 @@ function RetentionCard({ onChanged }: { onChanged: () => void }) {
       </label>
       {r.years > 0 && (
         <p className="small">
-          {r.due.length > 0 ? <>Beim nächsten Lauf (täglich) fällig: {names(r.due)}.</> : 'Zurzeit ist niemand fällig.'}
-          {r.soon.length > 0 && <> In den nächsten 30 Tagen fällig: {names(r.soon)}.</>}
+          {r.due.length > 0
+            ? t('Beim nächsten Lauf (täglich) fällig: {names}.', { names: names(r.due) })
+            : t('Zurzeit ist niemand fällig.')}
+          {r.soon.length > 0 && ' ' + t('In den nächsten 30 Tagen fällig: {names}.', { names: names(r.soon) })}
         </p>
       )}
       {saveError && (
@@ -278,10 +290,10 @@ function RetentionCard({ onChanged }: { onChanged: () => void }) {
       {form && (
         <div className="button-row">
           <button className="btn" type="submit" disabled={busy}>
-            {busy ? 'Speichert …' : 'Speichern'}
+            {busy ? t('Speichert …') : t('Speichern')}
           </button>
           <button className="btn btn-secondary" type="button" onClick={() => setForm(null)}>
-            Abbrechen
+            {t('Abbrechen')}
           </button>
         </div>
       )}
@@ -294,7 +306,7 @@ function FormerFields({ value, onChange }: { value: FormerInput; onChange: (v: F
   return (
     <>
       <label className="field">
-        <span>Grund des Ausscheidens</span>
+        <span>{t('Grund des Ausscheidens')}</span>
         <select value={value.reason} onChange={(e) => onChange({ ...value, reason: e.target.value as FormerReason })}>
           {(Object.keys(REASON_OPTIONS) as FormerReason[]).map((r) => (
             <option key={r} value={r}>
@@ -305,21 +317,21 @@ function FormerFields({ value, onChange }: { value: FormerInput; onChange: (v: F
       </label>
       <div className="field-row">
         <label className="field">
-          <span>{value.reason === 'deceased' ? 'Verstorben am' : 'Ausgeschieden am'} (optional)</span>
+          <span>{value.reason === 'deceased' ? t('Verstorben am (optional)') : t('Ausgeschieden am (optional)')}</span>
           <input
             type="text"
             inputMode="numeric"
-            placeholder="TT.MM.JJJJ oder Jahr"
+            placeholder={t('TT.MM.JJJJ oder Jahr')}
             value={value.left_on}
             onChange={(e) => onChange({ ...value, left_on: e.target.value })}
           />
         </label>
         <label className="field">
-          <span>Eintritt (optional)</span>
+          <span>{t('Eintritt (optional)')}</span>
           <input
             type="text"
             inputMode="numeric"
-            placeholder="TT.MM.JJJJ oder Jahr"
+            placeholder={t('TT.MM.JJJJ oder Jahr')}
             value={value.joined_on}
             onChange={(e) => onChange({ ...value, joined_on: e.target.value })}
           />
@@ -327,7 +339,7 @@ function FormerFields({ value, onChange }: { value: FormerInput; onChange: (v: F
       </div>
       <label className="toggle">
         <input type="checkbox" checked={value.founder} onChange={(e) => onChange({ ...value, founder: e.target.checked })} />
-        <span>Gründungsmitglied</span>
+        <span>{t('Gründungsmitglied')}</span>
       </label>
     </>
   );
@@ -337,7 +349,7 @@ function FormerFields({ value, onChange }: { value: FormerInput; onChange: (v: F
 const emptyFormer = (): FormerInput => ({ reason: 'left', joined_on: '', founder: false, left_on: '' });
 
 /**
- * Verwaltung → Ehemalige → „+ Ehemalige Person anlegen“ (create_users), aufgebaut wie „+ Mitglied anlegen“: Name, Angaben zum
+ * Verwaltung → Ehemalige → „+ Ehemalige Person anlegen“ (manage_former), aufgebaut wie „+ Mitglied anlegen“: Name, Angaben zum
  * Ausscheiden, Geburtstag und Foto. Es entsteht ein Konto ohne Anmeldung, das gleich als ehemalig eingetragen ist. Darüber
  * führt „Tabelle importieren“ zum Import vieler auf einmal.
  */
@@ -353,8 +365,8 @@ export function NewFormer() {
   async function submit(e: FormEvent) {
     e.preventDefault();
     setFormError(null);
-    if (!name.first_name.trim()) return setFormError('Bitte einen Vornamen angeben.');
-    const bday = canEnterBirthdays() ? readBirthday(birthday) : null;
+    if (!name.first_name.trim()) return setFormError(t('Bitte einen Vornamen angeben.'));
+    const bday = canEnterFormerBirthdays() ? readBirthday(birthday) : null;
     if (typeof bday === 'string') return setFormError(bday);
     setBusy(true);
     try {
@@ -378,12 +390,18 @@ export function NewFormer() {
   if (created) {
     return (
       <div>
-        <h2 className="member-name">{created.name} ist als ehemalig angelegt</h2>
+        <h2 className="member-name">{t('{name} ist als ehemalig angelegt', { name: created.name })}</h2>
         <p className="small">{formerSummary(created)}</p>
         {created.offices_linked > 0 && (
           <p className="small">
-            {created.offices_linked === 1 ? '1 Eintrag' : `${created.offices_linked} Einträge`} in den {sec.offices} mit dem Konto
-            verknüpft.
+            {tn(
+              '{count} Eintrag in den {offices} mit dem Konto verknüpft.',
+              '{count} Einträge in den {offices} mit dem Konto verknüpft.',
+              created.offices_linked,
+              {
+                offices: sec.offices,
+              },
+            )}
           </p>
         )}
         {created.warning && (
@@ -392,7 +410,7 @@ export function NewFormer() {
           </p>
         )}
         <button className="btn btn-block" onClick={() => navigate('verwaltung/ehemalige')}>
-          Fertig
+          {t('Fertig')}
         </button>
         <button
           className="btn btn-secondary btn-block"
@@ -404,7 +422,7 @@ export function NewFormer() {
             setPhoto(null);
           }}
         >
-          Weitere Person
+          {t('Weitere Person')}
         </button>
       </div>
     );
@@ -413,21 +431,21 @@ export function NewFormer() {
   return (
     <form className="form" onSubmit={submit}>
       <button type="button" className="btn btn-link back" onClick={() => navigate('verwaltung/ehemalige')}>
-        ‹ Ehemalige
+        ‹ {t('Ehemalige')}
       </button>
       <button type="button" className="btn btn-secondary btn-block bulk-link" onClick={() => navigate('verwaltung/ehemalige/import')}>
-        Tabelle importieren (z. B. Chronik)
+        {t('Tabelle importieren (z. B. Chronik)')}
       </button>
       <NameFields value={name} onChange={setName} />
       <FormerFields value={former} onChange={setFormer} />
-      {canEnterBirthdays() && (
+      {canEnterFormerBirthdays() && (
         <fieldset className="fieldset new-member-birthday">
-          <legend>Geburtstag (optional)</legend>
+          <legend>{t('Geburtstag (optional)')}</legend>
           <BirthdayFields value={birthday} onChange={setBirthday} />
         </fieldset>
       )}
       <fieldset className="fieldset new-member-photo">
-        <legend>Foto (optional)</legend>
+        <legend>{t('Foto (optional)')}</legend>
         <PhotoPicker name={`${name.first_name} ${name.last_name}`.trim()} value={photo} onChange={setPhoto} onError={setFormError} />
       </fieldset>
       {formError && (
@@ -436,14 +454,14 @@ export function NewFormer() {
         </p>
       )}
       <button className="btn btn-block" type="submit" disabled={busy}>
-        {busy ? 'Legt an …' : 'Ehemalige Person anlegen'}
+        {busy ? t('Legt an …') : t('Ehemalige Person anlegen')}
       </button>
     </form>
   );
 }
 
 /**
- * Im Mitglied unter „Konto und Rolle“ und hinter „Austritt“ (create_users): als ehemalig eintragen bzw. die Angaben
+ * Im Mitglied unter „Konto und Rolle“ und hinter „Austritt“ (manage_former): als ehemalig eintragen bzw. die Angaben
  * ändern und wieder aufnehmen. Offene Beträge werden vor dem Eintragen genannt, damit sie nicht in Vergessenheit geraten.
  * Mit `editing` steht gleich das Formular da; „Abbrechen“ ruft dann `onCancel` (z. B. schließt das Fenster).
  */
@@ -492,11 +510,12 @@ export function FormerPanel({
       const data = { ...form, joined_on: form.joined_on.trim(), left_on: form.left_on.trim() };
       if (former) {
         await api.updateFormer(id, data);
-        onToast('Gespeichert');
+        onToast(t('Gespeichert'));
       } else {
         const res = await api.markFormer(id, data);
         onToast(
-          `${name} ist jetzt als ehemalig eingetragen` + (res.offices_ended > 0 ? `. ${sec.offices} beendet: ${res.offices_ended}` : ''),
+          t('{name} ist jetzt als ehemalig eingetragen', { name }) +
+            (res.offices_ended > 0 ? '. ' + t('{offices} beendet: {count}', { offices: sec.offices, count: res.offices_ended }) : ''),
         );
       }
       setForm(null);
@@ -512,16 +531,26 @@ export function FormerPanel({
     // Benutzername und E-Mail-Adresse löscht die Frist nur in der eigenständigen Version (WordPress: Benutzer der Webseite).
     const loginDeleted = former?.personal_deleted && config?.variant !== 'wordpress';
     const deleted = former?.personal_deleted
-      ? ` Die persönlichen Angaben wurden nach Ablauf der Aufbewahrungsfrist gelöscht${loginDeleted ? ', auch Benutzername und E-Mail-Adresse' : ''}.`
+      ? ' ' +
+        (loginDeleted
+          ? t('Die persönlichen Angaben wurden nach Ablauf der Aufbewahrungsfrist gelöscht, auch Benutzername und E-Mail-Adresse.')
+          : t('Die persönlichen Angaben wurden nach Ablauf der Aufbewahrungsfrist gelöscht.'))
       : '';
-    if (!former || !(await confirmAsk(`${name} wieder aufnehmen (als ${levelLabel(former.previous_level)})?${deleted}`))) return;
+    if (
+      !former ||
+      !(await confirmAsk(t('{name} wieder aufnehmen (als {level})?', { name, level: levelLabel(former.previous_level) }) + deleted))
+    )
+      return;
     setBusy(true);
     try {
       await api.reactivate(id);
       onToast(
         loginDeleted
-          ? `${name} ist wieder aufgenommen. Bitte unter „Angaben ändern“ Benutzername und E-Mail-Adresse neu eintragen, dann ein neues Startpasswort erzeugen.`
-          : `${name} ist wieder aufgenommen. Für die Anmeldung bitte ein neues Startpasswort erzeugen.`,
+          ? t(
+              '{name} ist wieder aufgenommen. Bitte unter „Angaben ändern“ Benutzername und E-Mail-Adresse neu eintragen, dann ein neues Startpasswort erzeugen.',
+              { name },
+            )
+          : t('{name} ist wieder aufgenommen. Für die Anmeldung bitte ein neues Startpasswort erzeugen.', { name }),
       );
       onChanged();
     } catch (err) {
@@ -533,19 +562,22 @@ export function FormerPanel({
 
   return (
     <section className="former-panel">
-      <h3 className="section-title">Ehemalig</h3>
+      <h3 className="section-title">{t('Ehemalig')}</h3>
       {form ? (
         <form className="form card" onSubmit={save}>
           {!former && (
             <p className="small">
-              Das Konto bleibt mit allen Daten ({sec.points}, {sec.penalties}, {brand.labels.rank}, Titel, {sec.offices}) erhalten. {name}{' '}
-              hat danach keine Rolle mehr, steht in keiner Liste, bekommt keine Benachrichtigungen und kann sich nicht mehr in der App
-              anmelden.
+              {t(
+                'Das Konto bleibt mit allen Daten ({points}, {penalties}, {rank}, Titel, {offices}) erhalten. {name} hat danach keine Rolle mehr, steht in keiner Liste, bekommt keine Benachrichtigungen und kann sich nicht mehr in der App anmelden.',
+                { points: sec.points, penalties: sec.penalties, rank: brand.labels.rank, offices: sec.offices, name },
+              )}
             </p>
           )}
           {!former && (openCents ?? 0) > 0 && (
             <p className="form-error" role="alert">
-              Achtung: Es sind noch {formatEuro(openCents ?? 0)} offen. Sie bleiben offen und stehen auch in der Liste der Ehemaligen.
+              {t('Achtung: Es sind noch {amount} offen. Sie bleiben offen und stehen auch in der Liste der Ehemaligen.', {
+                amount: formatEuro(openCents ?? 0),
+              })}
             </p>
           )}
           <FormerFields value={form} onChange={setForm} />
@@ -557,7 +589,7 @@ export function FormerPanel({
           )}
           <div className="button-row">
             <button className="btn" type="submit" disabled={busy}>
-              {former ? 'Speichern' : 'Als ehemalig eintragen'}
+              {former ? t('Speichern') : t('Als ehemalig eintragen')}
             </button>
             <button
               className="btn btn-secondary"
@@ -567,7 +599,7 @@ export function FormerPanel({
                 onCancel?.();
               }}
             >
-              Abbrechen
+              {t('Abbrechen')}
             </button>
           </div>
         </form>
@@ -576,20 +608,20 @@ export function FormerPanel({
           <p className="small">{formerSummary(former)}</p>
           <div className="button-row">
             <button className="btn btn-secondary" disabled={busy} onClick={() => setForm(startForm())}>
-              Angaben ändern
+              {t('Angaben ändern')}
             </button>
             <button className="btn" disabled={busy} onClick={reactivate}>
-              Wieder aufnehmen
+              {t('Wieder aufnehmen')}
             </button>
           </div>
         </>
       ) : (
         <>
           <p className="muted small">
-            Ausgetreten oder verstorben? Dann hier eintragen statt das Konto zu löschen: Die Daten bleiben erhalten.
+            {t('Ausgetreten oder verstorben? Dann hier eintragen statt das Konto zu löschen: Die Daten bleiben erhalten.')}
           </p>
           <button className="btn btn-secondary" disabled={busy} onClick={() => setForm(startForm())}>
-            Als ehemalig eintragen …
+            {t('Als ehemalig eintragen …')}
           </button>
         </>
       )}
@@ -617,13 +649,19 @@ function EndingOffices({ id, leftOn }: { id: number; leftOn: string }) {
     };
   }, [id, leftOn]);
   if (!preview || preview.terms.length === 0) return null;
-  const clamped = preview.terms.filter((t) => t.clamped);
+  const clamped = preview.terms.filter((term) => term.clamped);
   return (
     <p className="small ending-offices" role="status">
-      Mit dem Ausscheiden enden: {preview.terms.map((t) => `${t.office} (seit ${t.start_year})`).join(', ')} – Ende {preview.end_year}.
+      {t('Mit dem Ausscheiden enden: {list} – Ende {year}.', {
+        list: preview.terms.map((term) => t('{office} (seit {year})', { office: term.office, year: term.start_year })).join(', '),
+        year: preview.end_year,
+      })}
       {clamped.length > 0 &&
-        ` Der Austritt liegt vor dem Beginn von ${clamped.map((t) => t.office).join(', ')}; dort ist das Ende deshalb das Jahr des Beginns.`}
-      {preview.terms.some((t) => t.shared) && ' Wer ein Amt gemeinsam innehat, bleibt darin; nur dieser Eintrag endet.'}
+        ' ' +
+          t('Der Austritt liegt vor dem Beginn von {list}; dort ist das Ende deshalb das Jahr des Beginns.', {
+            list: clamped.map((term) => term.office).join(', '),
+          })}
+      {preview.terms.some((term) => term.shared) && ' ' + t('Wer ein Amt gemeinsam innehat, bleibt darin; nur dieser Eintrag endet.')}
     </p>
   );
 }
@@ -649,8 +687,13 @@ export function FormerImport({ onToast }: { onToast: (msg: string) => void }) {
       const res = await api.importFormer(csv, apply);
       if (apply) {
         onToast(
-          `${res.new === 1 ? '1 Person' : `${res.new} Personen`} als ehemalig angelegt` +
-            ((res.offices_linked ?? 0) > 0 ? `, ${res.offices_linked} Einträge in den ${sec.offices} verknüpft` : ''),
+          tn('{count} Person als ehemalig angelegt', '{count} Personen als ehemalig angelegt', res.new) +
+            ((res.offices_linked ?? 0) > 0
+              ? ', ' +
+                tn('{count} Eintrag in den {offices} verknüpft', '{count} Einträge in den {offices} verknüpft', res.offices_linked ?? 0, {
+                  offices: sec.offices,
+                })
+              : ''),
         );
         navigate('verwaltung/ehemalige');
       } else {
@@ -667,11 +710,11 @@ export function FormerImport({ onToast }: { onToast: (msg: string) => void }) {
   return (
     <div className="office-import">
       <button className="btn btn-link back" onClick={() => navigate('verwaltung/ehemalige/neu')}>
-        ‹ Einzeln anlegen
+        ‹ {t('Einzeln anlegen')}
       </button>
-      <h2 className="member-name">Ehemalige importieren</h2>
+      <h2 className="member-name">{t('Ehemalige importieren')}</h2>
       <label className="field">
-        <span>Tabelle</span>
+        <span>{t('Tabelle')}</span>
         <textarea
           value={csv}
           placeholder={IMPORT_EXAMPLE}
@@ -682,7 +725,7 @@ export function FormerImport({ onToast }: { onToast: (msg: string) => void }) {
         />
       </label>
       <label className="field">
-        <span>Oder Datei wählen (Excel .xlsx oder CSV)</span>
+        <span>{t('Oder Datei wählen (Excel .xlsx oder CSV)')}</span>
         <FileInput
           accept=".xlsx,.csv,.txt,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           onChange={async (e) => {
@@ -704,34 +747,49 @@ export function FormerImport({ onToast }: { onToast: (msg: string) => void }) {
       )}
       <div className="button-row">
         <button className="btn btn-secondary" disabled={busy || csv.trim() === ''} onClick={() => send(false)}>
-          Vorschau
+          {t('Vorschau')}
         </button>
         {result && (
           <button className="btn" disabled={busy || errors > 0 || result.new === 0} onClick={() => send(true)}>
-            Übernehmen
+            {t('Übernehmen')}
           </button>
         )}
       </div>
       {result && (
         <section>
           <p role="status">
-            Neu: {result.new === 1 ? '1 Person' : `${result.new} Personen`} · schon vorhanden: {result.existing}
+            {t('Neu: {people} · schon vorhanden: {count}', {
+              people: tn('{count} Person', '{count} Personen', result.new),
+              count: result.existing,
+            })}
           </p>
           {(result.offices_linked ?? 0) > 0 && (
             <p className="small">
-              {result.offices_linked} Einträge in den {sec.offices}, die bisher nur den Namen hatten, werden mit dem Konto verknüpft.
+              {tn(
+                '{count} Eintrag in den {offices}, der bisher nur den Namen hatte, wird mit dem Konto verknüpft.',
+                '{count} Einträge in den {offices}, die bisher nur den Namen hatten, werden mit dem Konto verknüpft.',
+                result.offices_linked ?? 0,
+                { offices: sec.offices },
+              )}
             </p>
           )}
           {errors > 0 && (
-            <p className="form-error">{errors === 1 ? '1 Zeile hat' : `${errors} Zeilen haben`} einen Fehler; bitte erst korrigieren.</p>
+            <p className="form-error">
+              {tn(
+                '{count} Zeile hat einen Fehler; bitte erst korrigieren.',
+                '{count} Zeilen haben einen Fehler; bitte erst korrigieren.',
+                errors,
+              )}
+            </p>
           )}
           <ul className="office-import-rows">
             {result.rows.map((r) => (
               <li key={r.line} className={r.existing ? 'muted' : ''}>
-                <strong>Zeile {r.line}</strong> {r.name}
+                <strong>{t('Zeile {line}', { line: r.line })}</strong> {r.name}
                 {r.reason &&
                   ` · ${formerSummary({ reason: r.reason, joined_on: r.joined_on ?? '', founder: !!r.founder, left_on: r.left_on ?? '' })}`}
-                {r.existing && (r.existing.former ? ' · schon als ehemalig eingetragen' : ' · hat schon ein Konto, wird übersprungen')}
+                {r.existing &&
+                  ' · ' + (r.existing.former ? t('schon als ehemalig eingetragen') : t('hat schon ein Konto, wird übersprungen'))}
                 {r.error && <p className="form-error">{r.error}</p>}
               </li>
             ))}

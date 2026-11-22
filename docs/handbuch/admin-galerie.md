@@ -1,18 +1,23 @@
 ---
-titel: "{bereich.gallery} einrichten"
+titel: '{bereich.gallery} einrichten'
 reihenfolge: 122
 rechte: [manage_settings]
 ---
+
 Hier legst du fest, woher die {bereich.gallery} ihre Bilder nimmt: aus einem Ordner in Google Drive (die App holt neue Bilder von selbst dazu) oder nur vom eigenen Server. In beiden Fällen kannst du Alben in der App anlegen und Bilder selbst hochladen.
 
 ![Die Seite {bereich.gallery} in den Einstellungen](bild:admin-galerie)
 
 ## So öffnest du die Seite
+
 Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **{bereich.gallery}**. Im [Einrichtungsassistenten](seite:admin-einrichtung) steht derselbe Abschnitt im Schritt für die {bereich.gallery}.
 
 ## Was du hier siehst
+
 - **Quelle**: **Google Drive (dazu Alben der App)** oder **Eigener Server (nur Alben der App)**.
-- **Ablageort für hochgeladene Bilder**: vorerst immer **Eigener Server**. Darunter steht, wie viel Platz die hochgeladenen Bilder belegen.
+- **Ablageort**: wo eingereichte und in der App hochgeladene Bilder und Videos landen.
+  - **Google Drive**, wenn die Quelle Google Drive ist und der [Google-Zugang](seite:admin-google) vollen Zugriff auf Drive hat. Warten noch Dateien auf dem Server, steht dort, wie viele; scheitert das Übertragen, steht die Meldung darunter.
+  - Sonst **eigener Server**, mit dem belegten Platz. Darf die Verbindung Drive nur lesen, steht dort, wie du sie neu verbindest.
 - Mit der Quelle Google Drive außerdem:
 - **Gelesen wird über …**: welcher Google-Zugang genutzt wird, mit einem Verweis auf **Google-Zugang**. Gibt es noch keinen, steht das hier.
 - **Link zum Galerie-Ordner**: die Adresse des Ordners in Google Drive.
@@ -20,15 +25,18 @@ Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **{bereich.ga
 - **Jetzt abgleichen**: liest den Ordner sofort ein (erscheint, sobald ein Ordner eingetragen ist).
 - **… Bilder ließen sich nicht laden – anzeigen**: erscheint nur, wenn Bilder nicht geladen werden konnten.
 - **Knöpfe zum Herunterladen zeigen**: Ist der Haken gesetzt, kann jeder, der die {bereich.gallery} sieht, Bilder und Videos herunterladen: jedes einzeln in der Großansicht und jedes Album als ZIP. Ohne Haken (Vorgabe) gibt es diese Knöpfe nicht.
-- **Einreichen von Bildern und Videos durch Mitglieder erlauben**: Ist der Haken gesetzt, können alle mit dem Recht *Bilder und Videos einreichen* Bilder und Videos vorschlagen. Ohne Haken gibt es in der {bereich.gallery} keinen Knopf zum Einreichen, und die App nimmt keine Einreichungen an. Neu eingerichtete Apps starten ohne Haken; wer die {bereich.gallery} schon vor dem Haken genutzt hat, hat ihn gesetzt.
+- **Einreichen von Bildern und Videos durch Mitglieder erlauben**: Ist der Haken gesetzt, können alle mit dem Recht _Bilder und Videos einreichen_ Bilder und Videos vorschlagen. Ohne Haken gibt es in der {bereich.gallery} keinen Knopf zum Einreichen, und die App nimmt keine Einreichungen an. Neu eingerichtete Apps starten ohne Haken; wer die {bereich.gallery} schon vor dem Haken genutzt hat, hat ihn gesetzt.
 - **Speichern**: übernimmt Quelle, Link und die Haken für die Knöpfe zum Herunterladen und das Einreichen.
 - **Alben und eigene Bilder**: alle Alben mit der Zahl der Bilder aus Drive und der hochgeladenen, darunter **Neues Album in der App** mit **Titel**, **Jahr** und **Album anlegen**.
 
 ## So gehst du vor
+
 ### Den Ordner in Google Drive vorbereiten
+
 Lege in Google Drive einen Galerie-Ordner an. Darin kommt je Jahr ein Ordner und darin je Album ein Ordner mit den Bildern und Videos. Bilder und Videos im Unterordner `intern` eines Albums sehen nur Mitglieder. Freigeben musst du den Ordner nicht: Auch Videos spielt die App über den Google-Zugang ab.
 
 ### Den Ordner verbinden
+
 1. Richte zuerst den [Google-Zugang](seite:admin-google) ein. Mit einem Dienstkonto gibst du den Galerie-Ordner vorher für dessen E-Mail-Adresse frei (Rolle Betrachter).
 2. Öffne den Galerie-Ordner in Google Drive und kopiere die Adresse aus der Adresszeile des Browsers (z. B. `https://drive.google.com/drive/folders/…`).
 3. Füge sie bei **Link zum Galerie-Ordner** ein und tippe auf **Speichern**.
@@ -37,16 +45,19 @@ Lege in Google Drive einen Galerie-Ordner an. Darin kommt je Jahr ein Ordner und
 ![Nach dem Abgleich: wie viele Alben und Bilder gefunden wurden](bild:admin-galerie-abgleich)
 
 ### Die Galerie ohne Google Drive nutzen
+
 1. Wähle bei **Quelle** **Eigener Server (nur Alben der App)** und tippe auf **Speichern**. War vorher Google Drive eingetragen, verschwinden dessen Alben und Bilder aus der App; hochgeladene Bilder bleiben. Wechselst du zurück, holt der nächste Abgleich sie wieder.
 2. Lege unter **Neues Album in der App** ein Album an: **Titel** und **Jahr** eintragen, **Album anlegen** tippen.
 
 ### Bilder und Videos hochladen
+
 1. Tippe unter **Alben und eigene Bilder** auf ein Album. Es klappt auf. Das geht mit Alben aus der App und aus Google Drive.
 2. Setze den Haken **Nur für Mitglieder (intern)**, wenn die Bilder und Videos nur Mitglieder sehen sollen.
 3. Tippe auf **Bilder oder Videos hochladen** und wähle eine oder mehrere Dateien: Bilder als JPG, PNG oder WebP, Videos als MP4 oder WebM mit höchstens 1 GB je Video. Die App zeigt, wie viele schon oben sind, bei einem Video auch in Prozent, z. B. „Lädt … 40 %“. Lass die Seite dabei offen.
 4. Bilder und Videos erscheinen kurz darauf in der {bereich.gallery}. Mit **Löschen** daneben nimmst du sie wieder heraus.
 
 ### Ein hochgeladenes Bild intern oder öffentlich stellen
+
 Setze oder entferne neben dem Bild den Haken **intern**. Mit Haken sehen es nur {rolle.member}, ohne alle. Das Bild wird kurz neu aufbereitet und hat danach eine neue Adresse. Wer es vorher schon angesehen oder gespeichert hat, behält diese Kopie. Dasselbe geht in der Großansicht der {bereich.gallery}. Bilder aus Google Drive stellst du in Drive um: in den Unterordner `intern` des Albums verschieben oder heraus.
 
 Bei einem Album der App änderst du darunter **Titel des Albums** und **Jahr des Albums** (**Album speichern**) oder löschst es mit **Album löschen** samt allen Bildern darin.
@@ -54,25 +65,30 @@ Bei einem Album der App änderst du darunter **Titel des Albums** und **Jahr des
 Verschieben, mehrere auf einmal löschen und Alben bearbeiten geht auch direkt in der {bereich.gallery}, auch für alle mit dem Recht „{bereich.gallery} verwalten“. Wie das geht, steht im Handbuch unter „Die Galerie verwalten“.
 
 ### Herunterladen erlauben
+
 1. Setze den Haken **Knöpfe zum Herunterladen zeigen** und tippe auf **Speichern**.
 2. In jedem Album steht dann rechts neben dem Titel ein runder Knopf mit Pfeil nach unten (ganzes Album als ZIP), in der Großansicht oben rechts neben **✕** derselbe Knopf für das einzelne Bild oder Video.
 3. Zum Abschalten nimmst du den Haken wieder heraus und tippst auf **Speichern**.
 
 ### Einreichen erlauben
+
 1. Setze den Haken **Einreichen von Bildern und Videos durch Mitglieder erlauben** und tippe auf **Speichern**.
-2. Wer das Recht *Bilder und Videos einreichen* hat, sieht in der {bereich.gallery} oben den Knopf **Bilder und Videos einreichen** (Pfeil nach oben). Das Recht vergibst du unter [Rollen](seite:admin-rollen-und-mitglieder).
+2. Wer das Recht _Bilder und Videos einreichen_ hat, sieht in der {bereich.gallery} oben den Knopf **Bilder und Videos einreichen** (Pfeil nach oben). Das Recht vergibst du unter [Rollen](seite:admin-rollen-und-mitglieder).
 3. Zum Abschalten nimmst du den Haken wieder heraus und tippst auf **Speichern**. Schon eingereichte Bilder und Videos bleiben und lassen sich weiter prüfen.
 
 ### Bilder ansehen, die sich nicht laden ließen
+
 1. Tippe auf **… Bilder ließen sich nicht laden – anzeigen**. Die Liste zeigt je Bild Dateiname, Album, Anzahl der Versuche, die Fehlermeldung und **In Google Drive öffnen**.
 2. Lege das Bild als JPG in denselben Ordner in Google Drive und entferne das alte.
 3. Tippe auf **Alle erneut versuchen**. Die App versucht alle noch einmal und gleicht danach ab.
 
 ## Gut zu wissen
+
 - Beim Hochladen entfernt der Server Metadaten wie Aufnahmeort (GPS) und Kamera und speichert das Bild neu als JPG mit höchstens 8192 Pixeln an der längeren Kante. Wie groß ein Bild sein darf, hängt vom Webspace ab; ist es zu groß, sagt die App, woran es liegt.
-- Hochgeladene Bilder liegen auf dem eigenen Server und sind in der [Sicherung](seite:admin-updates-und-sicherung) enthalten. Hochgeladene Videos liegen ebenfalls dort, sind aber wegen ihrer Größe nicht in der Sicherung; bewahre ihre Originale selbst auf. Die App setzt keine Grenze für den Speicherplatz; wie viel belegt ist, steht hier und unter [Zustand und Updates](seite:admin-zustand).
+- Mit Google Drive als Ablageort kommt alles zuerst auf den Server (dort entfernt er die Metadaten) und dann im Hintergrund nach Drive, große Videos über mehrere Läufe. Offene Einreichungen liegen im Ordner **Einreichungen …** in der Ablage des verbundenen Google-Kontos, außerhalb des Galerie-Ordners, und sind so nicht in der {bereich.gallery} zu sehen. Bei der Freigabe verschiebt die App sie in den Ordner des Albums, bei _Nur für Mitglieder_ in dessen Ordner **intern** (gibt es ihn nicht, legt sie ihn an). Abgelehnte, zurückgezogene und wieder entfernte Bilder kommen in den Papierkorb von Drive und lassen sich dort 30 Tage lang wiederherstellen. In der App hochgeladene Bilder in Alben aus Drive ziehen nach dem Aufbereiten in den Ordner des Albums und zählen danach wie Bilder aus Drive. Alben, die vorher nur in der App angelegt waren, bekommen einmalig einen Ordner im Jahresordner, ihre Bilder ziehen ebenso dorthin um. Das verbundene Google-Konto braucht Bearbeitungsrechte am Galerie-Ordner.
+- Hochgeladene Bilder liegen sonst auf dem eigenen Server und sind in der [Sicherung](seite:admin-updates-und-sicherung) enthalten. Hochgeladene Videos liegen ebenfalls dort, sind aber wegen ihrer Größe nicht in der Sicherung; bewahre ihre Originale selbst auf. Die App setzt keine Grenze für den Speicherplatz; wie viel belegt ist, steht hier und unter [Zustand und Updates](seite:admin-zustand).
 - Der Abgleich mit Google Drive ändert und löscht keine hochgeladenen Bilder. Verschwindet ein Album aus Drive, in das du Bilder hochgeladen hast, bleibt es mit diesen Bildern.
-- Mitglieder mit dem Recht *Bilder und Videos einreichen* schlagen Bilder und Videos für jedes Album vor, sobald der Haken zum Einreichen gesetzt ist; wer *Einreichungen prüfen* hat, gibt sie frei. Beide Rechte vergibst du unter [Rollen](seite:admin-rollen-und-mitglieder); mit der {bereich.gallery} entsteht die Rolle *{bereich.gallery} verwalten* mit dem Recht zum Prüfen. Freigegebene Bilder stehen hier wie hochgeladene.
+- Mitglieder mit dem Recht _Bilder und Videos einreichen_ schlagen Bilder und Videos für jedes Album vor, sobald der Haken zum Einreichen gesetzt ist; wer _Einreichungen prüfen_ hat, gibt sie frei. Beide Rechte vergibst du unter [Rollen](seite:admin-rollen-und-mitglieder); mit der {bereich.gallery} entsteht die Rolle _{bereich.gallery} verwalten_ mit dem Recht zum Prüfen. Freigegebene Bilder stehen hier wie hochgeladene.
 - Was beim Abgleich nicht fertig wird, bereitet die App stündlich im Hintergrund weiter auf. Neue Bilder in Google Drive kommen ebenso stündlich dazu.
 - Videos zeigt die {bereich.gallery} als MP4 oder WebM. Andere Formate (z. B. MOV vom iPhone, AVI) stehen in der Liste als „Videoformat nicht unterstützt“. Abhilfe: das Video als MP4 speichern (viele Handys bieten das beim Teilen oder Exportieren an) und in denselben Ordner legen.
 - Videos aus Google Drive speichert die App nicht auf dem Server, sie spielt sie beim Ansehen aus Google Drive ab. Nur ihr Vorschaubild kommt von Google und liegt neben den Bildern.
@@ -85,4 +101,5 @@ Verschieben, mehrere auf einmal löschen und Alben bearbeiten geht auch direkt i
 - Mit WordPress gibt es dieselbe Einstellung auch im WordPress-Backend auf der Seite der App (Feld „Galerie-Ordner“, Knopf **Galerie speichern**).
 
 ## Siehe auch
+
 - [Google-Zugang](seite:admin-google)

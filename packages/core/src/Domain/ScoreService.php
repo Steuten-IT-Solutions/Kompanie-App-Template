@@ -6,6 +6,7 @@ namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\UserDirectory;
 use KompanieApp\Core\Storage\CatalogRepository;
 use KompanieApp\Core\Storage\PenaltyRepository;
@@ -71,7 +72,7 @@ final class ScoreService
      *
      * attendance_id: die Anwesenheitsliste, aus deren Vorschlag gebucht wird (geprüft von AttendanceService::forBooking).
      *
-     * @param array<string, mixed> $in user_ids, points, catalog_id, reason, date, apply_factor, attendance_id
+     * @param array<string, mixed> $in user_ids, points, catalog_id, reason, date, apply_factor, attendance_id, request_id
      * @return array<int, array<string, mixed>>
      */
     public function givePoints(array $in, int $by): array
@@ -87,13 +88,13 @@ final class ScoreService
         $catalogId = Input::integer($in['catalog_id'] ?? null) ?: null;
         $item = $catalogId ? $this->catalog->find($catalogId) : null;
         if ($catalogId && !$item) {
-            throw ApiError::invalid('Katalogeintrag nicht gefunden.');
+            throw ApiError::invalid(I18n::t('Katalogeintrag nicht gefunden.'));
         }
 
         $raw = $in['points'] ?? null;
         $points = ($raw === null || $raw === '') && $item ? (int) $item['points'] : self::parsePoints($raw);
         if ($points === 0) {
-            throw ApiError::invalid('Die Punktzahl darf nicht 0 sein.');
+            throw ApiError::invalid(I18n::t('Die Punktzahl darf nicht 0 sein.'));
         }
 
         $reason = Text::line($in['reason'] ?? '', 255);
@@ -101,19 +102,69 @@ final class ScoreService
             $reason = (string) $item['title'];
         }
         if ($reason === '') {
-            throw ApiError::invalid('Bitte einen Grund angeben.');
+            throw ApiError::invalid(I18n::t('Bitte einen Grund angeben.'));
         }
 
         $attendanceId = Input::integer($in['attendance_id'] ?? null) ?: null;
-        $ids = $this->points->add($factors, $points, $reason, $catalogId, $date, $by, $this->time->nowUtc(), $attendanceId);
+        $ids = $this->points->add($factors, $points, $reason, $catalogId, $date, $by, $this->time->nowUtc(), $attendanceId, self::requestId($in));
         return $this->formatPointRows($this->points->findMany($ids));
+    }
+
+    /**
+     * Dieselbe Buchung schon einmal angekommen (request_id, z. B. offline vorgemerkt und erneut gesendet, nachdem die
+     * Antwort unterwegs verloren ging)? Dann die Einträge von damals, sonst null.
+     *
+     * @param array<string, mixed> $in
+     * @return array<int, array<string, mixed>>|null
+     */
+    public function pointsForRequest(array $in, int $by): ?array
+    {
+        $requestId = self::requestId($in);
+        $ids = $requestId === null ? [] : $this->points->idsForRequest($requestId, $by);
+        return $ids === [] ? null : $this->formatPointRows($this->points->findMany($ids));
+    }
+
+    /**
+     * Wie pointsForRequest, für Strafen.
+     *
+     * @param array<string, mixed> $in
+     * @return array<int, array<string, mixed>>|null
+     */
+    public function penaltiesForRequest(array $in, int $by): ?array
+    {
+        $requestId = self::requestId($in);
+        $ids = $requestId === null ? [] : $this->penalties->idsForRequest($requestId, $by);
+        if ($ids === []) {
+            return null;
+        }
+        $rows = $this->penalties->findMany($ids);
+        $this->names->prime(array_column($rows, 'created_by'));
+        return array_map([$this, 'formatPenalty'], $rows);
+    }
+
+    /**
+     * Kennung einer Buchung aus der App (request_id): 8 bis 36 Zeichen aus Buchstaben, Ziffern und Bindestrich, sonst
+     * keine (ältere Apps senden keine).
+     *
+     * @param array<string, mixed> $in
+     */
+    private static function requestId(array $in): ?string
+    {
+        $raw = $in['request_id'] ?? null;
+        if ($raw === null || $raw === '') {
+            return null;
+        }
+        if (!is_string($raw) || preg_match('/^[A-Za-z0-9-]{8,36}$/', $raw) !== 1) {
+            throw ApiError::invalid(I18n::t('Ungültige Kennung der Buchung.'));
+        }
+        return $raw;
     }
 
     public function cancelPoints(int $id, int $by): void
     {
         $row = $this->points->find($id);
         if (!$row || $row['deleted_at']) {
-            throw ApiError::notFound('Eintrag nicht gefunden.');
+            throw ApiError::notFound(I18n::t('Eintrag nicht gefunden.'));
         }
         $this->points->cancel($id, $by, $this->time->nowUtc());
     }
@@ -148,7 +199,7 @@ final class ScoreService
     }
 
     /**
-     * @param array<string, mixed> $in user_ids, amount_cents, reason, date
+     * @param array<string, mixed> $in user_ids, amount_cents, reason, date, request_id
      * @return array<int, array<string, mixed>>
      */
     public function givePenalty(array $in, int $by): array
@@ -157,13 +208,13 @@ final class ScoreService
         $date = Input::date($in['date'] ?? null, $this->time->today());
         $cents = Input::integer($in['amount_cents'] ?? null);
         if ($cents === null || $cents <= 0 || $cents > self::MAX_CENTS) {
-            throw ApiError::invalid('Bitte einen Betrag zwischen 0,01 € und 1.000 € angeben.');
+            throw ApiError::invalid(I18n::t('Bitte einen Betrag zwischen 0,01 € und 1.000 € angeben.'));
         }
         $reason = Text::line($in['reason'] ?? '', 255);
         if ($reason === '') {
-            throw ApiError::invalid('Bitte einen Grund angeben.');
+            throw ApiError::invalid(I18n::t('Bitte einen Grund angeben.'));
         }
-        $ids = $this->penalties->add($userIds, $cents, $reason, $date, $by, $this->time->nowUtc());
+        $ids = $this->penalties->add($userIds, $cents, $reason, $date, $by, $this->time->nowUtc(), self::requestId($in));
         $rows = $this->penalties->findMany($ids);
         $this->names->prime(array_column($rows, 'created_by'));
         return array_map([$this, 'formatPenalty'], $rows);
@@ -173,10 +224,10 @@ final class ScoreService
     {
         $row = $this->penalties->find($id);
         if (!$row || $row['deleted_at']) {
-            throw ApiError::notFound('Strafe nicht gefunden.');
+            throw ApiError::notFound(I18n::t('Strafe nicht gefunden.'));
         }
         if (!in_array($status, [PenaltyRepository::OPEN, PenaltyRepository::PAID], true)) {
-            throw ApiError::invalid('Ungültiger Status.');
+            throw ApiError::invalid(I18n::t('Ungültiger Status.'));
         }
         $this->penalties->setStatus($id, $status, $by, $this->time->nowUtc());
         return $this->formatPenalty((array) $this->penalties->find($id));
@@ -186,7 +237,7 @@ final class ScoreService
     {
         $row = $this->penalties->find($id);
         if (!$row || $row['deleted_at']) {
-            throw ApiError::notFound('Strafe nicht gefunden.');
+            throw ApiError::notFound(I18n::t('Strafe nicht gefunden.'));
         }
         $this->penalties->cancel($id, $by, $this->time->nowUtc());
     }
@@ -219,7 +270,7 @@ final class ScoreService
     {
         $title = Text::line($in['title'] ?? '', 191);
         if ($title === '') {
-            throw ApiError::invalid('Bitte einen Titel angeben.');
+            throw ApiError::invalid(I18n::t('Bitte einen Titel angeben.'));
         }
         $points = self::parsePoints($in['points'] ?? null);
         // Ohne Angabe ans Ende (Issue #176: die Reihenfolge lässt sich per Ziehen ändern).
@@ -232,13 +283,13 @@ final class ScoreService
     public function updateCatalogItem(int $id, array $in): array
     {
         if (!$this->catalog->find($id)) {
-            throw ApiError::notFound('Eintrag nicht gefunden.');
+            throw ApiError::notFound(I18n::t('Eintrag nicht gefunden.'));
         }
         $data = [];
         if (($in['title'] ?? null) !== null) {
             $data['title'] = Text::line($in['title'], 191);
             if ($data['title'] === '') {
-                throw ApiError::invalid('Bitte einen Titel angeben.');
+                throw ApiError::invalid(I18n::t('Bitte einen Titel angeben.'));
             }
         }
         if (($in['points'] ?? null) !== null) {
@@ -272,7 +323,7 @@ final class ScoreService
         $known = array_keys($items);
         sort($known);
         if ($given !== $known) {
-            throw ApiError::invalid('Bitte die Reihenfolge aller Einträge angeben.');
+            throw ApiError::invalid(I18n::t('Bitte die Reihenfolge aller Einträge angeben.'));
         }
         $changed = [];
         foreach ($order as $i => $id) {
@@ -302,13 +353,13 @@ final class ScoreService
     private function members(mixed $raw): array
     {
         if (!is_array($raw) || $raw === []) {
-            throw ApiError::invalid('Bitte mindestens ein Mitglied auswählen.');
+            throw ApiError::invalid(I18n::t('Bitte mindestens ein Mitglied auswählen.'));
         }
         $ids = [];
         foreach ($raw as $v) {
             $id = Input::integer($v);
             if ($id === null || $id <= 0) {
-                throw ApiError::invalid('Unbekanntes Mitglied.');
+                throw ApiError::invalid(I18n::t('Unbekanntes Mitglied.'));
             }
             $ids[$id] = $id;
         }
@@ -318,10 +369,10 @@ final class ScoreService
         foreach ($ids as $id) {
             $user = $found[$id] ?? null;
             if (!$user) {
-                throw ApiError::invalid('Unbekanntes Mitglied.');
+                throw ApiError::invalid(I18n::t('Unbekanntes Mitglied.'));
             }
             if (!$user->isMember()) {
-                throw ApiError::invalid('Gäste können keine Punkte oder Strafen bekommen.');
+                throw ApiError::invalid(I18n::t('Gäste können keine Punkte oder Strafen bekommen.'));
             }
             $users[$id] = $user;
         }
@@ -338,7 +389,7 @@ final class ScoreService
     {
         $points = Input::integer($raw);
         if ($points === null || abs($points) > self::MAX_POINTS) {
-            throw ApiError::invalid('Bitte eine ganze Punktzahl angeben.');
+            throw ApiError::invalid(I18n::t('Bitte eine ganze Punktzahl angeben.'));
         }
         return $points;
     }

@@ -8,6 +8,7 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Storage\ActivityRepository;
 
 /**
@@ -192,7 +193,7 @@ final class ActivityService
         if ($userId !== null && $userId !== '') {
             $id = Input::integer($userId);
             if ($id === null || $id <= 0) {
-                throw ApiError::invalid('Ungültiges Konto.');
+                throw ApiError::invalid(I18n::t('Ungültiges Konto.'));
             }
         }
         [$start, $end] = $this->bounds($fromDay, $toDay);
@@ -211,7 +212,7 @@ final class ActivityService
     public function setPersonal(mixed $on): bool
     {
         if (!is_bool($on)) {
-            throw ApiError::invalid('Bitte angeben, ob die Nutzung je Person erfasst werden soll.');
+            throw ApiError::invalid(I18n::t('Bitte angeben, ob die Nutzung je Person erfasst werden soll.'));
         }
         $this->app->settings->set(self::PERSONAL_SETTING, $on ? 'on' : 'off');
         if (!$on) {
@@ -261,7 +262,7 @@ final class ActivityService
     private function label(string $area): string
     {
         if (isset(self::EXTRA_AREAS[$area])) {
-            return self::EXTRA_AREAS[$area];
+            return $area === 'login' ? I18n::t('Anmeldung') : I18n::t('Allgemein');
         }
         $def = Features::DEFINITIONS[$area] ?? null;
         return $def === null ? $area : $this->app->config->sectionLabel($area, $def['label']);
@@ -285,10 +286,10 @@ final class ActivityService
         $toDay = Input::date($to, $today);
         $fromDay = ($from === null || $from === '') ? (new \DateTimeImmutable($toDay))->modify('-29 days')->format('Y-m-d') : Input::date($from, $today);
         if ($fromDay > $toDay) {
-            throw ApiError::invalid('Der Beginn liegt nach dem Ende.');
+            throw ApiError::invalid(I18n::t('Der Beginn liegt nach dem Ende.'));
         }
         if ((new \DateTimeImmutable($fromDay))->diff(new \DateTimeImmutable($toDay))->days >= self::RANGE_MAX) {
-            throw ApiError::invalid(sprintf('Bitte höchstens %d Tage auf einmal auswählen.', self::RANGE_MAX));
+            throw ApiError::invalid(I18n::t('Bitte höchstens {max} Tage auf einmal auswählen.', ['max' => self::RANGE_MAX]));
         }
         return [$fromDay, $toDay];
     }

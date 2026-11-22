@@ -8,6 +8,7 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Preview;
 use KompanieApp\Core\Http\FileCache;
 use KompanieApp\Core\Http\ManifestIcons;
+use KompanieApp\Core\I18n\I18n;
 
 /**
  * Liefert die PWA unter /app/ aus.
@@ -17,7 +18,7 @@ use KompanieApp\Core\Http\ManifestIcons;
  * /app/sw.js                 → Service Worker (Bereich /app/)
  * /app/foto/<id>/<größe>     → Galeriebild (interne nur für Mitglieder)
  * /app/foto/<id>/video       → Galerievideo in Ausschnitten aus Drive oder der eigenen Ablage (Range; interne nur für Mitglieder)
- * /app/foto/<id>/einreichung → Video einer offenen Einreichung zum Prüfen (review_gallery, Issue #350)
+ * /app/foto/<id>/einreichung → Video einer offenen Einreichung zum Prüfen (view_submissions, Issue #350)
  * /app/dokument/<id>?v=…     → Dokument (nur für Mitglieder, die es sehen dürfen)
  * /app/abzeichen/<id>?v=…&s=… → Abzeichen eines Dienstgrads (angemeldet mit Mitgliederbereich oder Kalender)
  * /app/mitgliedsfoto/<id>?v=…&s=… → Foto eines Mitglieds (die Person selbst und wer Mitglieder verwaltet)
@@ -225,7 +226,7 @@ final class AppPage
         header('Content-Type: application/json; charset=utf-8');
         if (!is_user_logged_in()) {
             status_header(401);
-            echo wp_json_encode(['code' => 'not_logged_in', 'message' => 'Bitte melde dich an.']);
+            echo wp_json_encode(['code' => 'not_logged_in', 'message' => I18n::t('Bitte melde dich an.')]);
             return;
         }
         echo wp_json_encode(['token' => $app->authenticator->csrfToken()]);
@@ -337,7 +338,7 @@ final class AppPage
         $range = isset($_SERVER['HTTP_RANGE']) && is_string($_SERVER['HTTP_RANGE']) ? wp_unslash($_SERVER['HTTP_RANGE']) : null;
         $access = static function () use ($app, $submission): array {
             $user = $app->authContext->currentUser();
-            $cap = $submission ? \KompanieApp\Core\Auth\Capability::ReviewGallery : \KompanieApp\Core\Auth\Capability::ViewGalleryInternal;
+            $cap = $submission ? \KompanieApp\Core\Auth\Capability::ViewSubmissions : \KompanieApp\Core\Auth\Capability::ViewGalleryInternal;
             return [$app->can($cap), $user !== null];
         };
         if ($submission) {
@@ -555,7 +556,7 @@ final class AppPage
         $file = self::distDir() . 'index.html';
         if (!is_readable($file)) {
             status_header(500);
-            echo 'Die App wurde noch nicht gebaut (app/index.html fehlt).';
+            echo esc_html(I18n::t('Die App wurde noch nicht gebaut (app/index.html fehlt).'));
             return;
         }
         // Wer die App öffnet, bleibt angemeldet: Anmeldung bei Bedarf verlängern.

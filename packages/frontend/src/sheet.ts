@@ -1,6 +1,8 @@
 // Tabellen für Importe lesen: CSV als Text, Excel (.xlsx) als Tabulator-getrennter Text. Der Server prüft beides gleich
 // (Domain\CsvTable). Die Excel-Datei wird nur hier im Browser gelesen; dafür lädt die App fflate erst beim Import.
 
+import { t } from './i18n';
+
 /** Datei lesen: UTF-8, sonst Windows-1252 (so speichert Excel unter Windows „CSV (Trennzeichen-getrennt)“). */
 export async function readText(file: File): Promise<string> {
   const bytes = await file.arrayBuffer();
@@ -15,7 +17,9 @@ export async function readText(file: File): Promise<string> {
 export async function readSheet(file: File): Promise<string> {
   const name = file.name.toLowerCase();
   if (name.endsWith('.xls') || name.endsWith('.ods') || name.endsWith('.numbers')) {
-    throw new Error('Dieses Format kann die App nicht lesen. Bitte in Excel bzw. LibreOffice „Speichern unter“ als .xlsx oder CSV wählen.');
+    throw new Error(
+      t('Dieses Format kann die App nicht lesen. Bitte in Excel bzw. LibreOffice „Speichern unter“ als .xlsx oder CSV wählen.'),
+    );
   }
   if (!name.endsWith('.xlsx')) return readText(file);
   const { unzipSync } = await import('fflate');
@@ -32,7 +36,7 @@ export function toTsv(rows: string[][]): string {
       row
         .map((cell) => {
           const c = cell.replace(/[\t\r\n]+/g, ' ');
-          return c.includes('"') ? `"${c.replace(/"/g, '""')}"` : c;
+          return c.includes('"') ? `"${c.replace(/\x22/g, '""')}"` : c;
         })
         .join('\t'),
     )
@@ -45,14 +49,14 @@ export function xlsxRows(bytes: Uint8Array, unzip: Unzip): string[][] {
   try {
     files = unzip(bytes, { filter: (f) => (f.name.startsWith('xl/') && f.name.endsWith('.xml')) || f.name.endsWith('.rels') });
   } catch {
-    throw new Error('Die Datei ist keine gültige Excel-Datei (.xlsx).');
+    throw new Error(t('Die Datei ist keine gültige Excel-Datei (.xlsx).'));
   }
   const text = (path: string): string => (files[path] ? new TextDecoder('utf-8').decode(files[path]) : '');
   const workbook = text('xl/workbook.xml');
-  if (!workbook) throw new Error('Die Datei ist keine gültige Excel-Datei (.xlsx).');
+  if (!workbook) throw new Error(t('Die Datei ist keine gültige Excel-Datei (.xlsx).'));
   const sheetPath = firstSheetPath(workbook, text('xl/_rels/workbook.xml.rels'));
   const sheet = text(sheetPath);
-  if (!sheet) throw new Error('Das erste Tabellenblatt fehlt in der Datei.');
+  if (!sheet) throw new Error(t('Das erste Tabellenblatt fehlt in der Datei.'));
   const shared = sharedStrings(text('xl/sharedStrings.xml'));
   const dates = dateStyles(text('xl/styles.xml'));
   const date1904 = /<workbookPr\b[^>]*\bdate1904="(?:1|true)"/.test(workbook);

@@ -22,7 +22,7 @@ Tippe unten auf **Verwaltung** und dann auf **{bereich.polls}**. Auch am {bereic
 2. Wähle bei **Art**: **Eine Antwort**, **Mehrere Antworten möglich** oder **Freitext**.
 3. Bei **Eine Antwort** und **Mehrere Antworten möglich**: Trage unter **Antwortmöglichkeiten** mindestens zwei verschiedene ein. Mit **+ Möglichkeit** kommt eine weitere dazu, **×** entfernt eine.
 4. Wähle unter **Antworten**: **Namentlich** oder **Anonym**.
-5. Wähle bei **Wer sieht die Ergebnisse?**: **Alle, sobald sie geantwortet haben**, **Alle nach dem Ende** oder **Nur die Verwalter der Umfragen**.
+5. Wähle bei **Wer sieht die Ergebnisse?**: **Alle, sobald sie geantwortet haben**, **Alle nach dem Ende** oder **Nur wer alle Ergebnisse sehen darf**.
 6. Trage bei Bedarf ein **Ende (optional)** mit Datum und Uhrzeit ein. Ohne Ende läuft die Umfrage, bis jemand sie beendet.
 7. Tippe auf **Veröffentlichen** und bestätige die Nachfrage.
 
@@ -37,6 +37,15 @@ Die Umfrage steht danach sofort am {bereich.board} und im Banner der {rolle.memb
 
 ![Eine laufende Umfrage mit Ergebnissen und den Knöpfen Bearbeiten, Beenden und Löschen](bild:umfragen-verwalten-umfrage)
 
+### Eine Umfrage auch auf Englisch stellen
+Hat der Admin unter **Einstellungen → Sprachen** Englisch eingeschaltet, steht im Formular über **Ende (optional)** der aufklappbare Abschnitt **Auf English schreiben (freiwillig)**.
+1. Tippe auf **Auf English schreiben (freiwillig)**.
+2. Trage **Frage auf English** und bei Bedarf **Beschreibung auf English** ein.
+3. Trage unter **Antwortmöglichkeiten auf English** jede Möglichkeit auf Englisch ein. Leere Felder zeigen grau den deutschen Text.
+4. Tippe auf **Veröffentlichen** bzw. **Speichern**.
+
+Wer die App auf Englisch nutzt, sieht die Umfrage in dieser Fassung, auch in Benachrichtigung und Erinnerung. Was du leer lässt, erscheint auf Deutsch, mit dem Hinweis *Teilweise nur auf Deutsch verfügbar*. Die Antworten zählen für alle Sprachen gemeinsam: Wer auf Englisch „Yes“ wählt, hat dieselbe Möglichkeit gewählt wie mit „Ja“ auf Deutsch. Die englische Fassung kannst du auch ändern, wenn es schon Antworten gibt. Benutzt du die App selbst auf Englisch, bearbeitest du trotzdem die deutsche Fassung oben im Formular. Laufende Umfragen kann ein Admin auch unter **Einstellungen → Sprachen** im Abschnitt **Übersetzungen** in der Gruppe **Laufende Umfragen** übersetzen. Änderst du vor der ersten Antwort die deutschen Möglichkeiten, bleibt die englische Fassung bei ihrer Möglichkeit; neue Möglichkeiten erscheinen auf Englisch zunächst deutsch.
+
 ### Eine Umfrage vorzeitig beenden
 1. Tippe bei der Umfrage auf **Beenden**.
 2. Bestätige die Nachfrage. Danach kann niemand mehr antworten oder seine Antwort ändern. Wieder öffnen geht nicht.
@@ -50,7 +59,7 @@ Die Umfrage steht danach sofort am {bereich.board} und im Banner der {rolle.memb
 - 24 Stunden vor dem Ende erinnert die App einmal alle, die noch nicht geantwortet haben. Endet die Umfrage schon innerhalb von 24 Stunden nach dem Veröffentlichen, entfällt die Erinnerung. Verschiebst du das Ende auf später als 24 Stunden, gibt es wieder eine Erinnerung.
 - Ändern verschickt keine neue Benachrichtigung. Wer die Umfrage auf seinem Gerät ausgeblendet hatte, sieht sie danach wieder im Banner.
 - Bei **Anonym** sieht niemand, wer was geantwortet hat, auch du nicht. Bei **Namentlich** stehen die Namen bei den Ergebnissen.
-- Wer {bereich.polls} verwalten darf, sieht die Ergebnisse immer, auch bei **Nur die Verwalter der Umfragen** und schon während die Umfrage läuft.
+- Wer {bereich.polls} verwalten darf oder das Recht **{bereich.polls}: alle Ergebnisse sehen** hat, sieht die Ergebnisse immer, auch bei **Nur wer alle Ergebnisse sehen darf** und schon während die Umfrage läuft.
 - Ändern, beenden und löschen darf jede und jeder mit diesem Recht, nicht nur, wer die Umfrage angelegt hat.
 - Grenzen: Beschreibung höchstens 1000 Zeichen, 2 bis 20 Antwortmöglichkeiten mit je höchstens 100 Zeichen, keine doppelt. Das Ende muss in der Zukunft liegen.
 - An {bereich.polls} nehmen nur {rolle.member} teil, nicht z. B. Anwärter.

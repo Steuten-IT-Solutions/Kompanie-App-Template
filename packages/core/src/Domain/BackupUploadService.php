@@ -6,6 +6,7 @@ namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\App;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Storage\BackupCrypto;
 use KompanieApp\Core\Update\OffsiteBackup;
 
@@ -95,10 +96,10 @@ final class BackupUploadService implements OffsiteBackup
     public function setEnabled(bool $on): array
     {
         if ($on && !$this->available()) {
-            throw ApiError::invalid('Dafür braucht die App eine Verbindung über „Mit Google verbinden“ (Einstellungen → Google-Zugang).');
+            throw ApiError::invalid(I18n::t('Dafür braucht die App eine Verbindung über „Mit Google verbinden“ (Einstellungen → Google-Zugang).'));
         }
         if ($on && !$this->app->drive()->backupAccess()) {
-            throw ApiError::invalid('Die Verbindung zu Google erlaubt noch nicht, Dateien anzulegen. Bitte unter Einstellungen → Google-Zugang die Verbindung trennen und neu mit Google verbinden; dabei das Häkchen für eigene Dateien in Google Drive setzen.');
+            throw ApiError::invalid(I18n::t('Die Verbindung zu Google erlaubt noch nicht, Dateien anzulegen. Bitte unter Einstellungen → Google-Zugang die Verbindung trennen und neu mit Google verbinden; dabei das Häkchen für eigene Dateien in Google Drive setzen.'));
         }
         $this->app->settings->set(self::SETTING, ['enabled' => $on] + $this->config());
         return $this->status();
@@ -127,7 +128,7 @@ final class BackupUploadService implements OffsiteBackup
     {
         $backup = $this->app->backup;
         if ($backup === null || !$this->available() || !$this->app->drive()->backupAccess()) {
-            throw ApiError::invalid('Sicherungen in Google Drive sind noch nicht eingerichtet.');
+            throw ApiError::invalid(I18n::t('Sicherungen in Google Drive sind noch nicht eingerichtet.'));
         }
         $now = $this->app->time()->timestamp();
         $state = $this->state();
@@ -147,7 +148,7 @@ final class BackupUploadService implements OffsiteBackup
                 $this->store($tmp, $date . ($gzip ? self::GZIP_EXTENSION : '.json'), self::PREFIX, self::KEEP, $state);
             }
         } catch (\Throwable $e) {
-            $state['error'] = $e instanceof \JsonException ? 'Die Sicherung ließ sich nicht erstellen: ' . $e->getMessage() : $e->getMessage();
+            $state['error'] = $e instanceof \JsonException ? I18n::t('Die Sicherung ließ sich nicht erstellen: {error}', ['error' => $e->getMessage()]) : $e->getMessage();
             throw $e instanceof \RuntimeException ? $e : new \RuntimeException($state['error'], 0, $e);
         } finally {
             $tmp !== null && BackupEncryptionService::discard($tmp);
@@ -163,7 +164,7 @@ final class BackupUploadService implements OffsiteBackup
     public function storeBeforeUpdate(string $path, string $version, ?callable $onProgress = null): void
     {
         if (!$this->active()) {
-            throw new \RuntimeException('Sicherungen in Google Drive sind nicht eingeschaltet.');
+            throw new \RuntimeException(I18n::t('Sicherungen in Google Drive sind nicht eingeschaltet.'));
         }
         $now = $this->app->time()->timestamp();
         $state = $this->state();
@@ -230,7 +231,7 @@ final class BackupUploadService implements OffsiteBackup
     {
         $enc = $this->app->backupEncryption();
         if (!$enc->configured() && $enc->stored()) {
-            throw new \RuntimeException('Es ist ein Passwort für Sicherungen eingerichtet, aber PHP fehlt die Erweiterung sodium: Die Sicherung geht nicht unverschlüsselt nach Google Drive. Bitte beim Hoster nachfragen.');
+            throw new \RuntimeException(I18n::t('Es ist ein Passwort für Sicherungen eingerichtet, aber PHP fehlt die Erweiterung sodium: Die Sicherung geht nicht unverschlüsselt nach Google Drive. Bitte beim Hoster nachfragen.'));
         }
         return $enc->configured();
     }
@@ -324,7 +325,7 @@ final class BackupUploadService implements OffsiteBackup
         if (!is_array($raw) || !is_int($raw['bytes'] ?? null) || !is_int($raw['chunks'] ?? null)) {
             return null;
         }
-        $out = ['bytes' => $raw['bytes'], 'chunks' => $raw['chunks']];
+        $out = ['bytes' => $raw['bytes'], 'chunks' => $raw['chunks'], 'retries' => is_int($raw['retries'] ?? null) ? $raw['retries'] : 0];
         foreach (['start_seconds', 'read_seconds', 'send_seconds', 'slowest_seconds', 'total_seconds'] as $k) {
             $out[$k] = is_int($raw[$k] ?? null) || is_float($raw[$k] ?? null) ? (float) $raw[$k] : 0.0;
         }

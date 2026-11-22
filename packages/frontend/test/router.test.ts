@@ -24,6 +24,11 @@ test('Seiten von „Meins“ teilen sich den Schlüssel', () => {
   assert.equal(viewKey(['meins', 'punkte']), viewKey(['meins', 'dienstgrad']));
 });
 
+test('Link auf ein Bild teilt sich den Schlüssel mit seinem Album', () => {
+  assert.equal(viewKey(['galerie', '3']), viewKey(['galerie', '3', 'bild', '42']));
+  assert.notEqual(viewKey(['galerie', '3']), viewKey(['galerie', '4', 'bild', '42']));
+});
+
 test('sonst baut jede Adresse die Ansicht neu auf', () => {
   assert.notEqual(viewKey(['verwaltung', 'punkte']), viewKey(['verwaltung', 'punkte', '12']));
   assert.notEqual(viewKey(['galerie']), viewKey(['galerie', '3']));

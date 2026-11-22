@@ -49,21 +49,24 @@ const FONT_STACK = {
 };
 
 /**
- * brand.ts: die Bezeichnungen aus kompanie.json, darüber die eigenen Namen der Installation (Issue #362, /config
- * section_labels). Das geschieht hier, beim ersten Laden, damit alle Ansichten sie sehen, auch die, die einen Namen
+ * brand.ts: die Bezeichnungen aus kompanie.json in der Sprache der App (src/brandLocale.ts), darüber die eigenen Namen
+ * der Installation (Issue #362, /config section_labels). Das geschieht hier, beim ersten Laden, damit alle Ansichten sie sehen, auch die, die einen Namen
  * schon beim Laden ihrer Datei auslesen.
  */
 const BRAND_TS = `// Automatisch erzeugt aus kompanie.json – nicht von Hand ändern.
 import brand from './brand.json';
+import { localizeBrand, ownSections } from '../brandLocale';
+
+// In einer weiteren Sprache: Vorgaben übersetzt, translations.<sprache> aus kompanie.json davor (Plan „Mehrsprachigkeit“)
+localizeBrand(brand);
 
 /** Namen aus kompanie.json bzw. der Standard, ohne die eigenen der Installation (Einstellungen → Navigation zeigt sie an). */
 export const defaultSections: Readonly<typeof brand.labels.sections> = { ...brand.labels.sections };
 
-const own = (globalThis as { KOMPANIE_CONFIG?: { section_labels?: Record<string, string> | unknown[] } }).KOMPANIE_CONFIG?.section_labels;
-if (own && !Array.isArray(own)) {
-  const sections = brand.labels.sections as Record<string, string>;
-  for (const [key, label] of Object.entries(own)) if (key in sections && typeof label === 'string' && label !== '') sections[key] = label;
-}
+// Eigene Namen der Installation, in einer weiteren Sprache die für sie eingetragenen
+const own = ownSections((globalThis as { KOMPANIE_CONFIG?: Parameters<typeof ownSections>[0] }).KOMPANIE_CONFIG);
+const sections = brand.labels.sections as Record<string, string>;
+for (const [key, label] of Object.entries(own)) if (key in sections && typeof label === 'string' && label !== '') sections[key] = label;
 
 export default brand;
 export type Brand = typeof brand;
@@ -134,7 +137,7 @@ export function loadConfig(file) {
   return {
     name,
     shortName: (data.shortName ?? name).trim(),
-    description: data.description ?? `Die App der ${name}`,
+    description: data.description ?? (data.language === 'en' ? `The app of ${name}` : `Die App der ${name}`),
     greeting: data.greeting ?? DEFAULTS.greeting,
     guestWelcome: data.guestWelcome ?? '',
     labels: {
@@ -147,6 +150,10 @@ export function loadConfig(file) {
     font: data.font ?? 'System',
     colors: data.colors,
     legal: data.legal ?? {},
+    // Basissprache der Kompanie (Plan „Basissprache“): In ihr stehen Name, Bezeichnungen und Inhalte; ohne Angabe Deutsch
+    language: data.language ?? 'de',
+    // Weitere Sprachen (Plan „Mehrsprachigkeit“): Bezeichnungen und Texte je Sprache, übernimmt brand.ts beim Laden
+    translations: data.translations ?? {},
   };
 }
 
@@ -341,6 +348,7 @@ export async function build({ config, assets, out, publicDir }) {
     themeColor: theme.light.primary,
     backgroundColor: theme.light.bg,
     legal: cfg.legal,
+    translations: cfg.translations,
   };
   writeFileSync(join(out, 'brand.json'), JSON.stringify(brand, null, 2) + '\n');
   writeFileSync(join(out, 'brand.ts'), BRAND_TS);

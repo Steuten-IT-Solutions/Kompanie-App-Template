@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\Http\FileCache;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\Cache;
 use KompanieApp\Core\Port\Environment;
 use KompanieApp\Core\Port\FileStorage;
@@ -54,9 +55,19 @@ final class GalleryService
     public const SOURCE_DRIVE = 'drive';
     public const SOURCE_SERVER = 'server';
     public const SOURCES = [self::SOURCE_DRIVE, self::SOURCE_SERVER];
-    /** Ablageort hochgeladener Bilder; vorerst nur der eigene Server (MediaStore), weitere später. */
+    /**
+     * Ablageort hochgeladener Bilder und Einreichungen: der eigene Server (MediaStore) oder, mit Drive als Quelle und
+     * vollem Drive-Zugriff, Google Drive (GalleryDriveService). Ergibt sich daraus, store(); die Einstellung bleibt für
+     * ältere Fassungen der App.
+     */
     public const STORE_SETTING = 'gallery_store';
-    public const STORES = ['server'];
+    public const STORES = ['server', 'drive'];
+    /**
+     * Gerade nach Drive gebrachte Bilder: ID => Zeit. Ein Abgleich, der Drive vorher gelesen hat, löscht sie nicht als
+     * „nicht mehr in Drive“ (PUSHED_TTL Sekunden).
+     */
+    public const PUSHED_SETTING = 'gallery_drive_pushed';
+    private const PUSHED_TTL = 7200;
     /** Knöpfe zum Herunterladen (je Bild in der Großansicht und je Album als ZIP) für alle, die die Galerie sehen. */
     public const DOWNLOADS_SETTING = 'gallery_downloads';
     /** Präfix von photos.drive_file_id bei hochgeladenen Bildern (die Spalte ist NOT NULL UNIQUE). */
@@ -112,7 +123,25 @@ final class GalleryService
         private readonly Scheduler $scheduler,
         private readonly Cache $cache,
         private readonly ?MediaStore $media = null,
+        /** Namen der Alben je Sprache (Plan „Mehrsprachigkeit“, PR 9e); null in Tests ohne App */
+        private readonly ?\Closure $content = null,
     ) {
+    }
+
+    /**
+     * Titel der Alben in der Sprache der Anfrage (fehlt er dort: deutsch).
+     *
+     * @param list<int> $ids
+     * @return \Closure(int, string): string
+     */
+    private function titles(array $ids): \Closure
+    {
+        $content = $this->content !== null ? ($this->content)() : null;
+        if (!$content instanceof ContentTranslations || $content->current() === null || $ids === []) {
+            return static fn (int $id, string $title): string => $title;
+        }
+        $tr = $content->ofMany(GalleryUploadService::KIND, $ids);
+        return static fn (int $id, string $title): string => $content->titleIn($tr[$id] ?? [], $title);
     }
 
     /**
@@ -138,7 +167,27 @@ final class GalleryService
 
     public function store(): string
     {
-        return self::STORES[0];
+        return $this->driveConfigured() && $this->source->writeAccess() ? 'drive' : 'server';
+    }
+
+    /** Ein Bild wurde gerade nach Drive gebracht (siehe PUSHED_SETTING). */
+    public function notePushed(int $photoId): void
+    {
+        $now = $this->time->timestamp();
+        $pushed = array_filter($this->pushed(), static fn (int $t): bool => $t > $now - self::PUSHED_TTL);
+        $pushed[$photoId] = $now;
+        $this->settings->set(self::PUSHED_SETTING, $pushed);
+    }
+
+    /** @return array<int, int> */
+    private function pushed(): array
+    {
+        $raw = $this->settings->get(self::PUSHED_SETTING);
+        $out = [];
+        foreach (is_array($raw) ? $raw : [] as $id => $t) {
+            $out[(int) $id] = (int) $t;
+        }
+        return $out;
     }
 
     /** Zeigt die Galerie Knöpfe zum Herunterladen? Vorgabe: nein. */
@@ -205,7 +254,7 @@ final class GalleryService
     {
         $id = $this->source::parseFolderId($input);
         if (trim($input) !== '' && $id === '') {
-            throw new \RuntimeException('Der Galerie-Ordner wurde nicht erkannt.');
+            throw new \RuntimeException(I18n::t('Der Galerie-Ordner wurde nicht erkannt.'));
         }
         $this->settings->set(self::ROOT_SETTING, $id);
     }
@@ -260,7 +309,7 @@ final class GalleryService
     {
         $root = $this->root();
         if ($root === '') {
-            throw $this->fail('Es ist noch kein Galerie-Ordner eingetragen.');
+            throw $this->fail(I18n::t('Es ist noch kein Galerie-Ordner eingetragen.'));
         }
         try {
             $seenAlbums = [];
@@ -287,7 +336,9 @@ final class GalleryService
                         $unique[(string) $image[0]['id']] ??= $image;
                     }
                     $images = array_values($unique);
-                    if ($images === []) {
+                    // Leere Ordner nur mit Drive als Ablage (dort legt die App neue Alben an, die erst danach Bilder bekommen);
+                    // die Galerie zeigt leere Alben ohnehin nicht.
+                    if ($images === [] && $this->store() !== 'drive') {
                         continue;
                     }
                     $albumRow = $albumRows[(string) $album['id']] ?? null;
@@ -326,8 +377,10 @@ final class GalleryService
             throw $this->fail($e->getMessage());
         }
 
-        // Aufräumen nur, wenn es etwas zu tun gibt: Ein Abgleich ohne Änderungen braucht keine Transaktion.
-        $gone = $this->repo->photosExcept($seenPhotos);
+        // Aufräumen nur, wenn es etwas zu tun gibt: Ein Abgleich ohne Änderungen braucht keine Transaktion. Gerade nach
+        // Drive gebrachte Bilder hat dieser Abgleich vielleicht noch nicht gesehen: die bleiben.
+        $recent = array_filter($this->pushed(), fn (int $t): bool => $t > $this->time->timestamp() - self::PUSHED_TTL);
+        $gone = array_values(array_filter($this->repo->photosExcept($seenPhotos), static fn (array $p): bool => !isset($recent[(int) $p['id']])));
         $staleAlbums = array_values(array_diff(array_map(static fn (array $a): int => (int) $a['id'], $albumRows), $seenAlbums));
         if ($gone !== [] || $staleAlbums !== [] || $this->repo->countRetryable(self::MAX_ATTEMPTS) > 0) {
             $this->repo->transaction(function () use ($gone, $staleAlbums): void {
@@ -945,7 +998,19 @@ final class GalleryService
             }
             return $this->deliverFile($file, (string) $photo['mime'], '"v' . md5((string) $photo['md5']) . '"', $intern, $range, $begin, $write);
         }
-        $total = (int) $photo['bytes'];
+        return $this->deliverDriveRange((string) $photo['drive_file_id'], (int) $photo['bytes'], (string) $photo['mime'], '"v' . md5((string) $photo['md5']) . '"', $intern, $range, $begin, $write);
+    }
+
+    /**
+     * Ausschnitt eines Videos aus Drive durchreichen (deliverVideo, auch offene Einreichungen in Drive). Antwort wie dort;
+     * die Rechte prüft der Aufrufer.
+     *
+     * @param (\Closure(array{status: int, contentRange: string, length: int, mime: string, etag: string, intern: bool}): void)|null $begin
+     * @param (\Closure(string): bool)|null $write
+     * @return array{status: int, body?: string, sent?: bool, length?: int, contentRange?: string, mime?: string, etag?: string, intern?: bool, retryAfter?: int}
+     */
+    public function deliverDriveRange(string $fileId, int $total, string $mime, string $etag, bool $intern, ?string $range, ?\Closure $begin = null, ?\Closure $write = null): array
+    {
         $span = self::byteRange($range, $total);
         if ($span === null) {
             return ['status' => 416, 'contentRange' => 'bytes */' . $total];
@@ -959,13 +1024,13 @@ final class GalleryService
         $streaming = $begin !== null && $write !== null;
         $head = null;
         $body = '';
-        $onStart = static function (int $from, int $to, int $size) use (&$head, $photo, $intern, $begin, $streaming): void {
+        $onStart = static function (int $from, int $to, int $size) use (&$head, $mime, $etag, $intern, $begin, $streaming): void {
             $head = [
                 'status' => 206,
                 'contentRange' => 'bytes ' . $from . '-' . $to . '/' . $size,
                 'length' => $to - $from + 1,
-                'mime' => (string) $photo['mime'],
-                'etag' => '"v' . md5((string) $photo['md5']) . '"',
+                'mime' => $mime,
+                'etag' => $etag,
                 'intern' => $intern,
             ];
             if ($streaming) {
@@ -977,7 +1042,7 @@ final class GalleryService
             return true;
         };
         try {
-            $this->source->streamRange((string) $photo['drive_file_id'], $start, $end, $onStart, $onData);
+            $this->source->streamRange($fileId, $start, $end, $onStart, $onData);
         } catch (\RuntimeException) {
             if ($head === null) {
                 return ['status' => 502];
@@ -1275,15 +1340,19 @@ final class GalleryService
     {
         $years = [];
         // Eine Abfrage für alle Alben samt Titelbild (keine je Album).
-        foreach ($this->repo->albumSummaries($member) as $r) {
+        $rows = $this->repo->albumSummaries($member);
+        $title = $this->titles(array_map(static fn (array $r): int => (int) $r['id'], $rows));
+        foreach ($rows as $r) {
             $cover = $r['cover_id'] !== null
                 ? ['id' => (int) $r['cover_id'], 'file_key' => (string) $r['cover_file_key'], 'is_intern' => (int) $r['cover_is_intern'], 'album_id' => (int) $r['cover_album_id'], 'status' => (string) $r['cover_status'], 'media' => (string) $r['cover_media'], 'md5' => (string) ($r['cover_md5'] ?? '')]
                 : null;
             $years[(string) $r['year']][] = [
                 'id' => (int) $r['id'],
-                'title' => (string) $r['title'],
+                'title' => $title((int) $r['id'], (string) $r['title']),
                 // Album der App (in der App änderbar) oder aus Drive
                 'source' => (string) ($r['source'] ?? '') === 'app' ? 'app' : 'drive',
+                // In der App änderbar: Alben der App, mit Drive als Ablage auch die aus Drive
+                'editable' => (string) ($r['source'] ?? '') === 'app' || $this->store() === 'drive',
                 // Bilder und Videos zusammen; davon Videos
                 'count' => (int) $r['cnt'],
                 'video_count' => (int) $r['video_cnt'],
@@ -1319,13 +1388,17 @@ final class GalleryService
         if ($photos === []) {
             return null;
         }
+        $editable = $this->store() === 'drive';
         return [
             'id' => (int) $album['id'],
-            'title' => (string) $album['title'],
+            'title' => $this->titles([(int) $album['id']])((int) $album['id'], (string) $album['title']),
             'year' => (string) $album['year'],
             'source' => (string) $album['source'] === 'app' ? 'app' : 'drive',
+            'editable' => (string) $album['source'] === 'app' || $this->store() === 'drive',
             // Knöpfe zum Herunterladen zeigen (Einstellungen → Galerie)
             'downloads' => $this->downloadsEnabled(),
+            // In der App gewähltes Titelbild, wenn es hier zu sehen ist; null: automatisch (albumSummaries)
+            'cover_id' => self::chosenCover($album, $photos),
             'photos' => array_map(fn (array $ph): array => self::isVideoRow($ph) ? [
                 'id' => (int) $ph['id'],
                 'type' => 'video',
@@ -1341,6 +1414,8 @@ final class GalleryService
                 'intern' => (bool) (int) $ph['is_intern'],
                 // in der App hochgeladen: intern/öffentlich in der App umstellbar (aus Drive nur über den Ordner)
                 'upload' => self::isUpload($ph),
+                // in der App verschieben, intern stellen und löschen (mit Drive als Ablage auch Bilder aus Drive)
+                'editable' => $editable || self::isUpload($ph),
                 'name' => (string) $ph['name'],
                 'ready' => $ph['status'] === GalleryRepository::READY,
             ] : [
@@ -1355,11 +1430,30 @@ final class GalleryService
                 'intern' => (bool) (int) $ph['is_intern'],
                 // in der App hochgeladen: intern/öffentlich in der App umstellbar (aus Drive nur über den Ordner)
                 'upload' => self::isUpload($ph),
+                // in der App verschieben, intern stellen und löschen (mit Drive als Ablage auch Bilder aus Drive)
+                'editable' => $editable || self::isUpload($ph),
                 'name' => (string) $ph['name'],
                 // noch nicht aufbereitet: Die Adressen erzeugen das Bild oder liefern vorerst einen Platzhalter (202)
                 'ready' => $ph['status'] === GalleryRepository::READY,
             ], $photos),
         ];
+    }
+
+    /**
+     * Gewähltes Titelbild des Albums, wenn es unter den sichtbaren Bildern ist (kein Video); sonst null.
+     *
+     * @param array<string, mixed> $album
+     * @param array<int, array<string, mixed>> $photos sichtbare Bilder und Videos des Albums
+     */
+    private static function chosenCover(array $album, array $photos): ?int
+    {
+        $id = (int) ($album['cover_photo_id'] ?? 0);
+        foreach ($photos as $ph) {
+            if ($id > 0 && (int) $ph['id'] === $id && !self::isVideoRow($ph)) {
+                return $id;
+            }
+        }
+        return null;
     }
 
     /** Alles aus Drive entfernen (Index und Dateien), z. B. beim Wechsel des Ordners; hochgeladene Bilder bleiben. */

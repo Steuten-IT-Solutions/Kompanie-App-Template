@@ -8,6 +8,7 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Domain\Input;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 
 /**
  * Dokument zum Herunterladen aus dem Bereich Dokumente. Nur für alle, die das Dokument dort sehen dürfen (view_documents,
@@ -31,7 +32,7 @@ final class DocumentBlock implements BlockType
     {
         $id = Input::integer($in['document_id'] ?? null);
         if ($id === null || $id <= 0 || $this->app->documents()->repository()->find($id) === null) {
-            throw ApiError::invalid('Bitte ein Dokument auswählen.');
+            throw ApiError::invalid(I18n::t('Bitte ein Dokument auswählen.'));
         }
         return ['document_id' => $id];
     }

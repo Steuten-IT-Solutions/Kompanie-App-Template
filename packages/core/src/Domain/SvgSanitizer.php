@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core\Domain;
 
+use KompanieApp\Core\I18n\I18n;
+
 /**
  * Bereinigt hochgeladene SVG-Dateien (Abzeichen der Dienstgrade, Issue #17).
  *
@@ -63,12 +65,12 @@ final class SvgSanitizer
     public static function sanitize(string $svg): string
     {
         if (!class_exists(\DOMDocument::class)) {
-            throw new \InvalidArgumentException('SVG-Dateien werden auf diesem Server nicht unterstützt (PHP-Erweiterung DOM fehlt). Bitte lade ein PNG hoch.');
+            throw new \InvalidArgumentException(I18n::t('SVG-Dateien werden auf diesem Server nicht unterstützt (PHP-Erweiterung DOM fehlt). Bitte lade ein PNG hoch.'));
         }
         // UTF-8-BOM entfernen; DOCTYPE und Entitäten gar nicht erst parsen (XXE, „Billion Laughs“).
         $svg = (string) preg_replace('/^\xEF\xBB\xBF/', '', $svg);
         if (preg_match('/<!DOCTYPE|<!ENTITY/i', $svg)) {
-            throw new \InvalidArgumentException('Die SVG-Datei enthält eine DOCTYPE-Angabe; die ist aus Sicherheitsgründen nicht erlaubt.');
+            throw new \InvalidArgumentException(I18n::t('Die SVG-Datei enthält eine DOCTYPE-Angabe; die ist aus Sicherheitsgründen nicht erlaubt.'));
         }
         $doc = new \DOMDocument();
         $previous = libxml_use_internal_errors(true);
@@ -79,20 +81,20 @@ final class SvgSanitizer
             libxml_use_internal_errors($previous);
         }
         if (!$ok || $doc->doctype !== null) {
-            throw new \InvalidArgumentException('Die SVG-Datei ist kein gültiges XML.');
+            throw new \InvalidArgumentException(I18n::t('Die SVG-Datei ist kein gültiges XML.'));
         }
         $root = $doc->documentElement;
         if ($root === null || $root->localName !== 'svg' || $root->namespaceURI !== self::NS) {
-            throw new \InvalidArgumentException('Die Datei ist kein SVG-Bild (Wurzelelement <svg> im SVG-Namensraum fehlt).');
+            throw new \InvalidArgumentException(I18n::t('Die Datei ist kein SVG-Bild (Wurzelelement <svg> im SVG-Namensraum fehlt).'));
         }
         self::clean($root, $doc);
         if (!self::draws($root)) {
-            throw new \InvalidArgumentException('Im SVG bleibt nach der Prüfung nichts übrig, was sich anzeigen lässt.');
+            throw new \InvalidArgumentException(I18n::t('Im SVG bleibt nach der Prüfung nichts übrig, was sich anzeigen lässt.'));
         }
         self::ensureViewBox($root);
         $out = $doc->saveXML($root);
         if ($out === false) {
-            throw new \InvalidArgumentException('Die SVG-Datei konnte nicht verarbeitet werden.');
+            throw new \InvalidArgumentException(I18n::t('Die SVG-Datei konnte nicht verarbeitet werden.'));
         }
         return '<?xml version="1.0" encoding="UTF-8"?>' . "\n" . $out . "\n";
     }

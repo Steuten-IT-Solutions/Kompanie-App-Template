@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 
 /**
  * Eingefügte oder hochgeladene Tabellen (Importe): CSV mit Semikolon, Tabulator (aus einer Tabellenkalkulation kopiert
@@ -21,10 +22,10 @@ final class CsvTable
     public static function lines(mixed $csv, int $maxBytes): array
     {
         if (!is_string($csv) || trim($csv) === '') {
-            throw ApiError::invalid('Bitte die Tabelle einfügen oder eine Datei wählen.');
+            throw ApiError::invalid(I18n::t('Bitte die Tabelle einfügen oder eine Datei wählen.'));
         }
         if (strlen($csv) > $maxBytes) {
-            throw ApiError::invalid(sprintf('Die Tabelle ist zu groß (höchstens %d KB).', intdiv($maxBytes, 1000)));
+            throw ApiError::invalid(I18n::t('Die Tabelle ist zu groß (höchstens {max} KB).', ['max' => intdiv($maxBytes, 1000)]));
         }
         if (!mb_check_encoding($csv, 'UTF-8')) {
             $csv = (string) mb_convert_encoding($csv, 'UTF-8', 'Windows-1252');

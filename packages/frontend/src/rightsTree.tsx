@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { config, type Capability } from './api';
-import { CAPABILITY_GROUPS, groupState, shown, type CapabilityGroup, type GroupState } from './capabilities';
+import { t } from './i18n';
+import { CAPABILITY_GROUPS, groupState, rightsRows, shown, type CapabilityGroup, type GroupState } from './capabilities';
 
 /** Gruppen mit den Rechten, die zu eingeschalteten Bereichen gehören; leere Gruppen fallen weg. */
 export function visibleGroups(): CapabilityGroup[] {
@@ -81,7 +82,7 @@ export function RightsTree({
         className="btn btn-link rights-tree-all"
         onClick={() => setOpen(allOpen ? new Set() : new Set(groups.map((g) => g.key)))}
       >
-        {allOpen ? 'Alle zuklappen' : 'Alle aufklappen'}
+        {allOpen ? t('Alle zuklappen') : t('Alle aufklappen')}
       </button>
       {groups.map((g) => {
         const keys = g.items.map((i) => i.key);
@@ -93,7 +94,12 @@ export function RightsTree({
         return (
           <div key={g.key} className="rights-group">
             <div className="rights-group-head">
-              <TriCheckbox state={state} disabled={free.length === 0} label={`${g.label}: alle`} onChange={(on) => onToggle(free, on)} />
+              <TriCheckbox
+                state={state}
+                disabled={free.length === 0}
+                label={t('{group}: alle', { group: g.label })}
+                onChange={(on) => onToggle(free, on)}
+              />
               <button
                 type="button"
                 className="rights-group-toggle"
@@ -102,9 +108,7 @@ export function RightsTree({
                 onClick={() => flip(g.key)}
               >
                 <span className="rights-group-label">{g.label}</span>
-                <span className="rights-group-count muted small">
-                  {count} von {keys.length}
-                </span>
+                <span className="rights-group-count muted small">{t('{count} von {total}', { count, total: keys.length })}</span>
                 <span className="fold-arrow" aria-hidden="true">
                   ›
                 </span>
@@ -112,20 +116,51 @@ export function RightsTree({
             </div>
             <div id={bodyId} className="rights-group-body" hidden={!expanded}>
               {g.hint && <p className="small muted rights-group-hint">{g.hint}</p>}
-              {g.items.map((i) => (
-                <label key={i.key} className="toggle feature-toggle">
-                  <input
-                    type="checkbox"
-                    checked={isOn(i.key)}
-                    disabled={isDisabled(i.key)}
-                    onChange={(e) => onToggle([i.key], e.target.checked)}
-                  />
-                  <span>
-                    {i.label}
-                    {badge?.(i.key)}
-                  </span>
-                </label>
-              ))}
+              {rightsRows(g.items).map((row) =>
+                row.kind === 'single' ? (
+                  <label key={row.item.key} className="toggle feature-toggle">
+                    <input
+                      type="checkbox"
+                      checked={isOn(row.item.key)}
+                      disabled={isDisabled(row.item.key)}
+                      onChange={(e) => onToggle([row.item.key], e.target.checked)}
+                    />
+                    <span>
+                      {row.item.label}
+                      {badge?.(row.item.key)}
+                    </span>
+                  </label>
+                ) : (
+                  <div key={row.read.key} className="rights-pair" role="group" aria-label={row.area}>
+                    <span className="rights-pair-label">{row.area}</span>
+                    <div className="rights-pair-boxes">
+                      {(
+                        [
+                          [row.read, t('Lesen')],
+                          [row.write, t('Schreiben')],
+                        ] as const
+                      ).map(([item, word]) => (
+                        <label key={item.key} className="toggle rights-pair-box">
+                          <input
+                            type="checkbox"
+                            aria-label={`${item.label} (${word})`}
+                            checked={isOn(item.key)}
+                            disabled={isDisabled(item.key)}
+                            onChange={(e) => onToggle([item.key], e.target.checked)}
+                          />
+                          <span>
+                            {word}
+                            {badge?.(item.key)}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                    <p className="small muted rights-pair-desc">
+                      {t('Lesen: {read}. Schreiben: {write}.', { read: row.read.label, write: row.write.label })}
+                    </p>
+                  </div>
+                ),
+              )}
             </div>
           </div>
         );

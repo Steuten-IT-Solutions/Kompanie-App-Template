@@ -25,6 +25,8 @@ import { Caps, Empty, ErrorBox, FileInput, Loading, useAsync } from '../ui';
 import { nameWithCompanions, termYears } from './Aemter';
 import { confirmAsk } from '../ask';
 import { IconButton } from '../icons';
+import { t, tn } from '../i18n';
+import { TranslationsHint } from '../language';
 
 const sec = brand.labels.sections;
 
@@ -52,6 +54,14 @@ function useRunner(onToast: Toast, after: () => void) {
   return { busy, error, setError, run };
 }
 
+/** Namen in der Verwaltung: die der Basissprache (weitere Sprachen unter Einstellungen → Sprachen). */
+function useShownNames() {
+  return {
+    office: (o: { id: number; title: string }) => o.title,
+    group: (g: { id: number; title: string }) => g.title,
+  };
+}
+
 function FormError({ error }: { error: string | null }) {
   return error ? (
     <p className="form-error" role="alert">
@@ -75,6 +85,7 @@ export function OfficeAdmin({ path, onToast }: { path: string[]; onToast: Toast 
   const overview = data!;
   return (
     <KnownPhotos.Provider value={knownPhotos(overview.offices)}>
+      <TranslationsHint />
       {/^\d+$/.test(path[0] ?? '') ? (
         <OfficeEditorFor overview={overview} id={Number(path[0])} onToast={onToast} reload={reload} />
       ) : (
@@ -86,7 +97,7 @@ export function OfficeAdmin({ path, onToast }: { path: string[]; onToast: Toast 
 
 function OfficeEditorFor({ overview, id, onToast, reload }: { overview: OfficesOverview; id: number; onToast: Toast; reload: () => void }) {
   const office = overview.offices.find((o) => o.id === id);
-  if (!office) return <Empty>Dieses Amt gibt es nicht mehr.</Empty>;
+  if (!office) return <Empty>{t('Dieses Amt gibt es nicht mehr.')}</Empty>;
   return <OfficeEditor key={office.id} office={office} groups={overview.groups} onToast={onToast} reload={reload} />;
 }
 
@@ -124,6 +135,7 @@ function OfficeOverview({
   const [title, setTitle] = useState('');
   const [group, setGroup] = useState<string>(overview.groups[0] ? String(overview.groups[0].id) : '');
   const saveOrder = useSaveQueue();
+  const names = useShownNames();
 
   function reorderOffices(groupId: number | null, next: Office[]) {
     // Neue Reihenfolge innerhalb der Gruppe, die übrigen bleiben, wo sie sind
@@ -145,24 +157,25 @@ function OfficeOverview({
     ...overview.groups.map((g) => ({
       key: `g${g.id}`,
       group: g.id as number | null,
-      title: g.title,
+      title: names.group(g),
+      // Einzahl für eine einzelne gemeinsame Amtszeit
       singular: g.singular || g.title,
       joint: !!g.joint_terms,
     })),
-    { key: 'none', group: null, title: 'Ohne Gruppe', singular: '', joint: false },
+    { key: 'none', group: null, title: t('Ohne Gruppe'), singular: '', joint: false },
   ];
 
   return (
     <div>
       <div className="button-row">
         <button className="btn btn-secondary" onClick={() => navigate('verwaltung/aemter/import')}>
-          Tabelle importieren
+          {t('Tabelle importieren')}
         </button>
         <button className="btn btn-secondary" onClick={() => navigate('mitglieder/aemter')}>
-          Zeitstrahl ansehen
+          {t('Zeitstrahl ansehen')}
         </button>
         <button className="btn btn-secondary" onClick={() => navigate('verwaltung/aemter/verknuepfen')}>
-          Namen mit Mitgliedern verknüpfen
+          {t('Namen mit Mitgliedern verknüpfen')}
         </button>
       </div>
       <FormError error={error} />
@@ -176,7 +189,7 @@ function OfficeOverview({
           <section key={s.key} className="office-admin-group">
             <h3 className="section-title">{s.title}</h3>
             {offices.length === 0 ? (
-              <p className="muted small">Noch keine Ämter in dieser Gruppe.</p>
+              <p className="muted small">{t('Noch keine Ämter in dieser Gruppe.')}</p>
             ) : (
               <OfficeSortList offices={offices} onMove={(next) => reorderOffices(s.group, next)} />
             )}
@@ -198,28 +211,28 @@ function OfficeOverview({
         className="form card"
         onSubmit={async (e: FormEvent) => {
           e.preventDefault();
-          if (await run(() => api.createOffice({ title: title.trim(), group_id: group === '' ? null : Number(group) }), 'Amt angelegt'))
+          if (await run(() => api.createOffice({ title: title.trim(), group_id: group === '' ? null : Number(group) }), t('Amt angelegt')))
             setTitle('');
         }}
       >
-        <h3>Neues Amt</h3>
+        <h3>{t('Neues Amt')}</h3>
         <label className="field">
-          <span>Bezeichnung</span>
+          <span>{t('Bezeichnung')}</span>
           <input type="text" maxLength={60} value={title} onChange={(e) => setTitle(e.target.value)} required />
         </label>
         <label className="field">
-          <span>Gruppe</span>
+          <span>{t('Gruppe')}</span>
           <select value={group} onChange={(e) => setGroup(e.target.value)}>
             {overview.groups.map((g) => (
               <option key={g.id} value={g.id}>
-                {g.title}
+                {names.group(g)}
               </option>
             ))}
-            <option value="">Ohne Gruppe</option>
+            <option value="">{t('Ohne Gruppe')}</option>
           </select>
         </label>
         <button className="btn btn-block" type="submit" disabled={busy}>
-          Anlegen
+          {t('Anlegen')}
         </button>
       </form>
     </div>
@@ -228,18 +241,19 @@ function OfficeOverview({
 
 function OfficeSortList({ offices, onMove }: { offices: Office[]; onMove: (next: Office[]) => void }) {
   const sort = useDragSort(offices, onMove);
+  const names = useShownNames();
   return (
     <ul className="card-list">
       {offices.map((o, i) => (
         <li key={o.id} {...sort.itemProps(i, 'card row')}>
-          {offices.length > 1 && sort.handle(i, o.title)}
+          {offices.length > 1 && sort.handle(i, names.office(o))}
           <div className="row-main">
             <button type="button" className="btn btn-link row-title" onClick={() => navigate(`verwaltung/aemter/${o.id}`)}>
-              {o.title}
+              {names.office(o)}
             </button>
             <div className="row-sub">
-              {o.terms.length === 1 ? '1 Amtszeit' : `${o.terms.length} Amtszeiten`}
-              {o.linked_title ? ` · vergibt „${o.linked_title}“` : ''}
+              {tn('{count} Amtszeit', '{count} Amtszeiten', o.terms.length)}
+              {o.linked_title ? ' · ' + t('vergibt „{title}“', { title: o.linked_title }) : ''}
             </div>
           </div>
         </li>
@@ -252,9 +266,8 @@ function GroupList({ groups, onToast, reload }: { groups: OfficeGroup[]; onToast
   const { busy, error, setError, run } = useRunner(onToast, reload);
   const [title, setTitle] = useState('');
   const [editing, setEditing] = useState<number | null>(null);
-  const [editTitle, setEditTitle] = useState('');
-  const [editSingular, setEditSingular] = useState('');
   const [list, setList] = useState(groups);
+  const names = useShownNames();
   const [seen, setSeen] = useState(groups);
   if (seen !== groups) {
     setSeen(groups);
@@ -280,64 +293,32 @@ function GroupList({ groups, onToast, reload }: { groups: OfficeGroup[]; onToast
 
   return (
     <section className="stack">
-      <h3 className="section-title">Gruppen</h3>
+      <h3 className="section-title">{t('Gruppen')}</h3>
       <FormError error={error} />
       {list.length > 0 && (
         <ul className="card-list">
           {list.map((g, i) =>
             editing === g.id ? (
               <li key={g.id} {...sort.itemProps(i, 'card')}>
-                <form
-                  className="form"
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    if (await run(() => api.updateOfficeGroup(g.id, editTitle.trim(), editSingular.trim()), 'Gespeichert'))
-                      setEditing(null);
+                <GroupForm
+                  group={g}
+                  busy={busy}
+                  onCancel={() => setEditing(null)}
+                  onSave={async (save) => {
+                    if (await run(save, t('Gespeichert'))) setEditing(null);
                   }}
-                >
-                  <label className="field">
-                    <span>Bezeichnung</span>
-                    <input type="text" maxLength={60} value={editTitle} onChange={(e) => setEditTitle(e.target.value)} required autoFocus />
-                  </label>
-                  <label className="field">
-                    <span>Einzahl (optional, z. B. „Königshaus“ zu „Königshäuser“)</span>
-                    <input
-                      type="text"
-                      maxLength={60}
-                      value={editSingular}
-                      placeholder={editTitle}
-                      onChange={(e) => setEditSingular(e.target.value)}
-                    />
-                  </label>
-                  <div className="button-row">
-                    <button className="btn" type="submit" disabled={busy}>
-                      Speichern
-                    </button>
-                    <button className="btn btn-secondary" type="button" onClick={() => setEditing(null)}>
-                      Abbrechen
-                    </button>
-                  </div>
-                </form>
+                />
               </li>
             ) : (
               <li key={g.id} {...sort.itemProps(i, 'card row')}>
-                {list.length > 1 && sort.handle(i, g.title)}
+                {list.length > 1 && sort.handle(i, names.group(g))}
                 <div className="row-main">
                   <div className="row-title">
-                    {g.title}
-                    {g.singular && <span className="muted small"> · Einzahl: {g.singular}</span>}
+                    {names.group(g)}
+                    {g.singular && <span className="muted small"> · {t('Einzahl: {singular}', { singular: g.singular })}</span>}
                   </div>
                   <div className="row-actions">
-                    <IconButton
-                      icon="edit"
-                      label="Bearbeiten"
-                      disabled={busy}
-                      onClick={() => {
-                        setEditTitle(g.title);
-                        setEditSingular(g.singular ?? '');
-                        setEditing(g.id);
-                      }}
-                    />
+                    <IconButton icon="edit" label={t('Bearbeiten')} disabled={busy} onClick={() => setEditing(g.id)} />
                     <label className="toggle joint-toggle">
                       <input
                         type="checkbox"
@@ -346,19 +327,20 @@ function GroupList({ groups, onToast, reload }: { groups: OfficeGroup[]; onToast
                         onChange={(e) =>
                           run(
                             () => api.setOfficeGroupJoint(g.id, e.target.checked),
-                            e.target.checked ? 'Gemeinsame Amtszeiten an' : 'Gemeinsame Amtszeiten aus',
+                            e.target.checked ? t('Gemeinsame Amtszeiten an') : t('Gemeinsame Amtszeiten aus'),
                           )
                         }
                       />
-                      <span>Amtszeiten gemeinsam</span>
+                      <span>{t('Amtszeiten gemeinsam')}</span>
                     </label>
                     <IconButton
                       icon="delete"
-                      label="Löschen"
+                      label={t('Löschen')}
                       variant="danger"
                       disabled={busy}
                       onClick={async () =>
-                        (await confirmAsk(`Gruppe „${g.title}“ löschen?`)) && run(() => api.deleteOfficeGroup(g.id), 'Gelöscht')
+                        (await confirmAsk(t('Gruppe „{name}“ löschen?', { name: names.group(g) }))) &&
+                        run(() => api.deleteOfficeGroup(g.id), t('Gelöscht'))
                       }
                     />
                   </div>
@@ -372,18 +354,65 @@ function GroupList({ groups, onToast, reload }: { groups: OfficeGroup[]; onToast
         className="form"
         onSubmit={async (e) => {
           e.preventDefault();
-          if (await run(() => api.createOfficeGroup(title.trim()), 'Gruppe angelegt')) setTitle('');
+          if (await run(() => api.createOfficeGroup(title.trim()), t('Gruppe angelegt'))) setTitle('');
         }}
       >
         <label className="field">
-          <span>Neue Gruppe</span>
+          <span>{t('Neue Gruppe')}</span>
           <input type="text" maxLength={60} value={title} onChange={(e) => setTitle(e.target.value)} required />
         </label>
         <button className="btn" type="submit" disabled={busy}>
-          Gruppe anlegen
+          {t('Gruppe anlegen')}
         </button>
       </form>
     </section>
+  );
+}
+
+/**
+ * Gruppe bearbeiten: Bezeichnung und Einzahl. Auf einer weiteren Sprache (Einrichten auf) trägt das Feld den Namen dieser
+ * Sprache; Bezeichnung und Einzahl auf Deutsch bleiben, wie sie sind.
+ */
+function GroupForm({
+  group,
+  busy,
+  onSave,
+  onCancel,
+}: {
+  group: OfficeGroup;
+  busy: boolean;
+  onSave: (save: () => Promise<unknown>) => void;
+  onCancel: () => void;
+}) {
+  const [title, setTitle] = useState(group.title);
+  const [singular, setSingular] = useState(group.singular ?? '');
+  return (
+    <form
+      className="form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSave(async () => {
+          await api.updateOfficeGroup(group.id, title.trim(), singular.trim());
+        });
+      }}
+    >
+      <label className="field">
+        <span>{t('Bezeichnung')}</span>
+        <input type="text" maxLength={60} value={title} onChange={(e) => setTitle(e.target.value)} required autoFocus />
+      </label>
+      <label className="field">
+        <span>{t('Einzahl (optional, z. B. „Königshaus“ zu „Königshäuser“)')}</span>
+        <input type="text" maxLength={60} value={singular} placeholder={title} onChange={(e) => setSingular(e.target.value)} />
+      </label>
+      <div className="button-row">
+        <button className="btn" type="submit" disabled={busy}>
+          {t('Speichern')}
+        </button>
+        <button className="btn btn-secondary" type="button" onClick={onCancel}>
+          {t('Abbrechen')}
+        </button>
+      </div>
+    </form>
   );
 }
 
@@ -396,7 +425,7 @@ type People = { members: Person[]; former: Person[] };
  */
 function usePeople() {
   const source = memberListAllowed() ? 'members' : config?.features.directory ? 'directory' : null;
-  const formerSource = can('create_users') ? 'members' : config?.features.directory ? 'directory' : null;
+  const formerSource = can('manage_former') ? 'members' : config?.features.directory ? 'directory' : null;
   return useAsync(
     async (): Promise<People> => {
       const [members, former] = await Promise.all([
@@ -424,46 +453,49 @@ function OfficeEditor({ office, groups, onToast, reload }: { office: Office; gro
   const [group, setGroup] = useState(office.group_id === null ? '' : String(office.group_id));
   const [editing, setEditing] = useState<number | 'new' | null>(null);
   const people = usePeople();
+  const names = useShownNames();
+  const shown = names.office(office);
 
   return (
     <div>
       <button className="btn btn-link back" onClick={() => navigate('verwaltung/aemter')}>
-        ‹ Alle {sec.offices}
+        ‹ {t('Alle {offices}', { offices: sec.offices })}
       </button>
-      <h2 className="member-name">{office.title}</h2>
+      <h2 className="member-name">{shown}</h2>
       <FormError error={error} />
 
-      <h3 className="section-title">Amtszeiten</h3>
-      {office.terms.length === 0 && editing !== 'new' && <p className="muted small">Noch keine Amtszeiten.</p>}
+      <h3 className="section-title">{t('Amtszeiten')}</h3>
+      {office.terms.length === 0 && editing !== 'new' && <p className="muted small">{t('Noch keine Amtszeiten.')}</p>}
       <div className="office-admin-terms">
-        {office.terms.map((t) =>
-          editing === t.id ? (
+        {office.terms.map((term) =>
+          editing === term.id ? (
             <TermForm
-              key={t.id}
-              initial={t}
+              key={term.id}
+              initial={term}
               people={people.data ?? NO_PEOPLE}
               onCancel={() => setEditing(null)}
               onSave={async (input) => {
-                if (await run(() => api.updateOfficeTerm(t.id, input), 'Amtszeit gespeichert')) setEditing(null);
+                if (await run(() => api.updateOfficeTerm(term.id, input), t('Amtszeit gespeichert'))) setEditing(null);
               }}
               busy={busy}
             />
           ) : (
-            <div key={t.id} className="office-term-row">
-              <strong>{termYears(t)}</strong>
-              <span>{t.holders.map(nameWithCompanions).join(', ')}</span>
-              {t.note && <span className="muted small">{t.note}</span>}
-              {t.honor && <span className="badge timeline-honor">Ehrung</span>}
-              {t.current && <span className="badge timeline-now">aktuell</span>}
+            <div key={term.id} className="office-term-row">
+              <strong>{termYears(term)}</strong>
+              <span>{term.holders.map(nameWithCompanions).join(', ')}</span>
+              {term.note && <span className="muted small">{term.note}</span>}
+              {term.honor && <span className="badge timeline-honor">{t('Ehrung')}</span>}
+              {term.current && <span className="badge timeline-now">{t('aktuell')}</span>}
               <span className="row-actions">
-                <IconButton icon="edit" label="Bearbeiten" disabled={busy || editing !== null} onClick={() => setEditing(t.id)} />
+                <IconButton icon="edit" label={t('Bearbeiten')} disabled={busy || editing !== null} onClick={() => setEditing(term.id)} />
                 <IconButton
                   icon="delete"
-                  label="Löschen"
+                  label={t('Löschen')}
                   variant="danger"
                   disabled={busy || editing !== null}
                   onClick={async () =>
-                    (await confirmAsk(`Amtszeit ${termYears(t)} löschen?`)) && run(() => api.deleteOfficeTerm(t.id), 'Gelöscht')
+                    (await confirmAsk(t('Amtszeit {years} löschen?', { years: termYears(term) }))) &&
+                    run(() => api.deleteOfficeTerm(term.id), t('Gelöscht'))
                   }
                 />
               </span>
@@ -476,13 +508,13 @@ function OfficeEditor({ office, groups, onToast, reload }: { office: Office; gro
           people={people.data ?? NO_PEOPLE}
           onCancel={() => setEditing(null)}
           onSave={async (input) => {
-            if (await run(() => api.createOfficeTerm(office.id, input), 'Amtszeit eingetragen')) setEditing(null);
+            if (await run(() => api.createOfficeTerm(office.id, input), t('Amtszeit eingetragen'))) setEditing(null);
           }}
           busy={busy}
         />
       ) : (
         <button className="btn btn-block" disabled={editing !== null} onClick={() => setEditing('new')}>
-          Amtszeit eintragen
+          {t('Amtszeit eintragen')}
         </button>
       )}
 
@@ -492,24 +524,22 @@ function OfficeEditor({ office, groups, onToast, reload }: { office: Office; gro
         className="form card"
         onSubmit={async (e) => {
           e.preventDefault();
-          await run(
-            () =>
-              api.updateOffice(office.id, {
-                title: title.trim(),
-                singular: singular.trim(),
-                group_id: group === '' ? null : Number(group),
-              }),
-            'Gespeichert',
-          );
+          await run(async () => {
+            await api.updateOffice(office.id, {
+              title: title.trim(),
+              singular: singular.trim(),
+              group_id: group === '' ? null : Number(group),
+            });
+          }, t('Gespeichert'));
         }}
       >
-        <h3>Amt bearbeiten</h3>
+        <h3>{t('Amt bearbeiten')}</h3>
         <label className="field">
-          <span>Bezeichnung</span>
+          <span>{t('Bezeichnung')}</span>
           <input type="text" maxLength={60} value={title} onChange={(e) => setTitle(e.target.value)} required />
         </label>
         <label className="field">
-          <span>Einzahl (optional, z. B. „Kapitän“ zu „Kapitäne“)</span>
+          <span>{t('Einzahl (optional, z. B. „Kapitän“ zu „Kapitäne“)')}</span>
           <input
             type="text"
             maxLength={60}
@@ -519,19 +549,19 @@ function OfficeEditor({ office, groups, onToast, reload }: { office: Office; gro
           />
         </label>
         <label className="field">
-          <span>Gruppe</span>
+          <span>{t('Gruppe')}</span>
           <select value={group} onChange={(e) => setGroup(e.target.value)}>
             {groups.map((g) => (
               <option key={g.id} value={g.id}>
-                {g.title}
+                {names.group(g)}
               </option>
             ))}
-            <option value="">Ohne Gruppe</option>
+            <option value="">{t('Ohne Gruppe')}</option>
           </select>
         </label>
         <div className="button-row">
           <button className="btn" type="submit" disabled={busy}>
-            Speichern
+            {t('Speichern')}
           </button>
           <button
             type="button"
@@ -539,12 +569,17 @@ function OfficeEditor({ office, groups, onToast, reload }: { office: Office; gro
             disabled={busy}
             onClick={async () => {
               const n = office.terms.length;
-              const what = n === 0 ? '' : n === 1 ? ' mit seiner Amtszeit' : ` mit allen ${n} Amtszeiten`;
-              if ((await confirmAsk(`„${office.title}“${what} löschen?`)) && (await run(() => api.deleteOffice(office.id), 'Amt gelöscht')))
+              const question =
+                n === 0
+                  ? t('„{name}“ löschen?', { name: shown })
+                  : tn('„{name}“ mit seiner Amtszeit löschen?', '„{name}“ mit allen {count} Amtszeiten löschen?', n, {
+                      name: shown,
+                    });
+              if ((await confirmAsk(question)) && (await run(() => api.deleteOffice(office.id), t('Amt gelöscht'))))
                 navigate('verwaltung/aemter');
             }}
           >
-            Amt löschen
+            {t('Amt löschen')}
           </button>
         </div>
       </form>
@@ -577,13 +612,14 @@ function TitleLink({ office, onToast, reload }: { office: Office; onToast: Toast
     }
   }
 
-  const names = (list: { name: string }[]) => (list.length === 0 ? 'niemand' : list.map((p) => p.name).join(', '));
+  const names = (list: { name: string }[]) => (list.length === 0 ? t('niemand') : list.map((p) => p.name).join(', '));
   return (
     <section className="card form">
-      <h3>{sec.titles} vergeben</h3>
+      <h3>{t('{titles} vergeben', { titles: sec.titles })}</h3>
       {!allowed ? (
         <p className="muted small">
-          {office.linked_title ? `Verknüpft mit „${office.linked_title}“. ` : ''}Ändern kann das, wer {sec.titles} verwalten darf.
+          {office.linked_title ? t('Verknüpft mit „{title}“.', { title: office.linked_title }) + ' ' : ''}
+          {t('Ändern kann das, wer {titles} verwalten darf.', { titles: sec.titles })}
         </p>
       ) : titles.error ? (
         <ErrorBox message={titles.error} onRetry={titles.reload} />
@@ -591,23 +627,23 @@ function TitleLink({ office, onToast, reload }: { office: Office; onToast: Toast
         <>
           <label className="field">
             <span>
-              Verknüpfter <Caps text={sec.titles} />
+              {t('Verknüpfter')} <Caps text={sec.titles} />
             </span>
             <select value={choice} onChange={(e) => choose(e.target.value)} disabled={busy}>
-              <option value="">Keiner</option>
+              <option value="">{t('Keiner')}</option>
               {(titles.data ?? [])
-                .filter((t) => !t.office || t.office.id === office.id || String(t.id) === choice)
-                .map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.title}
-                    {!t.active ? ' (deaktiviert)' : ''}
+                .filter((ti) => !ti.office || ti.office.id === office.id || String(ti.id) === choice)
+                .map((ti) => (
+                  <option key={ti.id} value={ti.id}>
+                    {ti.title}
+                    {!ti.active ? ' ' + t('(deaktiviert)') : ''}
                   </option>
                 ))}
             </select>
           </label>
           {preview && (
             <p className="small" role="status">
-              Bekommen ihn: {names(preview.add)}. Verlieren ihn: {names(preview.remove)}.
+              {t('Bekommen ihn: {add}. Verlieren ihn: {remove}.', { add: names(preview.add), remove: names(preview.remove) })}
             </p>
           )}
           <FormError error={error} />
@@ -616,12 +652,13 @@ function TitleLink({ office, onToast, reload }: { office: Office; onToast: Toast
               className="btn btn-block"
               disabled={busy}
               onClick={() =>
-                run(() => api.updateOffice(office.id, { title_id: choice === '' ? null : Number(choice) }), 'Verknüpfung gespeichert').then(
-                  (ok) => ok && setPreview(null),
-                )
+                run(
+                  () => api.updateOffice(office.id, { title_id: choice === '' ? null : Number(choice) }),
+                  t('Verknüpfung gespeichert'),
+                ).then((ok) => ok && setPreview(null))
               }
             >
-              {choice === '' ? 'Verknüpfung lösen' : 'Verknüpfen'}
+              {choice === '' ? t('Verknüpfung lösen') : t('Verknüpfen')}
             </button>
           )}
         </>
@@ -662,6 +699,7 @@ function JointTermAdmin({
   const { busy, error, run } = useRunner(onToast, reload);
   const [editing, setEditing] = useState<number | 'new' | null>(null);
   const people = usePeople();
+  const names = useShownNames();
   const holdersOf = (gt: OfficeGroupTerm | undefined, o: Office) => o.terms.find((t) => gt && t.group_term_id === gt.id)?.holders;
   const form = (gt?: OfficeGroupTerm) => (
     <JointTermForm
@@ -675,7 +713,7 @@ function JointTermAdmin({
       onSave={async (input) => {
         const ok = await run(
           () => (gt ? api.updateOfficeGroupTerm(gt.id, input) : api.createOfficeGroupTerm(groupId, input)),
-          gt ? 'Gespeichert' : 'Gemeinsame Amtszeit angelegt',
+          gt ? t('Gespeichert') : t('Gemeinsame Amtszeit angelegt'),
         );
         if (ok) setEditing(null);
       }}
@@ -683,9 +721,9 @@ function JointTermAdmin({
   );
   return (
     <div className="joint-admin">
-      <h4 className="section-title">Gemeinsame Amtszeiten</h4>
+      <h4 className="section-title">{t('Gemeinsame Amtszeiten')}</h4>
       <FormError error={error} />
-      {terms.length === 0 && <p className="muted small">Noch keine gemeinsamen Amtszeiten.</p>}
+      {terms.length === 0 && <p className="muted small">{t('Noch keine gemeinsamen Amtszeiten.')}</p>}
       <ul className="card-list">
         {terms.map((gt) =>
           editing === gt.id ? (
@@ -696,26 +734,29 @@ function JointTermAdmin({
               <div className="row-main">
                 <div className="row-title">
                   {groupTitle} {termYears(gt)}
-                  {gt.current && <span className="badge">aktuell</span>}
+                  {gt.current && <span className="badge">{t('aktuell')}</span>}
                 </div>
                 <div className="row-sub">
                   {offices
                     .flatMap((o) => {
                       const h = holdersOf(gt, o);
-                      return h && h.length > 0 ? [`${o.title}: ${h.map(nameWithCompanions).join(', ')}`] : [];
+                      return h && h.length > 0
+                        ? [t('{office}: {people}', { office: names.office(o), people: h.map(nameWithCompanions).join(', ') })]
+                        : [];
                     })
-                    .join(' · ') || 'Noch keine Personen'}
+                    .join(' · ') || t('Noch keine Personen')}
                 </div>
                 <div className="row-actions">
-                  <IconButton icon="edit" label="Bearbeiten" disabled={busy} onClick={() => setEditing(gt.id)} />
+                  <IconButton icon="edit" label={t('Bearbeiten')} disabled={busy} onClick={() => setEditing(gt.id)} />
                   <IconButton
                     icon="delete"
-                    label="Löschen"
+                    label={t('Löschen')}
                     variant="danger"
                     disabled={busy}
                     onClick={async () =>
-                      (await confirmAsk(`Gemeinsame Amtszeit ${termYears(gt)} mit allen Amtszeiten darin und dem Bild löschen?`)) &&
-                      run(() => api.deleteOfficeGroupTerm(gt.id), 'Gelöscht')
+                      (await confirmAsk(
+                        t('Gemeinsame Amtszeit {years} mit allen Amtszeiten darin und dem Bild löschen?', { years: termYears(gt) }),
+                      )) && run(() => api.deleteOfficeGroupTerm(gt.id), t('Gelöscht'))
                     }
                   />
                 </div>
@@ -728,7 +769,7 @@ function JointTermAdmin({
         form()
       ) : (
         <button className="btn btn-secondary" disabled={busy} onClick={() => setEditing('new')}>
-          Neue gemeinsame Amtszeit
+          {t('Neue gemeinsame Amtszeit')}
         </button>
       )}
     </div>
@@ -753,6 +794,7 @@ function JointTermForm({
   onCancel: () => void;
   busy: boolean;
 }) {
+  const names = useShownNames();
   const [kind, setKind] = useState<OfficeTermKind>(initial?.kind ?? 'period');
   const [start, setStart] = useState(initial ? String(initial.start_year) : '');
   const [end, setEnd] = useState(initial?.end_year != null ? String(initial.end_year) : '');
@@ -796,23 +838,23 @@ function JointTermForm({
         });
       }}
     >
-      <h3>{initial ? 'Gemeinsame Amtszeit bearbeiten' : 'Neue gemeinsame Amtszeit'}</h3>
+      <h3>{initial ? t('Gemeinsame Amtszeit bearbeiten') : t('Neue gemeinsame Amtszeit')}</h3>
       <YearFields kind={kind} setKind={setKind} start={start} setStart={setStart} end={end} setEnd={setEnd} />
       <label className="field">
-        <span>Zusatz (optional)</span>
+        <span>{t('Zusatz (optional)')}</span>
         <input type="text" maxLength={100} value={note} onChange={(e) => setNote(e.target.value)} />
       </label>
       <div className="field">
-        <span>Gruppenbild (optional)</span>
-        {image.url && <img className="joint-term-form-image" src={image.url} alt="Gruppenbild" />}
+        <span>{t('Gruppenbild (optional)')}</span>
+        {image.url && <img className="joint-term-form-image" src={image.url} alt={t('Gruppenbild')} />}
         <div className="button-row">
           <label className="btn btn-small btn-secondary">
-            {uploading ? 'Lädt …' : image.url ? 'Bild ersetzen' : 'Bild wählen'}
+            {uploading ? t('Lädt …') : image.url ? t('Bild ersetzen') : t('Bild wählen')}
             <input
               type="file"
               accept=".jpg,.jpeg,.png,.webp"
               hidden
-              aria-label="Gruppenbild"
+              aria-label={t('Gruppenbild')}
               disabled={uploading}
               onChange={(e) => {
                 void upload(e.target.files?.[0] ?? null);
@@ -822,7 +864,7 @@ function JointTermForm({
           </label>
           {image.url && (
             <button type="button" className="btn btn-small btn-secondary" onClick={() => setImage({ uid: null, url: null })}>
-              Bild entfernen
+              {t('Bild entfernen')}
             </button>
           )}
         </div>
@@ -835,16 +877,16 @@ function JointTermForm({
           setHolders={(rows) => setHolders({ ...holders, [o.id]: rows })}
           people={people}
           initial={holdersOf(o)}
-          legend={o.title}
+          legend={names.office(o)}
           optional
         />
       ))}
       <div className="button-row">
         <button className="btn" type="submit" disabled={busy || uploading}>
-          Speichern
+          {t('Speichern')}
         </button>
         <button className="btn btn-secondary" type="button" onClick={onCancel}>
-          Abbrechen
+          {t('Abbrechen')}
         </button>
       </div>
     </form>
@@ -902,9 +944,9 @@ function HolderFields({
     if (h.user_id && !formerIds.has(h.user_id) && !members.some((p) => p.id === h.user_id)) members.push({ id: h.user_id, name: h.name });
   }
   const kinds: { value: HolderKind; label: string }[] = [
-    { value: 'name', label: 'Ohne Profil' },
-    ...(members.length > 0 ? [{ value: 'member' as const, label: 'Mitglied' }] : []),
-    ...(people.former.length > 0 ? [{ value: 'former' as const, label: 'Ehemaliger' }] : []),
+    { value: 'name', label: t('Ohne Profil') },
+    ...(members.length > 0 ? [{ value: 'member' as const, label: t('Mitglied') }] : []),
+    ...(people.former.length > 0 ? [{ value: 'former' as const, label: t('Ehemaliger') }] : []),
   ];
   const set = (i: number, row: Partial<HolderRow>) => setHolders(holders.map((h, j) => (j === i ? { ...h, ...row } : h)));
   return (
@@ -913,13 +955,13 @@ function HolderFields({
       {holders.map((h, i) => {
         const kind = kindOf(h);
         const list = kind === 'former' ? people.former : members;
-        const who = (kind === 'name' ? h.name : list.find((p) => String(p.id) === h.user)?.name)?.trim() || 'dieser Person';
+        const who = (kind === 'name' ? h.name : list.find((p) => String(p.id) === h.user)?.name)?.trim() || t('dieser Person');
         return (
           <div key={i} className="office-holder">
             <div className="office-holder-row">
               {kinds.length > 1 && (
                 <label className="field">
-                  <span>Profil</span>
+                  <span>{t('Profil')}</span>
                   <select value={kind} onChange={(e) => set(i, { kind: e.target.value as HolderKind, user: '' })}>
                     {kinds.map((k) => (
                       <option key={k.value} value={k.value}>
@@ -932,16 +974,16 @@ function HolderFields({
               {kind === 'name' ? (
                 <>
                   <label className="field">
-                    <span>Name</span>
+                    <span>{t('Name')}</span>
                     <input type="text" maxLength={100} value={h.name} onChange={(e) => set(i, { name: e.target.value })} required />
                   </label>
                   <HolderPhotoField row={h} onChange={(image) => set(i, { image })} />
                 </>
               ) : (
                 <label className="field">
-                  <span>{kind === 'former' ? 'Ehemaliger' : 'Mitglied'}</span>
+                  <span>{kind === 'former' ? t('Ehemaliger') : t('Mitglied')}</span>
                   <select value={h.user} onChange={(e) => set(i, { user: e.target.value })} required>
-                    <option value="">Bitte wählen</option>
+                    <option value="">{t('Bitte wählen')}</option>
                     {list.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name}
@@ -954,7 +996,7 @@ function HolderFields({
                 <button
                   type="button"
                   className="btn btn-small btn-secondary"
-                  aria-label={companions ? 'Person entfernen' : 'Begleitperson entfernen'}
+                  aria-label={companions ? t('Person entfernen') : t('Begleitperson entfernen')}
                   onClick={() => setHolders(holders.filter((_, j) => j !== i))}
                 >
                   ✕
@@ -969,7 +1011,7 @@ function HolderFields({
                     setHolders={(rows) => set(i, { companions: rows })}
                     people={people}
                     initial={initial}
-                    legend={`Begleitung von ${who}`}
+                    legend={t('Begleitung von {name}', { name: who })}
                     optional
                     companions={false}
                   />
@@ -980,7 +1022,7 @@ function HolderFields({
                   className="btn btn-small btn-link office-companion-add"
                   onClick={() => set(i, { companions: [{ user: '', name: '' }] })}
                 >
-                  + Begleitung (z. B. Partner/in)
+                  {t('+ Begleitung (z. B. Partner/in)')}
                 </button>
               ))}
           </div>
@@ -988,7 +1030,7 @@ function HolderFields({
       })}
       {holders.length < (companions ? 20 : COMPANIONS_MAX) && (holders.length > 0 || companions) && (
         <button type="button" className="btn btn-small btn-secondary" onClick={() => setHolders([...holders, { user: '', name: '' }])}>
-          {!companions ? 'Weitere Begleitperson' : holders.length === 0 ? 'Person hinzufügen' : 'Weitere Person'}
+          {!companions ? t('Weitere Begleitperson') : holders.length === 0 ? t('Person hinzufügen') : t('Weitere Person')}
         </button>
       )}
     </fieldset>
@@ -1004,7 +1046,7 @@ function HolderPhotoField({ row, onChange }: { row: HolderRow; onChange: (image:
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const suggestion = useMemo(() => known.get(row.name.trim().toLowerCase()) ?? null, [known, row.name]);
-  const label = row.name.trim() || 'Person';
+  const label = row.name.trim() || t('Person');
 
   async function upload(file: File | null) {
     if (!file) return;
@@ -1024,12 +1066,12 @@ function HolderPhotoField({ row, onChange }: { row: HolderRow; onChange: (image:
     <div className="office-holder-photo">
       {row.image && <MemberAvatar url={row.image.url} name={label} />}
       <label className="btn btn-small btn-secondary">
-        {uploading ? 'Lädt …' : row.image ? 'Foto ersetzen' : 'Foto'}
+        {uploading ? t('Lädt …') : row.image ? t('Foto ersetzen') : t('Foto')}
         <input
           type="file"
           accept=".jpg,.jpeg,.png,.webp"
           hidden
-          aria-label={`Foto von ${label}`}
+          aria-label={t('Foto von {name}', { name: label })}
           disabled={uploading}
           onChange={(e) => {
             void upload(e.target.files?.[0] ?? null);
@@ -1039,12 +1081,12 @@ function HolderPhotoField({ row, onChange }: { row: HolderRow; onChange: (image:
       </label>
       {row.image && (
         <button type="button" className="btn btn-small btn-secondary" onClick={() => onChange(null)}>
-          Foto entfernen
+          {t('Foto entfernen')}
         </button>
       )}
       {!row.image && suggestion && (
         <button type="button" className="btn btn-small btn-secondary" onClick={() => onChange(suggestion)}>
-          Foto von früher übernehmen
+          {t('Foto von früher übernehmen')}
         </button>
       )}
       <FormError error={error} />
@@ -1071,15 +1113,15 @@ function YearFields({
   return (
     <>
       <label className="field">
-        <span>Art</span>
+        <span>{t('Art')}</span>
         <select value={kind} onChange={(e) => setKind(e.target.value as OfficeTermKind)}>
-          <option value="period">Zeitraum (von–bis oder bis heute)</option>
-          <option value="point">Einzelnes Jahr</option>
+          <option value="period">{t('Zeitraum (von–bis oder bis heute)')}</option>
+          <option value="point">{t('Einzelnes Jahr')}</option>
         </select>
       </label>
       <div className="field-row">
         <label className="field">
-          <span>{kind === 'point' ? 'Jahr' : 'Von (Jahr)'}</span>
+          <span>{kind === 'point' ? t('Jahr') : t('Von (Jahr)')}</span>
           <input
             type="number"
             inputMode="numeric"
@@ -1092,7 +1134,7 @@ function YearFields({
         </label>
         {kind === 'period' && (
           <label className="field">
-            <span>Bis (leer: bis heute)</span>
+            <span>{t('Bis (leer: bis heute)')}</span>
             <input type="number" inputMode="numeric" min={1800} max={2200} value={end} onChange={(e) => setEnd(e.target.value)} />
           </label>
         )}
@@ -1137,28 +1179,28 @@ function TermForm({
         });
       }}
     >
-      <h3>{initial ? 'Amtszeit bearbeiten' : 'Neue Amtszeit'}</h3>
+      <h3>{initial ? t('Amtszeit bearbeiten') : t('Neue Amtszeit')}</h3>
       {initial?.group_term_id && (
         <p className="muted small">
-          Gehört zu einer gemeinsamen Amtszeit der Gruppe. Andere Jahre lösen sie daraus; Jahre für alle änderst du bei der Gruppe.
+          {t('Gehört zu einer gemeinsamen Amtszeit der Gruppe. Andere Jahre lösen sie daraus; Jahre für alle änderst du bei der Gruppe.')}
         </p>
       )}
       <YearFields kind={kind} setKind={setKind} start={start} setStart={setStart} end={end} setEnd={setEnd} />
-      <HolderFields holders={holders} setHolders={setHolders} people={people} initial={initial?.holders} legend="Personen" />
+      <HolderFields holders={holders} setHolders={setHolders} people={people} initial={initial?.holders} legend={t('Personen')} />
       <label className="field">
-        <span>Zusatz (optional, z. B. „Unter …“ oder „Ehrenvorsitz“)</span>
+        <span>{t('Zusatz (optional, z. B. „Unter …“ oder „Ehrenvorsitz“)')}</span>
         <input type="text" maxLength={100} value={note} onChange={(e) => setNote(e.target.value)} />
       </label>
       <label className="toggle">
         <input type="checkbox" checked={honor} onChange={(e) => setHonor(e.target.checked)} />
-        <span>Ehrung (im Zeitstrahl mit Stern, z. B. Ehrenmitglied)</span>
+        <span>{t('Ehrung (im Zeitstrahl mit Stern, z. B. Ehrenmitglied)')}</span>
       </label>
       <div className="button-row">
         <button className="btn" type="submit" disabled={busy}>
-          Speichern
+          {t('Speichern')}
         </button>
         <button className="btn btn-secondary" type="button" onClick={onCancel}>
-          Abbrechen
+          {t('Abbrechen')}
         </button>
       </div>
     </form>
@@ -1173,8 +1215,8 @@ const IMPORT_EXAMPLE =
  * Vorhandene Gruppen und Ämter werden nach Namen gefunden; was es schon gibt, wird übersprungen.
  */
 const LINK_MATCH: Record<OfficeLinkSuggestion['candidates'][number]['match'], string> = {
-  name: 'gleicher Name',
-  similar: 'ähnlicher Name',
+  name: t('gleicher Name'),
+  similar: t('ähnlicher Name'),
 };
 
 /**
@@ -1189,10 +1231,10 @@ function OfficeLink({ onToast }: { onToast: Toast }) {
   return (
     <div className="office-link">
       <button type="button" className="btn btn-link back" onClick={() => navigate('verwaltung/aemter')}>
-        ‹ Alle {sec.offices}
+        ‹ {t('Alle {offices}', { offices: sec.offices })}
       </button>
       {list.length === 0 ? (
-        <Empty>Keine Vorschläge: Kein freier Name passt zu einer Person in der App.</Empty>
+        <Empty>{t('Keine Vorschläge: Kein freier Name passt zu einer Person in der App.')}</Empty>
       ) : (
         <ul className="card-list">
           {list.map((s) => (
@@ -1214,7 +1256,12 @@ function LinkCard({ suggestion: s, onToast, onDone }: { suggestion: OfficeLinkSu
   async function link() {
     if (
       !person ||
-      !(await confirmAsk(`„${s.name}“ in ${s.entries === 1 ? 'einer Amtszeit' : `${s.entries} Einträgen`} mit ${person.name} verknüpfen?`))
+      !(await confirmAsk(
+        tn('„{name}“ in einer Amtszeit mit {person} verknüpfen?', '„{name}“ in {count} Einträgen mit {person} verknüpfen?', s.entries, {
+          name: s.name,
+          person: person.name,
+        }),
+      ))
     ) {
       return;
     }
@@ -1222,7 +1269,7 @@ function LinkCard({ suggestion: s, onToast, onDone }: { suggestion: OfficeLinkSu
     setError(null);
     try {
       const res = await api.linkOfficeName(s.name, person.id);
-      onToast(`${res.linked === 1 ? '1 Eintrag' : `${res.linked} Einträge`} mit ${person.name} verknüpft`);
+      onToast(tn('{count} Eintrag mit {person} verknüpft', '{count} Einträge mit {person} verknüpft', res.linked, { person: person.name }));
       onDone();
     } catch (e) {
       setError((e as Error).message);
@@ -1233,25 +1280,25 @@ function LinkCard({ suggestion: s, onToast, onDone }: { suggestion: OfficeLinkSu
     <div className="card office-link-card">
       <div className="row-title">{s.name}</div>
       <div className="row-sub">
-        {s.entries === 1 ? '1 Eintrag' : `${s.entries} Einträge`}: {s.terms.join(', ')}
+        {tn('{count} Eintrag', '{count} Einträge', s.entries)}: {s.terms.join(', ')}
         {s.entries > s.terms.length && ' …'}
       </div>
       <fieldset className="fieldset">
-        <legend>Verknüpfen mit</legend>
+        <legend>{t('Verknüpfen mit')}</legend>
         {s.candidates.map((c) => (
           <label key={c.id} className="toggle">
             <input type="radio" name={`link-${s.name}`} checked={choice === String(c.id)} onChange={() => setChoice(String(c.id))} />
             {c.name}{' '}
             <span className="muted small">
               ({LINK_MATCH[c.match]}
-              {c.former ? ', ehemalig' : ''})
+              {c.former ? ', ' + t('ehemalig') : ''})
             </span>
           </label>
         ))}
       </fieldset>
       <FormError error={error} />
       <button type="button" className="btn" disabled={busy || !person} onClick={link}>
-        {busy ? 'Verknüpft …' : 'Verknüpfen'}
+        {busy ? t('Verknüpft …') : t('Verknüpfen')}
       </button>
     </div>
   );
@@ -1270,7 +1317,7 @@ function OfficeImport({ onToast }: { onToast: Toast }) {
     try {
       const res = await api.importOffices(csv, apply, link);
       if (apply) {
-        onToast(`${res.terms_new === 1 ? '1 Amtszeit' : `${res.terms_new} Amtszeiten`} übernommen`);
+        onToast(tn('{count} Amtszeit übernommen', '{count} Amtszeiten übernommen', res.terms_new));
         navigate('verwaltung/aemter');
       } else {
         setResult(res);
@@ -1286,11 +1333,11 @@ function OfficeImport({ onToast }: { onToast: Toast }) {
   return (
     <div className="office-import">
       <button className="btn btn-link back" onClick={() => navigate('verwaltung/aemter')}>
-        ‹ Alle {sec.offices}
+        ‹ {t('Alle {offices}', { offices: sec.offices })}
       </button>
-      <h2 className="member-name">Tabelle importieren</h2>
+      <h2 className="member-name">{t('Tabelle importieren')}</h2>
       <label className="field">
-        <span>Tabelle</span>
+        <span>{t('Tabelle')}</span>
         <textarea
           value={csv}
           placeholder={IMPORT_EXAMPLE}
@@ -1301,7 +1348,7 @@ function OfficeImport({ onToast }: { onToast: Toast }) {
         />
       </label>
       <label className="field">
-        <span>Oder Datei wählen (CSV)</span>
+        <span>{t('Oder Datei wählen (CSV)')}</span>
         <FileInput
           accept=".csv,.txt,text/csv,text/plain"
           onChange={async (e) => {
@@ -1315,38 +1362,48 @@ function OfficeImport({ onToast }: { onToast: Toast }) {
       </label>
       <label className="toggle">
         <input type="checkbox" checked={link} onChange={(e) => setLink(e.target.checked)} />
-        <span>Personen mit dem Konto verknüpfen, wenn der Name genau zu einem Konto passt</span>
+        <span>{t('Personen mit dem Konto verknüpfen, wenn der Name genau zu einem Konto passt')}</span>
       </label>
       <FormError error={error} />
       <div className="button-row">
         <button className="btn btn-secondary" disabled={busy || csv.trim() === ''} onClick={() => send(false)}>
-          Vorschau
+          {t('Vorschau')}
         </button>
         {result && (
           <button className="btn" disabled={busy || errors > 0 || result.terms_new === 0} onClick={() => send(true)}>
-            Übernehmen
+            {t('Übernehmen')}
           </button>
         )}
       </div>
       {result && (
         <section>
           <p role="status">
-            Neu: {result.groups_new} Gruppen, {result.offices_new} Ämter, {result.terms_new} Amtszeiten.
-            {errors > 0 && ` ${errors === 1 ? '1 Zeile hat' : `${errors} Zeilen haben`} einen Fehler; bitte erst korrigieren.`}
+            {t('Neu: {groups} Gruppen, {offices} Ämter, {terms} Amtszeiten.', {
+              groups: result.groups_new,
+              offices: result.offices_new,
+              terms: result.terms_new,
+            })}
+            {errors > 0 &&
+              ' ' +
+                tn(
+                  '{count} Zeile hat einen Fehler; bitte erst korrigieren.',
+                  '{count} Zeilen haben einen Fehler; bitte erst korrigieren.',
+                  errors,
+                )}
           </p>
           <ul className="office-import-rows">
             {result.rows.map((r) => (
               <li key={r.line} className={r.duplicate ? 'muted' : ''}>
-                <strong>Zeile {r.line}</strong>
+                <strong>{t('Zeile {line}', { line: r.line })}</strong>
                 {r.office && (
                   <>
                     {' '}
                     {r.group ? `${r.group} / ` : ''}
                     {r.office}: {r.kind && termYears({ kind: r.kind, start_year: r.start_year!, end_year: r.end_year ?? null })} ·{' '}
-                    {(r.holders ?? []).map((h) => h.name + (h.user_id ? ' (Konto)' : '')).join(', ')}
+                    {(r.holders ?? []).map((h) => h.name + (h.user_id ? ' ' + t('(Konto)') : '')).join(', ')}
                     {r.note ? ` · ${r.note}` : ''}
-                    {r.honor ? ' · Ehrung' : ''}
-                    {r.duplicate ? ' · gibt es schon' : ''}
+                    {r.honor ? ' · ' + t('Ehrung') : ''}
+                    {r.duplicate ? ' · ' + t('gibt es schon') : ''}
                   </>
                 )}
                 {r.error && <p className="form-error">{r.error}</p>}

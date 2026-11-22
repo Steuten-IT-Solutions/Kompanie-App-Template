@@ -1,4 +1,13 @@
 import { useEffect, useState } from 'react';
+import { nameIn } from './names';
+
+/**
+ * Bezeichnung eines Dienstgrads in der Sprache der App („Einrichten je Sprache“): eigener Name dieser Sprache, sonst
+ * die deutsche Bezeichnung. Ohne ID (ältere Server) die deutsche.
+ */
+export function rankName(id: number | null | undefined, german: string): string {
+  return id === null || id === undefined ? german : nameIn('rank', String(id), german);
+}
 
 /** Darstellungsgrößen der Abzeichen; geladen wird die passende PNG-Fassung (für hochauflösende Displays doppelt). */
 export type RankBadgeSize = 'small' | 'medium' | 'large';
@@ -46,13 +55,27 @@ export function RankBadge({ url, title, size = 'small' }: { url?: string | null;
   );
 }
 
-/** Abzeichen und Bezeichnung nebeneinander; ohne Abzeichen nur die Bezeichnung. */
-export function RankLabel({ url, title, size = 'small' }: { url?: string | null; title: string; size?: RankBadgeSize }) {
-  if (!url) return <>{title}</>;
+/**
+ * Abzeichen und Bezeichnung nebeneinander; ohne Abzeichen nur die Bezeichnung. Mit `quoted` steht die Bezeichnung in
+ * Anführungszeichen („Maat“), das Abzeichen davor (z. B. der nächste Dienstgrad in den Beförderungen).
+ */
+export function RankLabel({
+  url,
+  title,
+  size = 'small',
+  quoted = false,
+}: {
+  url?: string | null;
+  title: string;
+  size?: RankBadgeSize;
+  quoted?: boolean;
+}) {
+  const text = quoted ? `„${title}“` : title;
+  if (!url) return <>{text}</>;
   return (
     <span className="rank-label">
       <RankBadge url={url} title={title} size={size} />
-      <span>{title}</span>
+      <span>{text}</span>
     </span>
   );
 }

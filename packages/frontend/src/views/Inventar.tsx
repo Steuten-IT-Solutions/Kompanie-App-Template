@@ -1,19 +1,21 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { api, type InventoryInput, type InventoryItem, type InventoryLogEntry } from '../api';
+import { api, can, type InventoryInput, type InventoryItem, type InventoryLogEntry } from '../api';
 import brand from '../generated/brand';
-import { formatShortTime } from '../format';
+import { formatNumber, formatShortTime } from '../format';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
 import { promptAsk } from '../ask';
 import { IconButton } from '../icons';
+import { t } from '../i18n';
 
 // Inventar (Issue #6): Liste nach Material gruppiert (Summe über alle Orte, je Einheit), aufklappbar zu den Einträgen je
-// Ort; anlegen, ändern, −/+, umlagern, löschen; Verlauf je Eintrag und gesamt. Nur mit manage_inventory.
+// Ort; anlegen, ändern, −/+, umlagern, löschen; Verlauf je Eintrag und gesamt. Sehen mit view_inventory, alles zum
+// Ändern nur mit manage_inventory.
 
 const sec = brand.labels.sections;
 
-const numberFmt = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 3 });
+const numberFmt = { format: (n: number) => formatNumber(n, { maximumFractionDigits: 3 }) };
 
 /** Menge mit Einheit, z. B. „2,5 kg“. */
 export function formatQuantity(quantity: number, unit: string | null): string {
@@ -80,6 +82,7 @@ function InventoryList({ onToast }: { onToast: (msg: string) => void }) {
   const [query, setQuery] = useState('');
   const [creating, setCreating] = useState(false);
   const [open, setOpen] = useState<Set<string>>(new Set());
+  const editable = can('manage_inventory');
 
   const items = list.data ?? [];
   const groups = useMemo(() => groupInventory(items), [items]);
@@ -109,7 +112,7 @@ function InventoryList({ onToast }: { onToast: (msg: string) => void }) {
         ))}
       </datalist>
       <datalist id={UNITS}>
-        {distinct(['Stück', ...items.map((i) => i.unit)]).map((u) => (
+        {distinct([t('Stück'), ...items.map((i) => i.unit)]).map((u) => (
           <option key={u} value={u} />
         ))}
       </datalist>
@@ -120,24 +123,26 @@ function InventoryList({ onToast }: { onToast: (msg: string) => void }) {
       </datalist>
 
       <div className="button-row">
-        <button className="btn inventory-add" onClick={() => setCreating((c) => !c)} aria-expanded={creating}>
-          + Eintrag anlegen
-        </button>
+        {editable && (
+          <button className="btn inventory-add" onClick={() => setCreating((c) => !c)} aria-expanded={creating}>
+            {t('+ Eintrag anlegen')}
+          </button>
+        )}
         <button className="btn btn-secondary inventory-history-all" onClick={() => navigate('inventar/verlauf')}>
-          Gesamter Verlauf
+          {t('Gesamter Verlauf')}
         </button>
       </div>
 
       {creating && (
         <ItemForm
-          heading="Neuer Eintrag"
-          submitLabel="Anlegen"
+          heading={t('Neuer Eintrag')}
+          submitLabel={t('Anlegen')}
           onCancel={() => setCreating(false)}
           onSubmit={async (data) => {
             const item = await api.createInventory(data);
             setCreating(false);
             setOpen((prev) => new Set(prev).add(key(item.title)));
-            onToast('Eintrag angelegt');
+            onToast(t('Eintrag angelegt'));
             reload();
           }}
         />
@@ -146,10 +151,10 @@ function InventoryList({ onToast }: { onToast: (msg: string) => void }) {
       <input
         className="search"
         type="search"
-        placeholder={`${sec.inventory} durchsuchen …`}
+        placeholder={t('{inventory} durchsuchen …', { inventory: sec.inventory })}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        aria-label={`${sec.inventory} durchsuchen`}
+        aria-label={t('{inventory} durchsuchen', { inventory: sec.inventory })}
       />
 
       {list.loading && !list.data ? (
@@ -157,9 +162,9 @@ function InventoryList({ onToast }: { onToast: (msg: string) => void }) {
       ) : list.error && !list.data ? (
         <ErrorBox message={list.error} onRetry={list.reload} />
       ) : groups.length === 0 ? (
-        <Empty>Noch keine Einträge. Lege den ersten mit „+ Eintrag anlegen“ an.</Empty>
+        <Empty>{t('Noch keine Einträge. Lege den ersten mit „+ Eintrag anlegen“ an.')}</Empty>
       ) : shown.length === 0 ? (
-        <Empty>Nichts gefunden.</Empty>
+        <Empty>{t('Nichts gefunden.')}</Empty>
       ) : (
         <ul className="card-list inventory-groups">
           {shown.map((g) => {
@@ -173,7 +178,7 @@ function InventoryList({ onToast }: { onToast: (msg: string) => void }) {
                   <span className="inventory-group-main">
                     <span className="inventory-group-title">{g.title}</span>
                     <span className="inventory-group-places">
-                      {g.items.length === 1 ? g.items[0].location : `an ${g.items.length} Orten`}
+                      {g.items.length === 1 ? g.items[0].location : t('an {count} Orten', { count: g.items.length })}
                     </span>
                   </span>
                   <span className="inventory-sum">{sumText(g)}</span>
@@ -197,6 +202,7 @@ function InventoryList({ onToast }: { onToast: (msg: string) => void }) {
 type Mode = 'view' | 'edit' | 'move';
 
 function Entry({ item, onToast, onChanged }: { item: InventoryItem; onToast: (msg: string) => void; onChanged: () => void }) {
+  const editable = can('manage_inventory');
   const [mode, setMode] = useState<Mode>('view');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -217,9 +223,12 @@ function Entry({ item, onToast, onChanged }: { item: InventoryItem; onToast: (ms
   }
 
   async function remove() {
-    const reason = await promptAsk(`„${item.title}“ in ${item.location} löschen? Grund (optional):`, '');
+    const reason = await promptAsk(
+      t('„{title}“ in {location} löschen? Grund (optional):', { title: item.title, location: item.location }),
+      '',
+    );
     if (reason === null) return;
-    void run(() => api.deleteInventory(item.id, reason), 'Eintrag gelöscht');
+    void run(() => api.deleteInventory(item.id, reason), t('Eintrag gelöscht'));
   }
 
   return (
@@ -232,50 +241,56 @@ function Entry({ item, onToast, onChanged }: { item: InventoryItem; onToast: (ms
           )}
         </div>
         <div className="inventory-qty">
-          <button
-            className="btn btn-secondary btn-small inventory-minus"
-            aria-label={`${item.title} in ${item.location}: eins weniger`}
-            disabled={busy || item.quantity < 1}
-            onClick={() => run(() => api.updateInventory(item.id, { adjust: -1 }), 'Menge geändert')}
-          >
-            −
-          </button>
+          {editable && (
+            <button
+              className="btn btn-secondary btn-small inventory-minus"
+              aria-label={t('{title} in {location}: eins weniger', { title: item.title, location: item.location })}
+              disabled={busy || item.quantity < 1}
+              onClick={() => run(() => api.updateInventory(item.id, { adjust: -1 }), t('Menge geändert'))}
+            >
+              −
+            </button>
+          )}
           <span className="inventory-qty-value">{formatQuantity(item.quantity, item.unit)}</span>
-          <button
-            className="btn btn-secondary btn-small inventory-plus"
-            aria-label={`${item.title} in ${item.location}: eins mehr`}
-            disabled={busy}
-            onClick={() => run(() => api.updateInventory(item.id, { adjust: 1 }), 'Menge geändert')}
-          >
-            +
-          </button>
+          {editable && (
+            <button
+              className="btn btn-secondary btn-small inventory-plus"
+              aria-label={t('{title} in {location}: eins mehr', { title: item.title, location: item.location })}
+              disabled={busy}
+              onClick={() => run(() => api.updateInventory(item.id, { adjust: 1 }), t('Menge geändert'))}
+            >
+              +
+            </button>
+          )}
         </div>
       </div>
       {error && <p className="form-error small">{error}</p>}
       {mode === 'view' && (
         <div className="row-actions inventory-actions">
-          <button className="btn btn-secondary btn-small" disabled={busy} onClick={() => setMode('move')}>
-            Umlagern
-          </button>
-          <IconButton icon="edit" label="Bearbeiten" disabled={busy} onClick={() => setMode('edit')} />
-          <IconButton icon="history" label="Verlauf" onClick={() => navigate(`inventar/verlauf/${item.id}`)} />
-          <IconButton icon="delete" label="Löschen" variant="danger" disabled={busy} onClick={remove} />
+          {editable && (
+            <button className="btn btn-secondary btn-small" disabled={busy} onClick={() => setMode('move')}>
+              {t('Umlagern')}
+            </button>
+          )}
+          {editable && <IconButton icon="edit" label={t('Bearbeiten')} disabled={busy} onClick={() => setMode('edit')} />}
+          <IconButton icon="history" label={t('Verlauf')} onClick={() => navigate(`inventar/verlauf/${item.id}`)} />
+          {editable && <IconButton icon="delete" label={t('Löschen')} variant="danger" disabled={busy} onClick={remove} />}
         </div>
       )}
       {mode === 'edit' && (
         <ItemForm
-          heading="Eintrag bearbeiten"
-          submitLabel="Speichern"
+          heading={t('Eintrag bearbeiten')}
+          submitLabel={t('Speichern')}
           item={item}
           onCancel={() => setMode('view')}
-          onSubmit={(data) => run(() => api.updateInventory(item.id, data), 'Eintrag gespeichert')}
+          onSubmit={(data) => run(() => api.updateInventory(item.id, data), t('Eintrag gespeichert'))}
         />
       )}
       {mode === 'move' && (
         <MoveForm
           item={item}
           onCancel={() => setMode('view')}
-          onSubmit={(data) => run(() => api.moveInventory(item.id, data), 'Umgelagert')}
+          onSubmit={(data) => run(() => api.moveInventory(item.id, data), t('Umgelagert'))}
         />
       )}
     </li>
@@ -310,8 +325,8 @@ function ItemForm({
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    if (title.trim() === '') return setError('Bitte eine Bezeichnung eingeben.');
-    if (location.trim() === '') return setError('Bitte einen Ort eingeben.');
+    if (title.trim() === '') return setError(t('Bitte eine Bezeichnung eingeben.'));
+    if (location.trim() === '') return setError(t('Bitte einen Ort eingeben.'));
     setBusy(true);
     try {
       await onSubmit({ title, quantity: quantity.trim() === '' ? 0 : quantity, unit, location, category, note, reason });
@@ -326,42 +341,49 @@ function ItemForm({
     <form className="form card inventory-form" onSubmit={submit}>
       <h3>{heading}</h3>
       <label className="field">
-        <span>Bezeichnung</span>
+        <span>{t('Bezeichnung')}</span>
         <input type="text" maxLength={100} value={title} onChange={(e) => setTitle(e.target.value)} required />
       </label>
       <div className="field-row">
         <label className="field">
-          <span>Menge</span>
+          <span>{t('Menge')}</span>
           <input type="text" inputMode="decimal" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="0" />
         </label>
         <label className="field">
-          <span>Einheit</span>
-          <input type="text" maxLength={20} list={UNITS} value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="z. B. Stück" />
+          <span>{t('Einheit')}</span>
+          <input
+            type="text"
+            maxLength={20}
+            list={UNITS}
+            value={unit}
+            onChange={(e) => setUnit(e.target.value)}
+            placeholder={t('z. B. Stück')}
+          />
         </label>
       </div>
       <label className="field">
-        <span>Ort</span>
+        <span>{t('Ort')}</span>
         <input type="text" maxLength={100} list={LOCATIONS} value={location} onChange={(e) => setLocation(e.target.value)} required />
       </label>
       <label className="field">
-        <span>Kategorie (optional)</span>
+        <span>{t('Kategorie (optional)')}</span>
         <input type="text" maxLength={100} list={CATEGORIES} value={category} onChange={(e) => setCategory(e.target.value)} />
       </label>
       <label className="field">
-        <span>Notiz (optional)</span>
+        <span>{t('Notiz (optional)')}</span>
         <textarea rows={2} maxLength={1000} value={note} onChange={(e) => setNote(e.target.value)} />
       </label>
       <label className="field">
-        <span>Grund (optional, steht im Verlauf)</span>
+        <span>{t('Grund (optional, steht im Verlauf)')}</span>
         <input type="text" maxLength={255} value={reason} onChange={(e) => setReason(e.target.value)} />
       </label>
       {error && <p className="form-error small">{error}</p>}
       <div className="button-row">
         <button className="btn" type="submit" disabled={busy}>
-          {busy ? 'Speichert …' : submitLabel}
+          {busy ? t('Speichert …') : submitLabel}
         </button>
         <button className="btn btn-secondary" type="button" disabled={busy} onClick={onCancel}>
-          Abbrechen
+          {t('Abbrechen')}
         </button>
       </div>
     </form>
@@ -394,31 +416,34 @@ function MoveForm({
 
   return (
     <form className="form card inventory-form inventory-move" onSubmit={submit}>
-      <h3>Umlagern</h3>
+      <h3>{t('Umlagern')}</h3>
       <p className="muted small">
-        Vorhanden in {item.location}: {formatQuantity(item.quantity, item.unit)}. Gibt es am Zielort schon „{item.title}“ mit derselben
-        Einheit, kommt die Menge dazu.
+        {t('Vorhanden in {location}: {quantity}. Gibt es am Zielort schon „{title}“ mit derselben Einheit, kommt die Menge dazu.', {
+          location: item.location,
+          quantity: formatQuantity(item.quantity, item.unit),
+          title: item.title,
+        })}
       </p>
       <div className="field-row">
         <label className="field">
-          <span>Menge</span>
+          <span>{t('Menge')}</span>
           <input type="text" inputMode="decimal" value={quantity} onChange={(e) => setQuantity(e.target.value)} required />
         </label>
         <label className="field">
-          <span>Zielort</span>
+          <span>{t('Zielort')}</span>
           <input type="text" maxLength={100} list={LOCATIONS} value={location} onChange={(e) => setLocation(e.target.value)} required />
         </label>
       </div>
       <label className="field">
-        <span>Grund (optional)</span>
+        <span>{t('Grund (optional)')}</span>
         <input type="text" maxLength={255} value={reason} onChange={(e) => setReason(e.target.value)} />
       </label>
       <div className="button-row">
         <button className="btn" type="submit" disabled={busy || location.trim() === ''}>
-          {busy ? 'Lagert um …' : 'Umlagern'}
+          {busy ? t('Lagert um …') : t('Umlagern')}
         </button>
         <button className="btn btn-secondary" type="button" disabled={busy} onClick={onCancel}>
-          Abbrechen
+          {t('Abbrechen')}
         </button>
       </div>
     </form>
@@ -428,12 +453,12 @@ function MoveForm({
 /* ------------------------------------------------------------------ */
 
 const FIELD_LABELS: Record<string, string> = {
-  title: 'Bezeichnung',
-  quantity: 'Menge',
-  unit: 'Einheit',
-  location: 'Ort',
-  category: 'Kategorie',
-  note: 'Notiz',
+  title: t('Bezeichnung'),
+  quantity: t('Menge'),
+  unit: t('Einheit'),
+  location: t('Ort'),
+  category: t('Kategorie'),
+  note: t('Notiz'),
 };
 
 /** Was ein Verlaufseintrag bedeutet, in Sätzen. */
@@ -444,20 +469,22 @@ export function describeLog(e: InventoryLogEntry): string[] {
   const c = e.changes;
   switch (e.action) {
     case 'create':
-      return [`Angelegt mit ${q(c.quantity?.new)} in ${text(c.location?.new ?? e.location)}`];
+      return [t('Angelegt mit {quantity} in {location}', { quantity: q(c.quantity?.new), location: text(c.location?.new ?? e.location) })];
     case 'delete':
-      return [`Gelöscht (zuletzt ${q(c.quantity?.old)})`];
+      return [t('Gelöscht (zuletzt {quantity})', { quantity: q(c.quantity?.old) })];
     case 'move': {
       const m = c.move;
-      const lines = m ? [`Umgelagert: ${q(m.quantity)} von ${m.from} nach ${m.to}`] : ['Umgelagert'];
+      const lines = m
+        ? [t('Umgelagert: {quantity} von {from} nach {to}', { quantity: q(m.quantity), from: m.from, to: m.to })]
+        : [t('Umgelagert')];
       if (c.quantity) {
         lines.push(
           c.quantity.old === null
-            ? `Neu angelegt in ${e.location} mit ${q(c.quantity.new)}`
-            : `Menge hier: ${q(c.quantity.old)} → ${q(c.quantity.new)}`,
+            ? t('Neu angelegt in {location} mit {quantity}', { location: e.location, quantity: q(c.quantity.new) })
+            : t('Menge hier: {old} → {new}', { old: q(c.quantity.old), new: q(c.quantity.new) }),
         );
       }
-      if (m?.source_removed && e.item_id === m.source_id) lines.push(`Eintrag in ${m.from} entfällt`);
+      if (m?.source_removed && e.item_id === m.source_id) lines.push(t('Eintrag in {location} entfällt', { location: m.from }));
       return lines;
     }
     default:
@@ -466,16 +493,16 @@ export function describeLog(e: InventoryLogEntry): string[] {
         .map(([field, ch]) => {
           const change = ch as { old: string | number | null; new: string | number | null };
           const fmt = field === 'quantity' ? q : text;
-          return `${FIELD_LABELS[field]}: ${fmt(change.old)} → ${fmt(change.new)}`;
+          return t('{field}: {old} → {new}', { field: FIELD_LABELS[field], old: fmt(change.old), new: fmt(change.new) });
         });
   }
 }
 
 const ACTION_LABELS: Record<InventoryLogEntry['action'], string> = {
-  create: 'Angelegt',
-  update: 'Geändert',
-  move: 'Umgelagert',
-  delete: 'Gelöscht',
+  create: t('Angelegt'),
+  update: t('Geändert'),
+  move: t('Umgelagert'),
+  delete: t('Gelöscht'),
 };
 
 /** So viele Einträge liefert die API je Seite (InventoryService::LOG_LIMIT). */
@@ -509,17 +536,21 @@ function History({ itemId }: { itemId?: number }) {
   return (
     <div className="inventory-history">
       <button className="btn btn-link back" onClick={() => navigate('inventar')}>
-        ‹ Zurück zum {sec.inventory}
+        ‹ {t('Zurück zum {inventory}', { inventory: sec.inventory })}
       </button>
       <h2 className="inventory-history-title">
-        {itemId === undefined ? 'Gesamter Verlauf' : latest ? `Verlauf: ${latest.title} · ${latest.location}` : 'Verlauf'}
+        {itemId === undefined
+          ? t('Gesamter Verlauf')
+          : latest
+            ? t('Verlauf: {title} · {location}', { title: latest.title, location: latest.location })
+            : t('Verlauf')}
       </h2>
       {log.loading && !log.data ? (
         <Loading shape="text" />
       ) : log.error ? (
         <ErrorBox message={log.error} onRetry={log.reload} />
       ) : entries.length === 0 ? (
-        <Empty>Noch keine Änderungen.</Empty>
+        <Empty>{t('Noch keine Änderungen.')}</Empty>
       ) : (
         <ul className="card-list inventory-log">
           {entries.map((e) => (
@@ -540,7 +571,7 @@ function History({ itemId }: { itemId?: number }) {
                   {line}
                 </p>
               ))}
-              {e.reason && <p className="muted small inventory-log-reason">Grund: {e.reason}</p>}
+              {e.reason && <p className="muted small inventory-log-reason">{t('Grund: {reason}', { reason: e.reason })}</p>}
             </li>
           ))}
         </ul>
@@ -548,7 +579,7 @@ function History({ itemId }: { itemId?: number }) {
       {moreError && <p className="form-error small">{moreError}</p>}
       {hasMore && entries.length > 0 && (
         <button className="btn btn-secondary btn-block inventory-log-more" disabled={loadingMore} onClick={loadMore}>
-          {loadingMore ? 'Lädt …' : 'Ältere Einträge laden'}
+          {loadingMore ? t('Lädt …') : t('Ältere Einträge laden')}
         </button>
       )}
     </div>

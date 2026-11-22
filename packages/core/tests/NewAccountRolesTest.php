@@ -25,10 +25,10 @@ final class NewAccountRolesTest extends TestCase
         $call = static fn (string $method, string $path, array $body = []) => $app->api()->handle(new Request($method, $path, [], $body));
         $keys = [
             'board' => $app->roles()->create(['label' => 'Vorstand', 'capabilities' => TestApp::caps(['member', 'manage_events'])])['key'],
-            'cash' => $app->roles()->create(['label' => 'Kasse', 'capabilities' => TestApp::caps(['member', 'manage_points'])])['key'],
+            'cash' => $app->roles()->create(['label' => 'Kasse', 'capabilities' => TestApp::caps(['member', 'view_points', 'manage_points'])])['key'],
             'friend' => $app->roles()->create(['label' => 'Freunde', 'capabilities' => ['calendar']])['key'],
-            'clerk' => $app->roles()->create(['label' => 'Schriftführer', 'capabilities' => TestApp::caps(['member', 'create_users'])])['key'],
-            'chief' => $app->roles()->create(['label' => 'Leitung', 'capabilities' => TestApp::caps(['member', 'create_users', 'promote_users', 'manage_events'])])['key'],
+            'clerk' => $app->roles()->create(['label' => 'Schriftführer', 'capabilities' => TestApp::caps(['member', 'view_accounts', 'create_users'])])['key'],
+            'chief' => $app->roles()->create(['label' => 'Leitung', 'capabilities' => TestApp::caps(['member', 'view_accounts', 'create_users', 'promote_users', 'manage_events'])])['key'],
         ];
         return [$app, $users, $call, $keys];
     }

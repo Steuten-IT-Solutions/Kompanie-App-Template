@@ -9,6 +9,7 @@ use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Http\FileCache;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Storage\RankRepository;
 
 /**
@@ -37,6 +38,11 @@ final class RankService
     public const KIND_PROMOTION = 'promotion';
     public const KIND_DEMOTION = 'demotion';
     public const KIND_INITIAL = 'initial';
+    /**
+     * „Bald zur Beförderung bereit“: Bis zur Schwelle des nächsten Dienstgrads fehlt höchstens so viel (wie bei den
+     * Aufnahmen „noch eine Teilnahme“). Fest, nicht einstellbar.
+     */
+    public const SOON_POINTS = 1;
 
     public const BADGE_MAX_BYTES = 1024 * 1024;
     /** Größen der PNG-Fassungen (längere Kante); badge_url zeigt auf BADGE_DEFAULT_SIZE, die App ändert s bei Bedarf. */
@@ -103,7 +109,7 @@ final class RankService
         $min = self::validThreshold($in['min_points'] ?? null);
         $sort = $repo->maxSort() + 10;
         $this->checkThresholds($repo->all(false), ['title' => $title, 'sort' => $sort, 'min_points' => $min, 'active' => true]);
-        return $this->format($repo->find($repo->insert($title, $sort, $min)) ?? throw ApiError::notFound(sprintf('%s nicht gefunden.', $this->app->config->rankLabel())));
+        return $this->format($repo->find($repo->insert($title, $sort, $min)) ?? throw ApiError::notFound(I18n::t('{rank} nicht gefunden.', ['rank' => $this->app->config->rankLabel()])));
     }
 
     /**
@@ -113,7 +119,7 @@ final class RankService
     public function update(int $id, array $in): array
     {
         $repo = $this->repository();
-        $rank = $repo->find($id) ?? throw ApiError::notFound(sprintf('%s nicht gefunden.', $this->app->config->rankLabel()));
+        $rank = $repo->find($id) ?? throw ApiError::notFound(I18n::t('{rank} nicht gefunden.', ['rank' => $this->app->config->rankLabel()]));
         $data = [];
         if (array_key_exists('title', $in)) {
             $data['title'] = $this->validTitle($in['title'], $id);
@@ -123,7 +129,7 @@ final class RankService
         }
         if (array_key_exists('active', $in)) {
             if (!is_bool($in['active'])) {
-                throw ApiError::invalid('Ungültiger Wert für „aktiv“.');
+                throw ApiError::invalid(I18n::t('Ungültiger Wert für „aktiv“.'));
             }
             $data['active'] = $in['active'];
         }
@@ -138,13 +144,23 @@ final class RankService
     public function delete(int $id): void
     {
         $repo = $this->repository();
-        $rank = $repo->find($id) ?? throw ApiError::notFound(sprintf('%s nicht gefunden.', $this->app->config->rankLabel()));
+        $rank = $repo->find($id) ?? throw ApiError::notFound(I18n::t('{rank} nicht gefunden.', ['rank' => $this->app->config->rankLabel()]));
         $this->forgetUnknownUsers();
         if ($repo->assignedCount($id) > 0) {
-            throw ApiError::invalid(sprintf('Dieser %s ist vergeben und lässt sich nur deaktivieren.', $this->app->config->rankLabel()));
+            throw ApiError::invalid(I18n::t('Dieser {rank} ist vergeben und lässt sich nur deaktivieren.', ['rank' => $this->app->config->rankLabel()]));
         }
         $repo->delete($id);
+        $this->app->translations()->repository()->deleteRef('rank', (string) $id);
         $this->removeBadgeFiles($rank['badge_file']);
+    }
+
+    /**
+     * Bezeichnung in der Sprache der Anfrage („Einrichten je Sprache“): eingetragene Übersetzung, sonst die deutsche.
+     * Gespeichert (Verlauf, Änderungsprotokoll) wird immer die deutsche.
+     */
+    public function displayTitle(int $id, string $german): string
+    {
+        return $this->app->translations()->name('rank', (string) $id, $german);
     }
 
     /**
@@ -165,7 +181,7 @@ final class RankService
         $known = array_keys($ranks);
         sort($known);
         if ($given !== $known) {
-            throw ApiError::invalid('Bitte die Reihenfolge aller Einträge angeben.');
+            throw ApiError::invalid(I18n::t('Bitte die Reihenfolge aller Einträge angeben.'));
         }
         $next = [];
         foreach ($order as $i => $id) {
@@ -194,12 +210,12 @@ final class RankService
     public function uploadBadge(int $id, mixed $file, mixed $png = null): array
     {
         $repo = $this->repository();
-        $rank = $repo->find($id) ?? throw ApiError::notFound(sprintf('%s nicht gefunden.', $this->app->config->rankLabel()));
+        $rank = $repo->find($id) ?? throw ApiError::notFound(I18n::t('{rank} nicht gefunden.', ['rank' => $this->app->config->rankLabel()]));
         $name = is_array($file) && is_string($file['name'] ?? null) ? $file['name'] : '';
-        $bytes = self::decode(is_array($file) ? ($file['data'] ?? null) : null, 'Es ist keine Datei angekommen.');
+        $bytes = self::decode(is_array($file) ? ($file['data'] ?? null) : null, I18n::t('Es ist keine Datei angekommen.'));
         $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
         if (!isset(self::BADGE_TYPES[$ext])) {
-            throw ApiError::invalid('Erlaubt sind PNG, JPG, WebP und SVG.');
+            throw ApiError::invalid(I18n::t('Erlaubt sind PNG, JPG, WebP und SVG.'));
         }
         $base = 'abz-' . bin2hex(random_bytes(12));
         try {
@@ -212,7 +228,7 @@ final class RankService
                 $this->writeBadgeFile($base . '.svg', $svg);
                 $hash = $svg;
                 if ($png !== null && $png !== '') {
-                    $raster = self::decode($png, 'Die PNG-Fassung des Abzeichens ist nicht angekommen.');
+                    $raster = self::decode($png, I18n::t('Die PNG-Fassung des Abzeichens ist nicht angekommen.'));
                     $this->checkRaster($raster, 'png');
                     $this->rasterize($raster, 'png', $base);
                     $hash .= $raster;
@@ -235,7 +251,7 @@ final class RankService
     public function removeBadge(int $id): array
     {
         $repo = $this->repository();
-        $rank = $repo->find($id) ?? throw ApiError::notFound(sprintf('%s nicht gefunden.', $this->app->config->rankLabel()));
+        $rank = $repo->find($id) ?? throw ApiError::notFound(I18n::t('{rank} nicht gefunden.', ['rank' => $this->app->config->rankLabel()]));
         $repo->update($id, ['badge_file' => '', 'badge_ext' => '', 'badge_version' => '']);
         $this->removeBadgeFiles($rank['badge_file']);
         return $this->format($repo->find($id) ?? $rank);
@@ -357,7 +373,7 @@ final class RankService
     private function writeBadgeFile(string $name, string $bytes): void
     {
         if (@file_put_contents($this->badgeFile($name), $bytes) === false) {
-            throw new ApiError(500, 'storage_failed', 'Das Abzeichen konnte nicht gespeichert werden.');
+            throw new ApiError(500, 'storage_failed', I18n::t('Das Abzeichen konnte nicht gespeichert werden.'));
         }
     }
 
@@ -384,7 +400,7 @@ final class RankService
             throw ApiError::invalid($missing);
         }
         if (strlen($bytes) > self::BADGE_MAX_BYTES) {
-            throw ApiError::invalid('Das Abzeichen darf höchstens 1 MB groß sein.');
+            throw ApiError::invalid(I18n::t('Das Abzeichen darf höchstens 1 MB groß sein.'));
         }
         return $bytes;
     }
@@ -396,10 +412,10 @@ final class RankService
         $ok = strncmp($bytes, $signature, strlen($signature)) === 0 && ($ext !== 'webp' || substr($bytes, 8, 4) === 'WEBP');
         $info = $ok ? @getimagesizefromstring($bytes) : false;
         if ($info === false) {
-            throw ApiError::invalid(sprintf('Die Datei ist keine gültige .%s-Datei.', $ext));
+            throw ApiError::invalid(I18n::t('Die Datei ist keine gültige .{ext}-Datei.', ['ext' => $ext]));
         }
         if ($info[0] < 1 || $info[1] < 1 || $info[0] > self::BADGE_MAX_EDGE || $info[1] > self::BADGE_MAX_EDGE) {
-            throw ApiError::invalid(sprintf('Das Bild darf höchstens %d × %d Pixel groß sein.', self::BADGE_MAX_EDGE, self::BADGE_MAX_EDGE));
+            throw ApiError::invalid(I18n::t('Das Bild darf höchstens {width} × {height} Pixel groß sein.', ['width' => self::BADGE_MAX_EDGE, 'height' => self::BADGE_MAX_EDGE]));
         }
     }
 
@@ -411,13 +427,13 @@ final class RankService
         $source = $tmp . '.' . $ext;
         try {
             if (@file_put_contents($source, $bytes) === false) {
-                throw new ApiError(500, 'storage_failed', 'Das Abzeichen konnte nicht gespeichert werden.');
+                throw new ApiError(500, 'storage_failed', I18n::t('Das Abzeichen konnte nicht gespeichert werden.'));
             }
             foreach (self::BADGE_SIZES as $size) {
                 try {
                     $this->app->images->resizeToPng($source, $this->badgeFile($base . '-' . $size . '.png'), $size);
                 } catch (\RuntimeException $e) {
-                    throw ApiError::invalid('Das Bild kann nicht verarbeitet werden: ' . $e->getMessage());
+                    throw ApiError::invalid(I18n::t('Das Bild kann nicht verarbeitet werden: {error}', ['error' => $e->getMessage()]));
                 }
             }
         } finally {
@@ -470,10 +486,10 @@ final class RankService
         return $out + $this->progress($ranks, $current, $entries);
     }
 
-    /** @return array<int, string> Benutzer-ID => Bezeichnung des Dienstgrads (für die Mitgliederliste) */
+    /** @return array<int, string> Benutzer-ID => Bezeichnung des Dienstgrads in der Sprache der Anfrage (für Listen) */
     public function titles(): array
     {
-        return array_map(static fn (array $r): string => $r['title'], $this->assigned());
+        return array_map(fn (array $r): string => $this->displayTitle($r['id'], $r['title']), $this->assigned());
     }
 
     /** @return array<int, array{id: int, title: string, badge_url: string|null}> Benutzer-ID => Dienstgrad (für die Mitgliederliste) */
@@ -503,8 +519,12 @@ final class RankService
         }
         // Der Verlauf speichert nur die Bezeichnungen; das Abzeichen ist das heutige des Dienstgrads (falls es ihn noch gibt).
         return array_map(fn (array $h): array => [
+            'id' => $h['id'],
             'from' => $h['from_title'] !== '' ? $h['from_title'] : null,
             'to' => $h['to_title'] !== '' ? $h['to_title'] : null,
+            // Zum Anzeigen in einer weiteren Sprache (Übersetzung des Dienstgrads, sonst die gespeicherte Bezeichnung)
+            'from_rank_id' => $h['from_rank_id'],
+            'to_rank_id' => $h['to_rank_id'],
             'to_badge_url' => $h['to_rank_id'] !== null && isset($ranks[$h['to_rank_id']]) ? $this->badgeUrl($ranks[$h['to_rank_id']]) : null,
             'kind' => $h['kind'],
             'points_at_change' => $h['points_at_change'] === null ? null : ScoreService::pointsValue($h['points_at_change']),
@@ -523,7 +543,7 @@ final class RankService
     public function promotions(): array
     {
         if (!$this->usesPoints()) {
-            throw new ApiError(403, 'feature_disabled', sprintf('Die Beförderungsübersicht gibt es nur zusammen mit dem Bereich %s.', $this->app->config->sectionLabel('points', 'Punkte')));
+            throw new ApiError(403, 'feature_disabled', I18n::t('Die Beförderungsübersicht gibt es nur zusammen mit dem Bereich {points}.', ['points' => $this->app->config->sectionLabel('points', 'Punkte')]));
         }
         $repo = $this->repository();
         $ranks = $repo->all(false);
@@ -559,23 +579,27 @@ final class RankService
      *
      * @return array<string, mixed> neuer Stand wie status()
      */
-    public function change(User $actor, int $userId, mixed $rankId, mixed $reason): array
+    public function change(User $actor, int $userId, mixed $rankId, mixed $reason, mixed $date = null): array
     {
-        $user = $this->app->users->find($userId) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
+        $user = $this->app->users->find($userId) ?? throw ApiError::notFound(I18n::t('Mitglied nicht gefunden.'));
         // Wer kein Mitglied (mehr) ist, z. B. nach einem Rollenwechsel zum Gast, kann den Dienstgrad nur verlieren.
         if (!$user->isMember() && $rankId !== null && $rankId !== '' && $rankId !== 0) {
-            throw ApiError::invalid(sprintf('Einen %s haben nur Mitglieder.', $this->app->config->rankLabel()));
+            throw ApiError::invalid(I18n::t('Einen {rank} haben nur Mitglieder.', ['rank' => $this->app->config->rankLabel()]));
         }
         $repo = $this->repository();
         $ranks = $repo->all(false);
         $current = $this->byId($ranks, $repo->rankOf($userId));
         $target = $this->target($ranks, $rankId);
         if (($current['id'] ?? null) === ($target['id'] ?? null)) {
-            throw ApiError::invalid(sprintf('Das ist schon der %s dieser Person.', $this->app->config->rankLabel()));
+            throw ApiError::invalid(I18n::t('Das ist schon der {rank} dieser Person.', ['rank' => $this->app->config->rankLabel()]));
         }
-        $total = $this->usesPoints() ? $this->app->scores()->pointsTotal($userId) : null;
+        [$day, $moment] = $this->changeMoment($userId, $date);
+        // Zählen die Punkte bis zum Tag des Wechsels: Bei einem früheren Datum nicht die, die erst danach dazukamen.
+        $total = !$this->usesPoints() ? null
+            : ($day === $this->app->time()->today()->format('Y-m-d') ? $this->app->scores()->pointsTotal($userId) : $this->pointsOn($userId, $day));
         // Punkteregeln nur für Mitglieder; frühere Mitglieder verlieren den Dienstgrad ohne Prüfung.
-        $kind = $user->isMember() ? $this->checkChange($ranks, $current, $target, $total === null ? null : (float) $total) : self::KIND_DEMOTION;
+        $past = $day === $this->app->time()->today()->format('Y-m-d') ? null : $day;
+        $kind = $user->isMember() ? $this->checkChange($ranks, $current, $target, $total === null ? null : (float) $total, $past) : self::KIND_DEMOTION;
         $entry = [
             'from_rank_id' => $current['id'] ?? null,
             'to_rank_id' => $target['id'] ?? null,
@@ -586,13 +610,258 @@ final class RankService
             'reason' => Text::line($reason ?? '', 255),
             'changed_by' => $actor->id,
         ];
-        $repo->change($userId, $entry, $this->app->time()->nowUtc());
+        $repo->change($userId, $entry, $moment);
         try {
             $this->app->pushTriggers()->rankChanged($userId, $entry);
         } catch (\Throwable $e) {
             error_log('Kompanie-App: Benachrichtigung zum Dienstgrad nicht eingereiht: ' . $e->getMessage());
         }
         return $this->status($userId);
+    }
+
+    /**
+     * Datum eines Eintrags im Verlauf nachträglich ändern: nicht in der Zukunft, nicht vor dem vorigen und nicht nach dem
+     * nächsten Eintrag dieser Person (Reihenfolge bleibt). Mit Punkten zählen die Punkte bis zum neuen Tag: für
+     * points_at_change und, bei einer Beförderung, für die Schwelle des neuen Dienstgrads. Die Ersteinstufung behält ihren
+     * Stand (Anfangsbestand).
+     *
+     * @return list<array<string, mixed>> Verlauf wie history()
+     */
+    public function changeDate(int $userId, int $entryId, mixed $date): array
+    {
+        $repo = $this->repository();
+        $rows = $repo->history($userId);
+        $index = null;
+        foreach ($rows as $i => $h) {
+            if ($h['id'] === $entryId) {
+                $index = $i;
+            }
+        }
+        if ($index === null) {
+            throw ApiError::notFound(I18n::t('Eintrag im Verlauf nicht gefunden.'));
+        }
+        $entry = $rows[$index];
+        $time = $this->app->time();
+        $today = $time->today()->format('Y-m-d');
+        if ($date === null || $date === '') {
+            throw ApiError::invalid(I18n::t('Bitte ein Datum angeben.'));
+        }
+        $day = Input::date($date, $time->today());
+        if ($day > $today) {
+            throw ApiError::invalid(I18n::t('Das Datum darf nicht in der Zukunft liegen.'));
+        }
+        // Neueste zuerst: davor = der ältere Eintrag (Index + 1), danach = der neuere (Index - 1).
+        $prevTs = isset($rows[$index + 1]) ? (int) strtotime($rows[$index + 1]['changed_at'] . ' UTC') : null;
+        $nextTs = $index > 0 ? (int) strtotime($rows[$index - 1]['changed_at'] . ' UTC') : null;
+        if ($prevTs !== null && $day < $time->format($prevTs, 'Y-m-d')) {
+            throw ApiError::invalid(I18n::t('Der Wechsel davor war am {date}. Ein früheres Datum geht nicht, sonst stimmt die Reihenfolge im Verlauf nicht.', ['date' => $time->format($prevTs, 'd.m.Y')]));
+        }
+        if ($nextTs !== null && $day > $time->format($nextTs, 'Y-m-d')) {
+            throw ApiError::invalid(I18n::t('Der Wechsel danach war am {date}. Ein späteres Datum geht nicht, sonst stimmt die Reihenfolge im Verlauf nicht.', ['date' => $time->format($nextTs, 'd.m.Y')]));
+        }
+        $ts = (new \DateTimeImmutable($day . ' 12:00:00', $time->timezone()))->getTimestamp();
+        if ($day === $today) {
+            $ts = min($ts, $time->timestamp());
+        }
+        if ($prevTs !== null && $ts <= $prevTs) {
+            $ts = $prevTs + 1;
+        }
+        if ($nextTs !== null && $ts >= $nextTs) {
+            $ts = $nextTs - 1;
+        }
+        $points = $entry['points_at_change'];
+        if ($this->usesPoints() && $entry['kind'] !== self::KIND_INITIAL) {
+            $points = $this->pointsOn($userId, $day);
+            $target = $entry['to_rank_id'] === null ? null : $repo->find($entry['to_rank_id']);
+            if ($entry['kind'] === self::KIND_PROMOTION && $target !== null && $target['min_points'] !== null && $points < $target['min_points']) {
+                throw ApiError::invalid(I18n::t('Schwelle für „{rank}“ am {date} noch nicht erreicht (fehlen {missing} Punkte).', [
+                    'rank' => $this->displayTitle($target['id'], $target['title']),
+                    'date' => implode('.', array_reverse(explode('-', $day))),
+                    'missing' => self::number($target['min_points'] - $points),
+                ]));
+            }
+        }
+        $repo->changeDate($userId, $entryId, gmdate('Y-m-d H:i:s', $ts), $points, $index === 0);
+        return $this->history($userId);
+    }
+
+    /**
+     * Den neuen Dienstgrad eines Eintrags im Verlauf nachträglich ändern (falsch gebucht). Die Art (Beförderung oder
+     * Degradierung) ergibt sich neu aus dem Dienstgrad davor; mit Punkten muss eine Beförderung die heutige Schwelle mit dem
+     * Stand dieses Eintrags erreichen. Der Eintrag danach beginnt dann beim neuen Dienstgrad. Beim neuesten Eintrag (wenn er
+     * den heutigen Dienstgrad ergeben hat) ändert sich auch der aktuelle Dienstgrad, „seit“ bleibt.
+     *
+     * @return array{rank: array<string, mixed>, history: list<array<string, mixed>>} neuer Stand wie status() und Verlauf
+     */
+    public function changeEntryRank(int $userId, int $entryId, mixed $rankId): array
+    {
+        $user = $this->app->users->find($userId) ?? throw ApiError::notFound(I18n::t('Mitglied nicht gefunden.'));
+        $repo = $this->repository();
+        $label = $this->app->config->rankLabel();
+        $rows = $repo->history($userId);
+        $index = null;
+        foreach ($rows as $i => $h) {
+            if ($h['id'] === $entryId) {
+                $index = $i;
+            }
+        }
+        if ($index === null) {
+            throw ApiError::notFound(I18n::t('Eintrag im Verlauf nicht gefunden.'));
+        }
+        $entry = $rows[$index];
+        $ranks = $repo->all(false);
+        $target = null;
+        if ($rankId !== null && $rankId !== '' && $rankId !== 0) {
+            $target = $this->byId($ranks, Input::integer($rankId)) ?? throw ApiError::notFound(I18n::t('{rank} nicht gefunden.', ['rank' => $label]));
+        }
+        $targetId = $target['id'] ?? null;
+        if ($targetId === $entry['to_rank_id']) {
+            throw ApiError::invalid(I18n::t('Das ist schon der {rank} dieses Eintrags.', ['rank' => $label]));
+        }
+        $initial = $entry['kind'] === self::KIND_INITIAL;
+        if ($initial && $target === null) {
+            throw ApiError::invalid(I18n::t('Eine Ersteinstufung braucht einen {rank}. Lösche den Eintrag stattdessen.', ['rank' => $label]));
+        }
+        if (!$initial && $targetId === $entry['from_rank_id']) {
+            throw ApiError::invalid(I18n::t('Das war schon der {rank} davor. Lösche den Eintrag stattdessen.', ['rank' => $label]));
+        }
+        $from = $this->byId($ranks, $entry['from_rank_id']);
+        if (!$initial && $entry['from_rank_id'] !== null && $from === null) {
+            throw ApiError::invalid(I18n::t('Den {rank} davor („{title}“) gibt es nicht mehr. Ändere den {rank} stattdessen.', ['rank' => $label, 'title' => $entry['from_title']]));
+        }
+        $kind = $initial ? self::KIND_INITIAL : $this->kindOf($ranks, $from, $target);
+        if ($kind === self::KIND_PROMOTION && $user->isMember() && $this->usesPoints() && $target !== null && $target['min_points'] !== null
+            && $entry['points_at_change'] !== null && $entry['points_at_change'] < $target['min_points']) {
+            $day = $this->app->time()->format((int) strtotime($entry['changed_at'] . ' UTC'), 'd.m.Y');
+            throw ApiError::invalid(I18n::t('Schwelle für „{rank}“ am {date} noch nicht erreicht (fehlen {missing} Punkte).', [
+                'rank' => $this->displayTitle($target['id'], $target['title']),
+                'date' => $day,
+                'missing' => self::number($target['min_points'] - $entry['points_at_change']),
+            ]));
+        }
+        // Der Eintrag danach beginnt beim neuen Dienstgrad; ginge er auf denselben, wäre er kein Wechsel mehr.
+        $next = null;
+        if ($index > 0) {
+            $after = $rows[$index - 1];
+            if ($after['to_rank_id'] === $targetId) {
+                throw ApiError::invalid(I18n::t('Der Wechsel danach geht schon auf „{title}“. Lösche stattdessen einen der beiden Einträge.', [
+                    'title' => $target === null ? I18n::t('kein {rank}', ['rank' => $label]) : $this->displayTitle($target['id'], $target['title']),
+                ]));
+            }
+            $next = [
+                'id' => $after['id'],
+                'from_rank_id' => $targetId,
+                'from_title' => $target['title'] ?? '',
+                'kind' => $this->kindOf($ranks, $target, $this->byId($ranks, $after['to_rank_id'])),
+            ];
+        }
+        $current = null;
+        if ($index === 0 && $repo->rankOf($userId) === $entry['to_rank_id']) {
+            if ($target !== null && !$user->isMember()) {
+                throw ApiError::invalid(I18n::t('Einen {rank} haben nur Mitglieder.', ['rank' => $label]));
+            }
+            $current = ['rank_id' => $targetId, 'since' => $entry['changed_at']];
+        }
+        $repo->changeEntryRank($userId, $entryId, $targetId, $target['title'] ?? '', $kind, $next, $current);
+        return ['rank' => $this->status($userId), 'history' => $this->history($userId)];
+    }
+
+    /**
+     * Art eines Wechsels: höher = Beförderung, sonst Degradierung.
+     *
+     * @param list<Rank> $ranks
+     * @param Rank|null $from
+     * @param Rank|null $to
+     */
+    private function kindOf(array $ranks, ?array $from, ?array $to): string
+    {
+        return $to !== null && ($from === null || $this->position($ranks, $to) > $this->position($ranks, $from)) ? self::KIND_PROMOTION : self::KIND_DEMOTION;
+    }
+
+    /**
+     * Einen Eintrag im Verlauf löschen (falsch gebucht). Beim neuesten Eintrag gilt wieder der Dienstgrad davor, als hätte
+     * es den Wechsel nie gegeben: „Dienstgrad seit“ ist dann der Zeitpunkt des Eintrags davor. Ältere Einträge ändern den
+     * aktuellen Dienstgrad nicht. Ohne Punkteprüfung (es wird nur rückgängig gemacht).
+     *
+     * @return array{rank: array<string, mixed>, history: list<array<string, mixed>>} neuer Stand wie status() und Verlauf
+     */
+    public function deleteHistoryEntry(int $userId, int $entryId): array
+    {
+        $user = $this->app->users->find($userId) ?? throw ApiError::notFound(I18n::t('Mitglied nicht gefunden.'));
+        $repo = $this->repository();
+        $rows = $repo->history($userId);
+        $index = null;
+        foreach ($rows as $i => $h) {
+            if ($h['id'] === $entryId) {
+                $index = $i;
+            }
+        }
+        if ($index === null) {
+            throw ApiError::notFound(I18n::t('Eintrag im Verlauf nicht gefunden.'));
+        }
+        $entry = $rows[$index];
+        $restore = null;
+        // Nur wenn der Eintrag den heutigen Stand ergeben hat (sonst passt der Verlauf ohnehin nicht zum Dienstgrad).
+        $revert = $index === 0 && $repo->rankOf($userId) === $entry['to_rank_id'];
+        if ($revert) {
+            $label = $this->app->config->rankLabel();
+            if ($entry['from_rank_id'] !== null) {
+                if ($repo->find($entry['from_rank_id']) === null) {
+                    throw ApiError::invalid(I18n::t('Den {rank} davor („{title}“) gibt es nicht mehr. Ändere den {rank} stattdessen.', ['rank' => $label, 'title' => $entry['from_title']]));
+                }
+                if (!$user->isMember()) {
+                    throw ApiError::invalid(I18n::t('Einen {rank} haben nur Mitglieder.', ['rank' => $label]));
+                }
+            }
+            $restore = ['rank_id' => $entry['from_rank_id'], 'since' => isset($rows[1]) ? $rows[1]['changed_at'] : $this->app->time()->nowUtc()];
+        }
+        $repo->deleteEntry($userId, $entryId, $restore);
+        return ['rank' => $this->status($userId), 'history' => $this->history($userId)];
+    }
+
+    /**
+     * Tag und Zeitpunkt (UTC) eines Wechsels. Leer oder heute = jetzt; ein früherer Tag = 12:00 Uhr Ortszeit, mindestens
+     * eine Sekunde nach dem letzten Wechsel. Nicht in der Zukunft (der Dienstgrad gilt sofort) und nicht vor dem letzten
+     * Wechsel der Person, damit der Verlauf in seiner Reihenfolge stimmt.
+     *
+     * @return array{0: string, 1: string} [JJJJ-MM-TT, 'Y-m-d H:i:s' in UTC]
+     */
+    private function changeMoment(int $userId, mixed $raw): array
+    {
+        $time = $this->app->time();
+        $today = $time->today()->format('Y-m-d');
+        $day = Input::date($raw, $time->today());
+        if ($day > $today) {
+            throw ApiError::invalid(I18n::t('Das Datum darf nicht in der Zukunft liegen.'));
+        }
+        $last = $this->repository()->lastChange($userId);
+        $lastTs = $last === null ? null : strtotime($last . ' UTC');
+        if ($lastTs !== null && $lastTs !== false && $day < $time->format($lastTs, 'Y-m-d')) {
+            throw ApiError::invalid(I18n::t(
+                'Der letzte Wechsel dieser Person war am {date}. Ein früheres Datum geht nicht, sonst stimmt die Reihenfolge im Verlauf nicht.',
+                ['date' => $time->format($lastTs, 'd.m.Y')],
+            ));
+        }
+        if ($day === $today) {
+            return [$day, $time->nowUtc()];
+        }
+        $ts = (new \DateTimeImmutable($day . ' 12:00:00', $time->timezone()))->getTimestamp();
+        if ($lastTs !== null && $lastTs !== false && $ts <= $lastTs) {
+            $ts = $lastTs + 1;
+        }
+        return [$day, gmdate('Y-m-d H:i:s', $ts)];
+    }
+
+    /** Punkte bis einschließlich zu einem Tag. */
+    private function pointsOn(int $userId, string $day): float
+    {
+        $sum = 0.0;
+        foreach ($this->repository()->pointEntries($userId) as $e) {
+            if ($e['entry_date'] <= $day) {
+                $sum += $e['value'];
+            }
+        }
+        return round($sum, 2);
     }
 
     /**
@@ -606,20 +875,20 @@ final class RankService
         $raw = $in['initial_points'] ?? null;
         $points = $raw === null || $raw === '' ? 0 : (Input::integer($raw) ?? -1);
         if ($points < 0 || $points > ScoreService::MAX_POINTS) {
-            throw ApiError::invalid('Anfangspunkte: bitte eine ganze Zahl ab 0 angeben.');
+            throw ApiError::invalid(I18n::t('Anfangspunkte: bitte eine ganze Zahl ab 0 angeben.'));
         }
         if ($points > 0 && (!$this->app->features()->enabled('points') || !$actor->can(Capability::ManagePoints))) {
-            throw ApiError::forbidden(sprintf('Anfangspunkte bucht, wer %s verwalten darf.', $this->app->config->sectionLabel('points', 'Punkte')));
+            throw ApiError::forbidden(I18n::t('Anfangspunkte bucht, wer {points} verwalten darf.', ['points' => $this->app->config->sectionLabel('points', 'Punkte')]));
         }
         $date = Input::date($in['initial_points_date'] ?? null, $this->app->time()->today());
         $rank = null;
         if (($in['rank_id'] ?? null) !== null && $in['rank_id'] !== '') {
             if (!$this->app->features()->enabled('ranks') || !$actor->can(Capability::ManageRanks)) {
-                throw ApiError::forbidden(sprintf('Den %s vergibt, wer %s verwalten darf.', $this->app->config->rankLabel(), $this->app->config->sectionLabel('ranks', 'Dienstgrade')));
+                throw ApiError::forbidden(I18n::t('Den {rank} vergibt, wer {ranks} verwalten darf.', ['rank' => $this->app->config->rankLabel(), 'ranks' => $this->app->config->sectionLabel('ranks', 'Dienstgrade')]));
             }
             $rank = $this->target($this->repository()->all(false), $in['rank_id']);
             if ($rank !== null && $this->usesPoints() && $rank['min_points'] !== null && $points < $rank['min_points']) {
-                throw ApiError::invalid(sprintf('Für „%s“ sind mindestens %d Punkte nötig.', $rank['title'], $rank['min_points']));
+                throw ApiError::invalid(I18n::t('Für „{rank}“ sind mindestens {min} Punkte nötig.', ['rank' => $this->displayTitle($rank['id'], $rank['title']), 'min' => $rank['min_points']]));
             }
         }
         return ['points' => $points, 'date' => $date, 'rank' => $rank];
@@ -655,18 +924,21 @@ final class RankService
      * @param Rank|null $target
      * @return string promotion | demotion
      */
-    private function checkChange(array $ranks, ?array $current, ?array $target, ?float $total): string
+    private function checkChange(array $ranks, ?array $current, ?array $target, ?float $total, ?string $pastDay = null): string
     {
         $promotion = $target !== null && ($current === null || $this->position($ranks, $target) > $this->position($ranks, $current));
         if ($total === null) {
             return $promotion ? self::KIND_PROMOTION : self::KIND_DEMOTION;
         }
         if ($promotion && $target['min_points'] !== null && $total < $target['min_points']) {
-            throw ApiError::invalid(sprintf(
-                'Schwelle für „%s“ noch nicht erreicht (fehlen %s Punkte).',
-                $target['title'],
-                self::number($target['min_points'] - $total),
-            ));
+            $missing = self::number($target['min_points'] - $total);
+            throw ApiError::invalid($pastDay === null
+                ? I18n::t('Schwelle für „{rank}“ noch nicht erreicht (fehlen {missing} Punkte).', ['rank' => $this->displayTitle($target['id'], $target['title']), 'missing' => $missing])
+                : I18n::t('Schwelle für „{rank}“ am {date} noch nicht erreicht (fehlen {missing} Punkte).', [
+                    'rank' => $this->displayTitle($target['id'], $target['title']),
+                    'date' => implode('.', array_reverse(explode('-', $pastDay))),
+                    'missing' => $missing,
+                ]));
         }
         return $promotion ? self::KIND_PROMOTION : self::KIND_DEMOTION;
     }
@@ -720,13 +992,15 @@ final class RankService
                 }
             }
         }
+        $toNext = $threshold === null ? null : round($threshold - $total, 2);
         return [
             'points' => ScoreService::pointsValue($total),
             'next_rank' => $next === null ? null : ['id' => $next['id'], 'title' => $next['title'], 'min_points' => $next['min_points'], 'badge_url' => $this->badgeUrl($next)],
-            'points_to_next' => $threshold === null ? null : ScoreService::pointsValue($threshold - $total),
+            'points_to_next' => $toNext === null ? null : ScoreService::pointsValue($toNext),
             'reachable_rank' => $this->ref($reachable),
             'threshold_reached_since' => $since,
             'below_current_threshold' => $current !== null && $current['min_points'] !== null && $total < $current['min_points'],
+            'soon' => $next !== null && $toNext !== null && $toNext > 0 && $toNext <= self::SOON_POINTS,
         ];
     }
 
@@ -748,13 +1022,12 @@ final class RankService
                 continue;
             }
             if ($prev !== null && $r['min_points'] <= $prev['min_points']) {
-                throw ApiError::invalid(sprintf(
-                    'Die Punkteschwellen müssen mit der Reihenfolge steigen: „%s“ (%d) steht über „%s“ (%d).',
-                    $r['title'],
-                    $r['min_points'],
-                    $prev['title'],
-                    $prev['min_points'],
-                ));
+                throw ApiError::invalid(I18n::t('Die Punkteschwellen müssen mit der Reihenfolge steigen: „{rank}“ ({points}) steht über „{prev}“ ({prevPoints}).', [
+                    'rank' => $this->displayTitle($r['id'], $r['title']),
+                    'points' => (int) $r['min_points'],
+                    'prev' => $this->displayTitle($prev['id'], $prev['title']),
+                    'prevPoints' => (int) $prev['min_points'],
+                ]));
             }
             $prev = $r;
         }
@@ -790,7 +1063,7 @@ final class RankService
         }
         $rank = $this->byId($ranks, Input::integer($rankId));
         if ($rank === null || !$rank['active']) {
-            throw ApiError::invalid(sprintf('Unbekannter oder deaktivierter %s.', $this->app->config->rankLabel()));
+            throw ApiError::invalid(I18n::t('Unbekannter oder deaktivierter {rank}.', ['rank' => $this->app->config->rankLabel()]));
         }
         return $rank;
     }
@@ -827,14 +1100,14 @@ final class RankService
     {
         $title = Text::line($raw ?? '', self::TITLE_MAX + 1);
         if ($title === '') {
-            throw ApiError::invalid('Bitte eine Bezeichnung angeben.');
+            throw ApiError::invalid(I18n::t('Bitte eine Bezeichnung angeben.'));
         }
         if (mb_strlen($title) > self::TITLE_MAX) {
-            throw ApiError::invalid(sprintf('Die Bezeichnung darf höchstens %d Zeichen lang sein.', self::TITLE_MAX));
+            throw ApiError::invalid(I18n::t('Die Bezeichnung darf höchstens {max} Zeichen lang sein.', ['max' => self::TITLE_MAX]));
         }
         foreach ($this->repository()->all(false) as $r) {
             if ($r['id'] !== $id && mb_strtolower($r['title']) === mb_strtolower($title)) {
-                throw ApiError::invalid('Diese Bezeichnung gibt es schon.');
+                throw ApiError::invalid(I18n::t('Diese Bezeichnung gibt es schon.'));
             }
         }
         return $title;
@@ -847,7 +1120,7 @@ final class RankService
         }
         $v = Input::integer($raw);
         if ($v === null || $v < 0 || $v > self::MAX_THRESHOLD) {
-            throw ApiError::invalid('Die Punkteschwelle muss eine ganze Zahl ab 0 sein (oder leer).');
+            throw ApiError::invalid(I18n::t('Die Punkteschwelle muss eine ganze Zahl ab 0 sein (oder leer).'));
         }
         return $v;
     }

@@ -23,7 +23,9 @@
  *   einem Fehler geht es direkt ans Netz, damit die App ihn sieht. Jede eigene Änderung (API-Anfrage außer GET; nicht
  *   die Abfrage des Push-Status beim Start) beendet das sofort, und was vor ihr gespeichert wurde, kommt erst wieder
  *   sofort, wenn es danach einmal aus dem Netz kam (Zeitpunkt der Änderung bleibt gespeichert, auch über ein Neuladen
- *   hinweg).
+ *   hinweg). Schlechtes Netz: Antwortet das Netz nicht binnen API_TIMEOUT_MS (oder gar nicht), kommt die gespeicherte
+ *   Version derselben Person, gekennzeichnet mit X-Kompanie-Stale: 1 (die App zeigt dann „Schlechte Verbindung“); kommt
+ *   die Antwort aus dem Netz später doch noch, wird sie gespeichert und den Fenstern gemeldet wie oben.
  * - Dokumente (<App>/dokument/<id>?v=<Fassung>, Issue #2) → zuerst aus dem Speicher: Die Adresse wechselt mit
  *   jeder neuen Fassung. Was einmal geöffnet wurde, ist so offline verfügbar; gespeichert wird je Dokument nur die
  *   aktuelle Fassung. Direkt aufgerufen (nicht über fetch) nie als App-Seite speichern.
@@ -35,6 +37,10 @@
  *   Nur fertige Bilder (200, kein Platzhalter), nur mit Fassung in der Adresse; je Bild und Größe nur die aktuelle
  *   Fassung, höchstens PHOTOS_MAX Vorschaubilder und PHOTOS_LARGE_MAX große, die ältesten fallen heraus. Wer gerade
  *   dasselbe Bild lädt (Vorladen und Ansicht), wartet auf diese eine Anfrage. Beim Abmelden gelöscht wie alles.
+ * - Weitere Bilder über die App (Offline-Prüfung): Mitgliedsfotos (<App>/mitgliedsfoto/<id>?v=…&s=…), Logos von Sponsoren
+ *   und Kompanien (<App>/sponsorlogo/<id>?v=…, <App>/kompanielogo/<id>?v=…) und Bilder in Texten (<App>/bild/<Kennung>,
+ *   eine Kennung hat immer denselben Inhalt) → zuerst aus dem Speicher, auch offline; je Bild (und Größe) nur die aktuelle
+ *   Fassung, höchstens IMAGES_MAX, die ältesten fallen heraus. Ohne Fassung in der Adresse (außer bild/) durchgereicht.
  * - Bildschirmfotos des Handbuchs (<Programmdateien>/handbuch/bilder/<name>.jpg?v=<Version>) → zuerst aus dem Speicher;
  *   je Foto nur die Fassung der aktuellen Version. Vorab geladen wird nichts (die App bliebe sonst nicht klein); was
  *   einmal in der Hilfe angesehen wurde, ist offline da.
@@ -62,14 +68,20 @@ const HELP_IMAGES_CACHE = 'kompanie-hilfebilder-v1';
 const PHOTOS_CACHE = 'kompanie-fotos-v1';
 const PHOTOS_MAX = 600;
 const PHOTOS_LARGE_MAX = 80;
+const IMAGES_CACHE = 'kompanie-bilder-v1';
+const IMAGES_MAX = 500;
 // Gerüste der Seiten, von der App selbst gespeichert (src/skeleton.tsx); bleiben bei einem Update.
 const VIEWS_CACHE = 'kompanie-ansicht-';
 const params = new URL(self.location.href).searchParams;
 const API = params.get('api') || '';
 const ASSETS = params.get('assets') || '';
 const NAVIGATION_TIMEOUT_MS = 2500;
-const DATA_MAX = 100;
+// Je Adresse ein Eintrag (jedes Mitglied, jede Liste, jede Umfrage …): genug für einen Tag in der App.
+const DATA_MAX = 300;
 const FRESH_MS = 10000;
+/** So lange wartet eine Anfrage der App auf das Netz, bevor die gespeicherte Version kommt (schlechtes Netz). */
+const API_TIMEOUT_MS = 6000;
+const STALE_HEADER = 'X-Kompanie-Stale';
 /** Gemeldete Adressen (neue Daten oder Fehler im Hintergrund): Adresse → { at, ok, clients }, für das Neuladen danach
  * in den gemeldeten Fenstern. */
 const announced = new Map();
@@ -146,7 +158,7 @@ self.addEventListener('activate', (event) => {
           keys
             .filter(
               (k) =>
-                ![STATIC_CACHE, DATA_CACHE, DOCS_CACHE, BADGES_CACHE, HELP_IMAGES_CACHE, PHOTOS_CACHE].includes(k) &&
+                ![STATIC_CACHE, DATA_CACHE, DOCS_CACHE, BADGES_CACHE, HELP_IMAGES_CACHE, PHOTOS_CACHE, IMAGES_CACHE].includes(k) &&
                 !k.startsWith(VIEWS_CACHE),
             )
             .map((k) => caches.delete(k)),
@@ -321,6 +333,40 @@ async function photoFirst(request, key) {
   return (await running).clone();
 }
 
+/**
+ * Weitere Bilder über die App: Schlüssel für Bild und Größe (ohne Fassung), sonst null. Mitgliedsfotos und Logos nur mit
+ * Fassung (v), Bilder in Texten (bild/<Kennung>) immer.
+ */
+function imageKey(url) {
+  const scope = new URL(self.registration.scope);
+  const path = url.pathname.startsWith(scope.pathname) ? url.pathname.slice(scope.pathname.length) : '';
+  const param = (url.searchParams.get('kompanie_app') || url.searchParams.get('r') || '').replace(/^\//, '');
+  const match = (re) => path.match(re) || param.match(re);
+  const rich = match(/^bild\/([A-Za-z0-9_-]+)\/?$/);
+  if (rich) return 'bild:' + rich[1];
+  if (!url.searchParams.get('v')) return null;
+  const photo = match(/^mitgliedsfoto\/(\d+)\/?$/);
+  if (photo) return 'mitgliedsfoto:' + photo[1] + ':' + (url.searchParams.get('s') || '');
+  const logo = match(/^(sponsorlogo|kompanielogo)\/(\d+)\/?$/);
+  return logo ? logo[1] + ':' + logo[2] : null;
+}
+
+/** Weitere Bilder: gespeicherte Fassung, sonst laden, ältere Fassungen ersetzen, Anzahl begrenzen. */
+async function imageFirst(request, key) {
+  const cache = await caches.open(IMAGES_CACHE);
+  const cached = await cache.match(request, MATCH);
+  if (cached) return cached;
+  const res = await fetch(request);
+  if (cacheable(res) && res.status === 200) {
+    const keys = await cache.keys();
+    await Promise.all(keys.filter((k) => imageKey(new URL(k.url)) === key).map((k) => cache.delete(k)));
+    await cache.put(request, res.clone());
+    const all = await cache.keys();
+    await Promise.all(all.slice(0, Math.max(0, all.length - IMAGES_MAX)).map((k) => cache.delete(k)));
+  }
+  return res;
+}
+
 function isHelpImage(url) {
   return ASSETS !== '' && url.href.startsWith(ASSETS + 'handbuch/bilder/') && url.pathname.endsWith('.jpg');
 }
@@ -401,7 +447,8 @@ async function networkFirst(request, fallbackUrl, timeoutMs, event) {
     }
     return res;
   });
-  const cached = caches.match(key, MATCH);
+  // Daten nur für dieselbe Person (Konto gewechselt, ohne abzumelden): sonst lieber ein Fehler.
+  const cached = caches.match(key, MATCH).then((found) => (found && (fallbackUrl || sameUser(found, request)) ? found : undefined));
   if (timeoutMs) {
     const fallback = await cached;
     if (fallback) {
@@ -416,6 +463,55 @@ async function networkFirst(request, fallbackUrl, timeoutMs, event) {
     if (fallback) return fallback;
     throw err;
   }
+}
+
+/** Gespeicherte Antwort für die Person der Anfrage (X-Kompanie-User; ohne Angabe gilt sie für Anfragen ohne Angabe)? */
+function sameUser(found, request) {
+  return (found.headers.get(USER_HEADER) || '') === (request.headers.get(USER_HEADER) || '');
+}
+
+/** Gespeicherte Antwort statt der aus dem Netz (schlechtes Netz oder keins): für die App gekennzeichnet. */
+function markStale(res) {
+  const headers = new Headers(res.headers);
+  headers.set(STALE_HEADER, '1');
+  return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+}
+
+/**
+ * API mit X-Kompanie-Stale-Ok, wenn die gespeicherte Version nicht sofort kommen darf (nach einer eigenen Änderung, nach
+ * einem gemeldeten Fehler): zuerst aus dem Netz. Antwortet es nicht binnen API_TIMEOUT_MS oder gar nicht, kommt die
+ * gespeicherte Version (fallback, nur dieselbe Person) gekennzeichnet; die Antwort aus dem Netz wird danach trotzdem
+ * gespeichert und, wenn sie anders ist, den Fenstern gemeldet.
+ */
+async function networkOrStale(request, event, fallback) {
+  const key = request.url;
+  const startedAt = Date.now();
+  /** Text der gespeicherten Version, falls sie statt der Antwort aus dem Netz kam */
+  let delivered = null;
+  const network = fetch(request);
+  // Gleich anmelden (nicht erst, wenn die Antwort da ist): Der Service Worker bleibt dann bis zum Speichern wach.
+  const saving = network.then(
+    async (res) => {
+      if (!cacheable(res)) return;
+      // Beide Kopien sofort: Danach liest die App den Körper, und eine spätere Kopie schlüge fehl.
+      const copy = res.clone();
+      const text = res.clone().text();
+      await store(key, tagged(copy, request, startedAt));
+      if (delivered !== null && (await text) !== (await delivered)) await announce(key, true);
+    },
+    () => undefined,
+  );
+  try {
+    event.waitUntil(saving);
+  } catch {
+    // Ereignis schon beendet: Das Speichern läuft trotzdem weiter.
+  }
+  if (!fallback) return network;
+  const timer = new Promise((resolve) => setTimeout(() => resolve(null), API_TIMEOUT_MS));
+  const first = await Promise.race([network.catch(() => null), timer]);
+  if (first) return first;
+  delivered = fallback.clone().text();
+  return markStale(fallback);
 }
 
 /**
@@ -533,7 +629,9 @@ async function staleWhileRevalidate(request, event) {
     last.clients.delete(client);
     if (last.clients.size === 0) announced.delete(key);
   }
-  if (!stored || (recent && !last.ok)) return networkFirst(request, undefined, 0, event);
+  if (!stored || (recent && !last.ok)) {
+    return networkOrStale(request, event, found && user !== '' && sameUser(found, request) ? found : undefined);
+  }
   if (recent) return stored;
   let running = revalidating.get(key);
   if (running) {
@@ -579,6 +677,11 @@ async function revalidate(request, key, before) {
     await store(key, tagged(res, request, startedAt));
     if (text === before) return;
   }
+  await announce(key, ok);
+}
+
+/** Den Fenstern der App melden, dass es für key neue Daten (ok) oder einen Fehler gibt; sie laden dann neu. */
+async function announce(key, ok) {
   const windows = await self.clients.matchAll({ type: 'window' });
   announced.set(key, { at: Date.now(), ok, clients: new Set(windows.map((w) => w.id || '')) });
   for (const w of windows) w.postMessage({ type: 'kompanie-data', url: key });
@@ -606,7 +709,10 @@ self.addEventListener('fetch', (event) => {
   const doc = documentId(url);
   const badge = doc === null ? badgeKey(url) : null;
   const photo = doc === null && badge === null ? photoKey(url) : null;
-  if (photo !== null) {
+  const image = doc === null && badge === null && photo === null ? imageKey(url) : null;
+  if (image !== null) {
+    if (request.mode !== 'navigate') event.respondWith(imageFirst(request, image));
+  } else if (photo !== null) {
     if (request.mode !== 'navigate') event.respondWith(photoFirst(request, photo));
   } else if (badge !== null) {
     if (request.mode !== 'navigate') event.respondWith(badgeFirst(request, badge));

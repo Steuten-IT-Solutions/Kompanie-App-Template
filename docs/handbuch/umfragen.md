@@ -23,6 +23,7 @@ Mit **{bereich.polls}** fragt die {kompanie.name} alle {rolle.member} nach ihrer
 2. Es öffnet sich die Seite der Umfrage. Dort antwortest du oder siehst deine Antwort und die Ergebnisse (siehe [Umfrage beantworten](seite:umfrage-beantworten)).
 
 ## Gut zu wissen
+- Mit dem Recht **{bereich.polls}: alle Ergebnisse sehen** siehst du die Ergebnisse jeder Umfrage, auch während sie läuft und bei **Nur wer alle Ergebnisse sehen darf**. Anlegen, ändern und beenden kannst du damit nicht.
 - Jede Umfrage hat genau eine Frage: mit einer Antwort, mit mehreren Antworten oder mit freiem Text.
 - Laufende {bereich.polls} stehen auch am {bereich.board}. Solange du noch nicht geantwortet hast, erscheint eine Umfrage außerdem im Banner oben auf jeder Seite, mit dem Knopf **Teilnehmen**.
 - Bei einer neuen Umfrage und 24 Stunden vor ihrem Ende (nur, wenn du noch nicht geantwortet hast) bekommst du eine Benachrichtigung, wenn du die Art **{bereich.polls}: neue Umfrage und Erinnerung** für dein Gerät eingeschaltet hast. Ein Tipp darauf öffnet die Umfrage.

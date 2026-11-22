@@ -11,7 +11,7 @@ Die Übersicht zeigt deine eigenen Angaben auf einen Blick: {begriff.rank}, {ber
 Tippe unten auf **Meins**. Die Übersicht ist die erste Seite. Steht oben im Menü etwas anderes, tippe auf das Menü und wähle **Übersicht**.
 
 ## Was du hier siehst
-- **Menü oben** (drei Striche): wechselt zwischen **Übersicht**, deinen {bereich.points}, deinen {bereich.penalties}, deinem {begriff.rank}, deiner {bereich.attendance} und **Konto**. Es stehen nur die Bereiche darin, die es bei euch gibt.
+- **Menü oben** (drei Striche): wechselt zwischen **Übersicht**, deinen {bereich.points}, deinen {bereich.penalties}, deinem {begriff.rank}, deiner {bereich.attendance}, **Meine Passiven** (wenn du Passive betreust) und **Konto**. Es stehen nur die Bereiche darin, die es bei euch gibt.
 - **Dein Name**, darunter das Abzeichen mit deinem {begriff.rank} (wenn es bei euch {bereich.ranks} gibt) und dein Foto, falls eines hinterlegt ist.
 - **Rolle** bzw. **Rollen**: welche Rolle(n) du in der App hast.
 - **Kachel {bereich.points}**: deine Summe der {bereich.points}.

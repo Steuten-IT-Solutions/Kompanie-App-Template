@@ -34,7 +34,7 @@ final class RolesTest extends TestCase
         $this->assertSame([Roles::GUEST, Roles::MEMBER, 'points', 'penalties', Roles::ADMIN], array_keys($roles), 'Kalender braucht keine Rechte');
         $this->assertSame('Punkte verwalten', $roles['points']['label']);
         $this->assertSame('Kasse verwalten', $roles['penalties']['label'], 'mit der Bezeichnung aus kompanie.json');
-        $this->assertSame(TestApp::capabilities(['member', 'manage_penalties']), $app->roles()->capabilities('penalties'), 'sieht, was Mitglieder sehen');
+        $this->assertSame(TestApp::capabilities(['member', 'view_penalties', 'manage_penalties']), $app->roles()->capabilities('penalties'), 'sieht, was Mitglieder sehen');
 
         // Ausschalten: Rolle verschwindet, wenn niemand sie hat; sonst bleibt sie.
         $users->add('kasse', 'penalties');
@@ -64,7 +64,7 @@ final class RolesTest extends TestCase
         $roles = $app->roles()->all();
         $this->assertSame([Roles::GUEST, Roles::MEMBER, Roles::ORGANIZER, Roles::MANAGER, Roles::ADMIN], array_keys($roles));
         $this->assertSame('Spieß', $roles[Roles::MANAGER]['label']);
-        $this->assertSame(TestApp::capabilities(['member', 'manage_events', 'manage_documents', 'manage_points', 'manage_penalties']), $app->roles()->capabilities(Roles::MANAGER));
+        $this->assertSame(TestApp::capabilities(['member', 'manage_events', 'view_restricted_documents', 'manage_documents', 'view_points', 'manage_points', 'view_penalties', 'manage_penalties']), $app->roles()->capabilities(Roles::MANAGER));
         // Bestehende Installationen bekommen beim Einschalten neue Standardrollen, behalten aber ihre.
         $app->features()->update(['points' => true]);
         $this->assertArrayHasKey('points', $app->roles()->all());
@@ -75,7 +75,7 @@ final class RolesTest extends TestCase
     {
         $settings = new MemorySettings([RoleService::SETTING => [['key' => 'r1', 'label' => 'Kasse', 'capabilities' => ['member', 'manage']]]]);
         $app = TestApp::create(TestApp::connection(), settings: $settings, features: false);
-        $this->assertSame(TestApp::capabilities(['member', 'manage_points', 'manage_penalties']), $app->roles()->capabilities('r1'));
+        $this->assertSame(TestApp::capabilities(['member', 'view_points', 'manage_points', 'view_penalties', 'manage_penalties']), $app->roles()->capabilities('r1'));
         $this->assertSame([Roles::GUEST, Roles::MEMBER, 'r1', Roles::ADMIN], array_keys($app->roles()->all()), 'feste Rollen ergänzt');
     }
 
@@ -95,7 +95,7 @@ final class RolesTest extends TestCase
     {
         $users = new FakeUsers();
         $app = TestApp::create(TestApp::connection(), $users);
-        $app->roles()->create(['label' => 'Schriftführer', 'capabilities' => TestApp::caps(['member', 'promote_users', 'create_users', 'manage_points'])]);
+        $app->roles()->create(['label' => 'Schriftführer', 'capabilities' => TestApp::caps(['member', 'view_accounts', 'promote_users', 'create_users', 'view_points', 'manage_points'])]);
         $schrift = $users->add('schrift', 'r1');
         $kasse = $users->add('kasse', 'penalties');
         $m = $users->add('m', Roles::MEMBER);
@@ -232,7 +232,7 @@ final class RolesTest extends TestCase
 
         // Wer nur Mitglieder anlegen darf: freigegebene Rollen mit höchstens Mitgliederbereich bzw. Kalender, sonst nur
         // Rollen mit Rechten, die er weitergeben darf.
-        $clerk = $users->add('schrift', $app->roles()->create(['label' => 'Schriftführer', 'capabilities' => TestApp::caps(['member', 'create_users'])])['key']);
+        $clerk = $users->add('schrift', $app->roles()->create(['label' => 'Schriftführer', 'capabilities' => TestApp::caps(['member', 'view_accounts', 'create_users'])])['key']);
         $users->current = $clerk;
         $res = $call('POST', '/users', ['name' => 'Fritz', 'level' => $friend]);
         $this->assertSame([201, $friend], [$res->status, $res->data['level'] ?? null], (string) json_encode($res->data));

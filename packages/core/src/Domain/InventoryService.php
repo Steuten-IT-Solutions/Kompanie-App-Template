@@ -7,6 +7,7 @@ namespace KompanieApp\Core\Domain;
 use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Storage\InventoryRepository;
 
 /**
@@ -95,7 +96,7 @@ final class InventoryService
     public function itemLog(int $id, mixed $limit = null, mixed $before = null): array
     {
         if ($this->repository()->find($id) === null) {
-            throw ApiError::notFound('Diesen Eintrag gibt es nicht.');
+            throw ApiError::notFound(I18n::t('Diesen Eintrag gibt es nicht.'));
         }
         return $this->formatLog($this->repository()->history($id, self::limit($limit), self::before($before)));
     }
@@ -106,11 +107,11 @@ final class InventoryService
      */
     public function create(User $user, array $in): array
     {
-        $title = self::requiredText($in['title'] ?? null, self::TITLE_MAX, 'Bitte eine Bezeichnung eingeben.', 'Die Bezeichnung');
-        $location = self::requiredText($in['location'] ?? null, self::LOCATION_MAX, 'Bitte einen Ort eingeben.', 'Der Ort');
-        $quantity = self::quantity($in['quantity'] ?? 0, 'Die Menge');
-        $category = self::optionalText($in['category'] ?? null, self::CATEGORY_MAX, 'Die Kategorie');
-        $unit = self::optionalText($in['unit'] ?? null, self::UNIT_MAX, 'Die Einheit');
+        $title = self::requiredText($in['title'] ?? null, self::TITLE_MAX, I18n::t('Bitte eine Bezeichnung eingeben.'), I18n::t('Die Bezeichnung'));
+        $location = self::requiredText($in['location'] ?? null, self::LOCATION_MAX, I18n::t('Bitte einen Ort eingeben.'), I18n::t('Der Ort'));
+        $quantity = self::quantity($in['quantity'] ?? 0, I18n::t('Die Menge'));
+        $category = self::optionalText($in['category'] ?? null, self::CATEGORY_MAX, I18n::t('Die Kategorie'));
+        $unit = self::optionalText($in['unit'] ?? null, self::UNIT_MAX, I18n::t('Die Einheit'));
         $note = self::note($in['note'] ?? null);
         $reason = self::reason($in['reason'] ?? null);
         $repo = $this->repository();
@@ -147,25 +148,25 @@ final class InventoryService
     public function update(User $user, int $id, array $in): array
     {
         if (array_key_exists('quantity', $in) && array_key_exists('adjust', $in)) {
-            throw ApiError::invalid('Bitte entweder die Menge oder eine Änderung der Menge angeben, nicht beides.');
+            throw ApiError::invalid(I18n::t('Bitte entweder die Menge oder eine Änderung der Menge angeben, nicht beides.'));
         }
         $next = [];
         if (array_key_exists('title', $in)) {
-            $next['title'] = self::requiredText($in['title'], self::TITLE_MAX, 'Bitte eine Bezeichnung eingeben.', 'Die Bezeichnung');
+            $next['title'] = self::requiredText($in['title'], self::TITLE_MAX, I18n::t('Bitte eine Bezeichnung eingeben.'), I18n::t('Die Bezeichnung'));
         }
         if (array_key_exists('location', $in)) {
-            $next['location'] = self::requiredText($in['location'], self::LOCATION_MAX, 'Bitte einen Ort eingeben.', 'Der Ort');
+            $next['location'] = self::requiredText($in['location'], self::LOCATION_MAX, I18n::t('Bitte einen Ort eingeben.'), I18n::t('Der Ort'));
         }
         if (array_key_exists('category', $in)) {
-            $next['category'] = self::optionalText($in['category'], self::CATEGORY_MAX, 'Die Kategorie');
+            $next['category'] = self::optionalText($in['category'], self::CATEGORY_MAX, I18n::t('Die Kategorie'));
         }
         if (array_key_exists('unit', $in)) {
-            $next['unit'] = self::optionalText($in['unit'], self::UNIT_MAX, 'Die Einheit');
+            $next['unit'] = self::optionalText($in['unit'], self::UNIT_MAX, I18n::t('Die Einheit'));
         }
         if (array_key_exists('note', $in)) {
             $next['note'] = self::note($in['note']);
         }
-        $quantity = array_key_exists('quantity', $in) ? self::quantity($in['quantity'], 'Die Menge') : null;
+        $quantity = array_key_exists('quantity', $in) ? self::quantity($in['quantity'], I18n::t('Die Menge')) : null;
         $adjust = array_key_exists('adjust', $in) ? self::adjust($in['adjust']) : null;
         $reason = self::reason($in['reason'] ?? null);
         $repo = $this->repository();
@@ -180,10 +181,10 @@ final class InventoryService
             if ($adjust !== null) {
                 $quantity = $item['quantity'] + $adjust;
                 if ($quantity < 0) {
-                    throw ApiError::invalid(sprintf('Die Menge darf nicht unter 0 fallen (vorhanden: %s).', self::display($item['quantity'])));
+                    throw ApiError::invalid(I18n::t('Die Menge darf nicht unter 0 fallen (vorhanden: {quantity}).', ['quantity' => self::display($item['quantity'])]));
                 }
                 if ($quantity > self::MAX_MILLI) {
-                    throw ApiError::invalid('Die Menge ist zu groß.');
+                    throw ApiError::invalid(I18n::t('Die Menge ist zu groß.'));
                 }
             }
             $data = [];
@@ -241,11 +242,11 @@ final class InventoryService
      */
     public function move(User $user, int $id, array $in): array
     {
-        $amount = self::quantity($in['quantity'] ?? null, 'Die Menge zum Umlagern');
+        $amount = self::quantity($in['quantity'] ?? null, I18n::t('Die Menge zum Umlagern'));
         if ($amount === 0) {
-            throw ApiError::invalid('Bitte eine Menge größer als 0 angeben.');
+            throw ApiError::invalid(I18n::t('Bitte eine Menge größer als 0 angeben.'));
         }
-        $to = self::requiredText($in['location'] ?? null, self::LOCATION_MAX, 'Bitte den Zielort eingeben.', 'Der Zielort');
+        $to = self::requiredText($in['location'] ?? null, self::LOCATION_MAX, I18n::t('Bitte den Zielort eingeben.'), I18n::t('Der Zielort'));
         $reason = self::reason($in['reason'] ?? null);
         $repo = $this->repository();
         [$sourceId, $targetId] = $repo->db()->transaction(function () use ($repo, $user, $id, $amount, $to, $reason): array {
@@ -253,10 +254,10 @@ final class InventoryService
             $others = array_values(array_filter($repo->active(), static fn (array $i): bool => $i['id'] !== $id));
             $to = self::canonical($to, array_column($others, 'location'));
             if (mb_strtolower($to) === mb_strtolower($source['location'])) {
-                throw ApiError::invalid('Der Zielort ist derselbe wie der jetzige Ort.');
+                throw ApiError::invalid(I18n::t('Der Zielort ist derselbe wie der jetzige Ort.'));
             }
             if ($amount > $source['quantity']) {
-                throw ApiError::invalid(sprintf('Es sind nur %s vorhanden.', self::display($source['quantity'], $source['unit'])));
+                throw ApiError::invalid(I18n::t('Es sind nur {quantity} vorhanden.', ['quantity' => self::display($source['quantity'], $source['unit'])]));
             }
             $target = null;
             foreach ($others as $other) {
@@ -291,7 +292,7 @@ final class InventoryService
                 $targetId = $target['id'];
                 $targetBefore = $target['quantity'];
                 if ($targetBefore + $amount > self::MAX_MILLI) {
-                    throw ApiError::invalid('Die Menge am Zielort wäre zu groß.');
+                    throw ApiError::invalid(I18n::t('Die Menge am Zielort wäre zu groß.'));
                 }
                 $repo->update($targetId, ['quantity' => $targetBefore + $amount] + $stamp);
                 $targetLocation = $target['location'];
@@ -314,7 +315,7 @@ final class InventoryService
     {
         $item = $this->repository()->find($id, $lock);
         if ($item === null || $item['deleted_at'] !== null) {
-            throw ApiError::notFound('Diesen Eintrag gibt es nicht (mehr).');
+            throw ApiError::notFound(I18n::t('Diesen Eintrag gibt es nicht (mehr).'));
         }
         return $item;
     }
@@ -396,31 +397,31 @@ final class InventoryService
             $value = (string) $value;
         } elseif (is_float($value)) {
             if (!is_finite($value)) {
-                throw ApiError::invalid($what . ' ist keine gültige Zahl.');
+                throw ApiError::invalid(I18n::t('{field} ist keine gültige Zahl.', ['field' => $what]));
             }
             $milli = (int) round($value * 1000);
             if (abs($value * 1000 - $milli) > 1e-6 * max(1.0, abs($value))) {
-                throw ApiError::invalid($what . ' darf höchstens drei Nachkommastellen haben.');
+                throw ApiError::invalid(I18n::t('{field} darf höchstens drei Nachkommastellen haben.', ['field' => $what]));
             }
             $value = InventoryRepository::toDecimal($milli);
         }
         if (!is_string($value) || trim($value) === '') {
-            throw ApiError::invalid('Bitte eine Menge angeben.');
+            throw ApiError::invalid(I18n::t('Bitte eine Menge angeben.'));
         }
         $s = str_replace(',', '.', trim($value));
         if (preg_match('/^-/', $s)) {
-            throw ApiError::invalid($what . ' darf nicht negativ sein.');
+            throw ApiError::invalid(I18n::t('{field} darf nicht negativ sein.', ['field' => $what]));
         }
         if (!preg_match('/^(\d+)(?:\.(\d*))?$/', $s, $m)) {
-            throw ApiError::invalid($what . ' ist keine gültige Zahl.');
+            throw ApiError::invalid(I18n::t('{field} ist keine gültige Zahl.', ['field' => $what]));
         }
         $fraction = rtrim($m[2] ?? '', '0');
         if (strlen($fraction) > 3) {
-            throw ApiError::invalid($what . ' darf höchstens drei Nachkommastellen haben.');
+            throw ApiError::invalid(I18n::t('{field} darf höchstens drei Nachkommastellen haben.', ['field' => $what]));
         }
         $whole = ltrim($m[1], '0');
         if (strlen($whole) > 9) {
-            throw ApiError::invalid($what . ' ist zu groß.');
+            throw ApiError::invalid(I18n::t('{field} ist zu groß.', ['field' => $what]));
         }
         return (int) $whole * 1000 + (int) str_pad($fraction, 3, '0');
     }
@@ -434,7 +435,7 @@ final class InventoryService
         } elseif (is_string($value)) {
             $value = ltrim(trim($value), '+-');
         }
-        $milli = self::quantity($value, 'Die Änderung der Menge');
+        $milli = self::quantity($value, I18n::t('Die Änderung der Menge'));
         return $negative ? -$milli : $milli;
     }
 
@@ -445,7 +446,7 @@ final class InventoryService
             throw ApiError::invalid($missing);
         }
         if (mb_strlen($text) > $max) {
-            throw ApiError::invalid(sprintf('%s darf höchstens %d Zeichen lang sein.', $what, $max));
+            throw ApiError::invalid(I18n::t('{field} darf höchstens {max} Zeichen lang sein.', ['field' => $what, 'max' => $max]));
         }
         return $text;
     }
@@ -456,11 +457,11 @@ final class InventoryService
             return '';
         }
         if (!is_string($value)) {
-            throw ApiError::invalid($what . ' muss ein Text sein.');
+            throw ApiError::invalid(I18n::t('{field} muss ein Text sein.', ['field' => $what]));
         }
         $text = Text::line($value);
         if (mb_strlen($text) > $max) {
-            throw ApiError::invalid(sprintf('%s darf höchstens %d Zeichen lang sein.', $what, $max));
+            throw ApiError::invalid(I18n::t('{field} darf höchstens {max} Zeichen lang sein.', ['field' => $what, 'max' => $max]));
         }
         return $text;
     }
@@ -471,18 +472,18 @@ final class InventoryService
             return '';
         }
         if (!is_string($value)) {
-            throw ApiError::invalid('Die Notiz muss ein Text sein.');
+            throw ApiError::invalid(I18n::t('Die Notiz muss ein Text sein.'));
         }
         $text = Text::multiline($value);
         if (mb_strlen($text) > self::NOTE_MAX) {
-            throw ApiError::invalid(sprintf('Die Notiz darf höchstens %d Zeichen lang sein.', self::NOTE_MAX));
+            throw ApiError::invalid(I18n::t('Die Notiz darf höchstens {max} Zeichen lang sein.', ['max' => self::NOTE_MAX]));
         }
         return $text;
     }
 
     private static function reason(mixed $value): string
     {
-        return self::optionalText($value, self::REASON_MAX, 'Der Grund');
+        return self::optionalText($value, self::REASON_MAX, I18n::t('Der Grund'));
     }
 
     /**
@@ -511,7 +512,7 @@ final class InventoryService
         }
         $n = Input::integer($value);
         if ($n === null || $n < 1 || $n > self::LOG_LIMIT_MAX) {
-            throw ApiError::invalid(sprintf('limit: Zahl von 1 bis %d.', self::LOG_LIMIT_MAX));
+            throw ApiError::invalid(I18n::t('limit: Zahl von 1 bis {max}.', ['max' => self::LOG_LIMIT_MAX]));
         }
         return $n;
     }
@@ -523,7 +524,7 @@ final class InventoryService
         }
         $n = Input::integer($value);
         if ($n === null || $n < 1) {
-            throw ApiError::invalid('before: ID eines Verlaufseintrags.');
+            throw ApiError::invalid(I18n::t('before: ID eines Verlaufseintrags.'));
         }
         return $n;
     }

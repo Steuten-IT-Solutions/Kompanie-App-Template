@@ -7,6 +7,7 @@ namespace KompanieApp\Core\Domain\Blocks;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Domain\Text;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 
 /** Hinweis-Kasten: kurzer Text (reiner Text, Zeilenumbrüche bleiben) farbig hervorgehoben, als Info, Warnung oder Erfolg. */
 final class NoticeBlock implements BlockType
@@ -25,16 +26,16 @@ final class NoticeBlock implements BlockType
     {
         $tone = $in['tone'] ?? 'info';
         if (!in_array($tone, self::TONES, true)) {
-            throw ApiError::invalid('Ungültige Art des Hinweises: erlaubt sind info, warning und success.');
+            throw ApiError::invalid(I18n::t('Ungültige Art des Hinweises: erlaubt sind info, warning und success.'));
         }
         $text = is_string($in['text'] ?? null) ? Text::multiline($in['text']) : '';
         if ($text === '') {
-            throw ApiError::invalid('Bitte einen Text für den Hinweis eingeben.');
+            throw ApiError::invalid(I18n::t('Bitte einen Text für den Hinweis eingeben.'));
         }
         if (mb_strlen($text) > self::TEXT_MAX) {
-            throw ApiError::invalid(sprintf('Der Hinweis darf höchstens %d Zeichen lang sein.', self::TEXT_MAX));
+            throw ApiError::invalid(I18n::t('Der Hinweis darf höchstens {max} Zeichen lang sein.', ['max' => self::TEXT_MAX]));
         }
-        return ['title' => Field::line($in['title'] ?? '', self::TITLE_MAX, 'Die Überschrift des Hinweises'), 'text' => $text, 'tone' => $tone];
+        return ['title' => Field::line($in['title'] ?? '', self::TITLE_MAX, I18n::t('Die Überschrift des Hinweises')), 'text' => $text, 'tone' => $tone];
     }
 
     public function render(array $data, ?User $viewer, bool $manager): ?array

@@ -1,8 +1,29 @@
-const euro = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
-const dateFmt = new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
-const weekdayFmt = new Intl.DateTimeFormat('de-DE', { weekday: 'short', day: 'numeric', month: 'short' });
-const timeFmt = new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit' });
-const monthFmt = new Intl.DateTimeFormat('de-DE', { month: 'long', year: 'numeric' });
+import { localeTag, t } from './i18n';
+
+/** Formate in der aktuellen Sprache, beim ersten Gebrauch angelegt und je Sprache gemerkt. */
+const numberFormats = new Map<string, Intl.NumberFormat>();
+const dateFormats = new Map<string, Intl.DateTimeFormat>();
+export function numberFormat(options: Intl.NumberFormatOptions = {}): Intl.NumberFormat {
+  const key = localeTag() + JSON.stringify(options);
+  let f = numberFormats.get(key);
+  if (!f) numberFormats.set(key, (f = new Intl.NumberFormat(localeTag(), options)));
+  return f;
+}
+export function dateFormat(options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  const key = localeTag() + JSON.stringify(options);
+  let f = dateFormats.get(key);
+  if (!f) dateFormats.set(key, (f = new Intl.DateTimeFormat(localeTag(), options)));
+  return f;
+}
+
+/** Zahl im Format der aktuellen Sprache, z. B. „1.234,5“. */
+export const formatNumber = (n: number, options?: Intl.NumberFormatOptions) => numberFormat(options).format(n);
+
+const euro = { format: (n: number) => numberFormat({ style: 'currency', currency: 'EUR' }).format(n) };
+const dateFmt = { format: (d: Date) => dateFormat({ day: '2-digit', month: '2-digit', year: 'numeric' }).format(d) };
+const weekdayFmt = { format: (d: Date) => dateFormat({ weekday: 'short', day: 'numeric', month: 'short' }).format(d) };
+const timeFmt = { format: (d: Date) => dateFormat({ hour: '2-digit', minute: '2-digit' }).format(d) };
+const monthFmt = { format: (d: Date) => dateFormat({ month: 'long', year: 'numeric' }).format(d) };
 
 export const formatEuro = (cents: number) => euro.format(cents / 100);
 
@@ -15,7 +36,7 @@ export function parseLocalDate(ymd: string): Date {
 export const formatDate = (ymd: string) => dateFmt.format(parseLocalDate(ymd));
 
 /** Monat kurz ohne Punkt für das Datumsfeld links an Karten, z. B. „Okt“. */
-export const shortMonth = (d: Date) => d.toLocaleDateString('de-DE', { month: 'short' }).replace('.', '');
+export const shortMonth = (d: Date) => dateFormat({ month: 'short' }).format(d).replace('.', '');
 
 /** Datum vom Server, das auch nur das Jahr sein kann (JJJJ-MM-TT oder JJJJ, z. B. Eintritt), zum Anzeigen. */
 export const formatYearOrDate = (value: string): string => (value.length === 4 ? value : formatDate(value));
@@ -33,7 +54,7 @@ export function todayYmd(): string {
 }
 
 export function formatPoints(points: number): string {
-  return (points > 0 ? '+' : '') + points.toLocaleString('de-DE');
+  return (points > 0 ? '+' : '') + formatNumber(points);
 }
 
 /**
@@ -77,7 +98,7 @@ export function eventEnd(ev: { end: string; start: string; all_day: boolean }): 
   return d;
 }
 
-const yearDateFmt = new Intl.DateTimeFormat('de-DE', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+const yearDateFmt = { format: (d: Date) => dateFormat({ weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }).format(d) };
 
 /** Wochentag, Tag und Monat kurz („Di., 27. Okt.“), in einem anderen Jahr als `now` mit Jahreszahl („Fr., 8. Jan. 2027“). */
 export const formatWeekdayDateYear = (d: Date, now: Date = new Date()) =>
@@ -98,15 +119,15 @@ export function formatEventWhen(ev: { start: string; end: string; all_day: boole
     // Eintägig ohne Uhrzeit: nur das Datum (ohne Zusatz „ganztägig“).
     return sameDay ? day(s) : `${from} – ${day(e)}`;
   }
-  if (e.getTime() <= s.getTime()) return `${day(s)} · ${timeFmt.format(s)} Uhr`;
+  if (e.getTime() <= s.getTime()) return `${day(s)} · ${t('{time} Uhr', { time: timeFmt.format(s) })}`;
   return sameDay
-    ? `${day(s)} · ${timeFmt.format(s)}–${timeFmt.format(e)} Uhr`
-    : `${from}, ${timeFmt.format(s)} – ${day(e)}, ${timeFmt.format(e)} Uhr`;
+    ? `${day(s)} · ${t('{time} Uhr', { time: `${timeFmt.format(s)}–${timeFmt.format(e)}` })}`
+    : `${from}, ${timeFmt.format(s)} – ${day(e)}, ${t('{time} Uhr', { time: timeFmt.format(e) })}`;
 }
 
 export const formatMonth = (d: Date) => monthFmt.format(d);
 
-const newsDateFmt = new Intl.DateTimeFormat('de-DE', { day: 'numeric', month: 'long', year: 'numeric' });
+const newsDateFmt = { format: (d: Date) => dateFormat({ day: 'numeric', month: 'long', year: 'numeric' }).format(d) };
 
 /** Datum eines Beitrags; leer, wenn die Quelle keines oder ein unlesbares liefert. */
 export function newsDate(iso: string): string {
@@ -118,14 +139,14 @@ export function newsDate(iso: string): string {
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toLocaleString('de-DE', { maximumFractionDigits: 1 })} MB`;
+  return `${formatNumber(bytes / (1024 * 1024), { maximumFractionDigits: 1 })} MB`;
 }
 
 /** Zeitpunkt (ISO 8601) kurz: heute „14:05 Uhr“, sonst „Mo., 19. Okt., 14:05 Uhr“. */
 export function formatShortTime(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
-  const time = `${timeFmt.format(d)} Uhr`;
+  const time = t('{time} Uhr', { time: timeFmt.format(d) });
   return d.toDateString() === new Date().toDateString() ? time : `${weekdayFmt.format(d)}, ${time}`;
 }
 
@@ -155,5 +176,7 @@ export function fromLocalInput(value: string): string | null {
 export function formatUntil(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
-  return d.getFullYear() === new Date().getFullYear() ? formatShortTime(iso) : `${yearDateFmt.format(d)}, ${timeFmt.format(d)} Uhr`;
+  return d.getFullYear() === new Date().getFullYear()
+    ? formatShortTime(iso)
+    : `${yearDateFmt.format(d)}, ${t('{time} Uhr', { time: timeFmt.format(d) })}`;
 }

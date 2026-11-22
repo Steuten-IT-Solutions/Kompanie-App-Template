@@ -5,6 +5,7 @@ import GuestPushButton from '../GuestPushButton';
 import { navigate } from '../router';
 import { Empty, ErrorBox, lazyView, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
+import { t } from '../i18n';
 
 // Mit DOMPurify (ca. 12 kB gzip): erst laden, wenn jemand einen Beitrag öffnet.
 const NewsDetail = lazyView(() => import('./NewsArtikel'));
@@ -13,6 +14,25 @@ const NewsSchreiben = lazyView(() => import('./NewsSchreiben'));
 
 /** Darf die Person hier News schreiben (Quelle „In der App“ und manage_news)? */
 export const canWriteNews = (): boolean => !!config?.newsInApp && can('manage_news');
+
+/** Adresse des Editors von WordPress für einen neuen Beitrag (Quelle „Beiträge dieser WordPress-Seite“, manage_news). */
+// Wechselt ein Admin in den Einstellungen auf „In der App“, gilt sofort das Formular der App (newsInApp), nicht die
+// beim Laden mitgeschickte Adresse.
+export const newsEditorUrl = (): string | null => (config?.newsInApp ? null : (config?.newsEditorUrl ?? null));
+
+/**
+ * Den Editor von WordPress in einem eigenen Fenster öffnen (Browser bzw. Custom Tab); kommt man in die App zurück,
+ * lädt sie die Beiträge neu, damit der gespeicherte Beitrag gleich zu sehen ist.
+ */
+export function openNewsEditor(url: string, onBack: () => void): void {
+  window.open(url, '_blank', 'noopener');
+  const back = () => {
+    if (document.visibilityState !== 'visible') return;
+    document.removeEventListener('visibilitychange', back);
+    onBack();
+  };
+  document.addEventListener('visibilitychange', back);
+}
 
 type Toast = (msg: string) => void;
 
@@ -33,8 +53,24 @@ function NewsList({ onToast }: { onToast: Toast }) {
 
   if (loading && items.length === 0) return <Loading shape="news" />;
   if (error && items.length === 0) return <ErrorBox message={error} onRetry={reload} />;
-  const notify = <GuestPushButton label="Bei neuen Beiträgen benachrichtigen" />;
-  const write = canWriteNews() ? (
+  const notify = <GuestPushButton label={t('Bei neuen Beiträgen benachrichtigen')} />;
+  const editor = newsEditorUrl();
+  const write = editor ? (
+    <p>
+      <button
+        type="button"
+        className="btn"
+        onClick={() =>
+          openNewsEditor(editor, () => {
+            setPage(1);
+            reload();
+          })
+        }
+      >
+        {t('Neuer Beitrag')}
+      </button>
+    </p>
+  ) : canWriteNews() ? (
     writing ? (
       <NewsSchreiben
         onToast={onToast}
@@ -46,7 +82,7 @@ function NewsList({ onToast }: { onToast: Toast }) {
     ) : (
       <p>
         <button type="button" className="btn" onClick={() => setWriting(true)}>
-          Neuer Beitrag
+          {t('Neuer Beitrag')}
         </button>
       </p>
     )
@@ -55,7 +91,7 @@ function NewsList({ onToast }: { onToast: Toast }) {
     return (
       <>
         {write}
-        {!writing && <Empty>Noch keine Beiträge.</Empty>}
+        {!writing && <Empty>{t('Noch keine Beiträge.')}</Empty>}
         {notify}
       </>
     );
@@ -77,7 +113,7 @@ function NewsList({ onToast }: { onToast: Toast }) {
       </ul>
       {data && page < data.totalPages && (
         <button className="btn btn-secondary btn-block more" disabled={loading} onClick={() => setPage((p) => p + 1)}>
-          {loading ? 'Lädt …' : 'Ältere Beiträge'}
+          {loading ? t('Lädt …') : t('Ältere Beiträge')}
         </button>
       )}
       {notify}

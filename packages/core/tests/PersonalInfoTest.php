@@ -138,7 +138,7 @@ final class PersonalInfoTest extends TestCase
         $this->app->db->insert('birthdays', ['user_id' => $this->m, 'month' => 2, 'day' => 3, 'year' => 1980, 'visible' => 1, 'show_age' => 0, 'updated_by' => $this->m, 'updated_at' => '2026-01-01 00:00:00']);
 
         // Nur Mitglieder anlegen: Name, Benutzername, E-Mail; nichts Persönliches darüber hinaus.
-        $this->users->current = $this->withRights('anleger', ['create_users']);
+        $this->users->current = $this->withRights('anleger', ['view_accounts', 'create_users']);
         $detail = $this->call('GET', "/members/{$this->m}")->data;
         $this->assertArrayNotHasKey('personal', $detail);
         $this->assertArrayNotHasKey('birthday', $detail);
@@ -178,7 +178,7 @@ final class PersonalInfoTest extends TestCase
 
     public function testCreateWithAllPersonalData(): void
     {
-        $this->users->current = $this->withRights('anleger', ['create_users']);
+        $this->users->current = $this->withRights('anleger', ['view_accounts', 'create_users']);
         $res = $this->call('POST', '/users', ['first_name' => 'Erika', 'phone' => '+49 171 1234567', 'address' => self::ADDRESS]);
         $this->assertSame(201, $res->status, (string) json_encode($res->data));
         $this->users->current = $this->admin;
@@ -224,7 +224,7 @@ final class PersonalInfoTest extends TestCase
             ['key' => 'guest', 'label' => 'Gast', 'capabilities' => []],
             ['key' => 'member', 'label' => 'Mitglied', 'capabilities' => ['member']],
             ['key' => 'r1', 'label' => 'Schriftführer', 'capabilities' => ['member', 'create_users']],
-            ['key' => 'r2', 'label' => 'Kasse', 'capabilities' => ['member', 'manage_penalties']],
+            ['key' => 'r2', 'label' => 'Kasse', 'capabilities' => ['member', 'view_penalties', 'manage_penalties']],
             ['key' => 'admin', 'label' => 'Admin', 'capabilities' => []],
         ]);
         $settings->set(RoleService::OVERRIDES_SETTING, [
@@ -240,6 +240,43 @@ final class PersonalInfoTest extends TestCase
         $this->assertTrue($has($b, 'view_personal') && $has($b, 'manage_personal'), 'zusätzlich gegeben');
         $this->assertFalse($has($c, 'view_personal') || $has($c, 'manage_personal'), 'entzogen');
         $this->assertNotContains('view_personal', $app->roles()->all()['r2']['capabilities']);
+    }
+
+    /** Nach dem Update: Wer Mitglieder anlegt, verwaltet die Ehemaligen weiter (migrateFormerRights, manage_former). */
+    public function testRolesWithCreateUsersKeepManagingFormer(): void
+    {
+        $db = TestApp::connection();
+        $settings = new MemorySettings();
+        $users = new FakeUsers();
+        TestApp::create($db, $users, settings: $settings, features: false);
+        $a = $users->add('a', 'r1');
+        $b = $users->add('b', Roles::MEMBER);
+        $c = $users->add('c', 'r1');
+        $settings->set(RoleService::SETTING, [
+            ['key' => 'guest', 'label' => 'Gast', 'capabilities' => []],
+            ['key' => 'member', 'label' => 'Mitglied', 'capabilities' => ['member']],
+            ['key' => 'r1', 'label' => 'Schriftführer', 'capabilities' => ['member', 'create_users']],
+            ['key' => 'r2', 'label' => 'Kasse', 'capabilities' => ['member', 'view_penalties', 'manage_penalties']],
+            ['key' => 'admin', 'label' => 'Admin', 'capabilities' => []],
+        ]);
+        $settings->set(RoleService::OVERRIDES_SETTING, [
+            ['user' => $b, 'grant' => ['create_users'], 'revoke' => []],
+            ['user' => $c, 'grant' => [], 'revoke' => ['create_users']],
+        ]);
+        $settings->delete(RoleService::FORMER_SETTING);
+
+        $app = TestApp::create($db, $users, settings: $settings, features: false);
+        $this->assertTrue($settings->get(RoleService::FORMER_SETTING));
+        $has = static fn (int $id): bool => in_array('manage_former', array_map(static fn ($x): string => $x->value, $users->find($id)?->capabilities ?? []), true);
+        $this->assertTrue($has($a), 'Rolle mit create_users');
+        $this->assertTrue($has($b), 'zusätzlich gegeben');
+        $this->assertFalse($has($c), 'entzogen');
+        $this->assertNotContains('manage_former', $app->roles()->all()['r2']['capabilities']);
+
+        // Nur einmal: Nimmt der Admin es danach weg, kommt es nicht wieder.
+        $app->roles()->update('r1', ['capabilities' => ['member', 'view_accounts', 'create_users']]);
+        TestApp::create($db, $users, settings: $settings, features: false);
+        $this->assertFalse($has($a));
     }
 
     /** Datenbankversion 35: Spalten der Adresse; vorhandene Handynummern bleiben. */

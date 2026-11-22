@@ -9,11 +9,13 @@ use KompanieApp\Core\Auth\PreviewEnvironment;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Config\KompanieConfig;
 use KompanieApp\Core\Domain\ActivityService;
+use KompanieApp\Core\Domain\LanguageService;
 use KompanieApp\Core\Domain\ChangeLogService;
 use KompanieApp\Core\Domain\AttendanceService;
 use KompanieApp\Core\Domain\BackupEncryptionService;
 use KompanieApp\Core\Domain\BackupUploadService;
 use KompanieApp\Core\Domain\PersonalDataExport;
+use KompanieApp\Core\Domain\ReportService;
 use KompanieApp\Core\Domain\BirthdayService;
 use KompanieApp\Core\Domain\BoardMailService;
 use KompanieApp\Core\Domain\BoardService;
@@ -21,10 +23,14 @@ use KompanieApp\Core\Domain\BugReportService;
 use KompanieApp\Core\Domain\CalendarService;
 use KompanieApp\Core\Domain\DocumentService;
 use KompanieApp\Core\Domain\DriveClient;
+use KompanieApp\Core\Domain\AdmissionService;
+use KompanieApp\Core\Domain\EventKindService;
+use KompanieApp\Core\Domain\EventResponseService;
 use KompanieApp\Core\Domain\EventService;
 use KompanieApp\Core\Domain\Features;
 use KompanieApp\Core\Domain\FileMediaStore;
 use KompanieApp\Core\Domain\FormerMemberService;
+use KompanieApp\Core\Domain\GalleryDriveService;
 use KompanieApp\Core\Domain\GalleryService;
 use KompanieApp\Core\Domain\GallerySubmissionService;
 use KompanieApp\Core\Domain\NewsService;
@@ -43,16 +49,21 @@ use KompanieApp\Core\Domain\RoleService;
 use KompanieApp\Core\Domain\ScoreService;
 use KompanieApp\Core\Domain\SettingsService;
 use KompanieApp\Core\Domain\ServerBackupService;
+use KompanieApp\Core\Domain\TileLayoutService;
 use KompanieApp\Core\Domain\TitleService;
 use KompanieApp\Core\Domain\StatusService;
 use KompanieApp\Core\Domain\Time;
+use KompanieApp\Core\Domain\TranslationService;
 use KompanieApp\Core\Domain\MaintenanceService;
 use KompanieApp\Core\Domain\NavigationService;
 use KompanieApp\Core\Domain\MemberPhotoService;
 use KompanieApp\Core\Domain\InventoryService;
 use KompanieApp\Core\Domain\OfficeService;
 use KompanieApp\Core\Domain\CompanyService;
+use KompanieApp\Core\Domain\ContentTranslations;
 use KompanieApp\Core\Domain\SponsorService;
+use KompanieApp\Core\Domain\PassiveImportService;
+use KompanieApp\Core\Domain\PassiveMemberService;
 use KompanieApp\Core\Domain\ListService;
 use KompanieApp\Core\Domain\MailGroupService;
 use KompanieApp\Core\Domain\MailingService;
@@ -61,6 +72,7 @@ use KompanieApp\Core\Domain\BackupDownload;
 use KompanieApp\Core\Domain\MailService;
 use KompanieApp\Core\Domain\RichImageService;
 use KompanieApp\Core\Domain\SignatureService;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Mail\PhpMailerMailer;
 use KompanieApp\Core\Domain\UserNames;
 use KompanieApp\Core\Http\Api;
@@ -112,6 +124,7 @@ final class App
     public const TASKS = [
         GalleryService::TASK => 3600,
         GalleryService::PROCESS_TASK => 3600,
+        GalleryDriveService::TASK => 3600,
         CalendarService::TASK => 3600,
         UpdateService::TASK => UpdateService::INTERVAL,
         StatusReporter::TASK => StatusReporter::INTERVAL,
@@ -122,6 +135,7 @@ final class App
         MailingService::CLEANUP_TASK => 86400,
         PollService::TASK => 3600,
         BirthdayService::TASK => 3600,
+        PassiveMemberService::TASK => 3600,
         BugReportService::TASK => BugReportService::INTERVAL,
         BackupUploadService::TASK => BackupUploadService::INTERVAL,
         ServerBackupService::TASK => ServerBackupService::INTERVAL,
@@ -174,16 +188,22 @@ final class App
         public readonly array $packageConfig = [],
         /** Mailversand; ohne Angabe PHPMailer über SMTP mit den Einstellungen (MailService). Tests setzen einen Test-Mailer. */
         private readonly ?Mailer $customMailer = null,
+        /** Where the website is served (Issue #273); null where there is none (WordPress manages its own pages). */
+        public readonly ?\KompanieApp\Core\Port\WebsiteHost $websiteHost = null,
     ) {
         // Vorschau „App als Rolle ansehen“ (Issue #63): Wer die Anfrage stellt und die Adressen geschützter Dateien gehen
         // über die Vorschau – so gilt sie überall gleich, ohne dass Dienste oder Adapter sie kennen müssen.
-        $this->preview = new Preview($authContext, fn (): RoleService => $this->roles());
+        // Basissprache der Kompanie: Sprache der Inhalte und Vorgabe, bis die Anfrage ihre Sprache setzt (Http\Api)
+        I18n::setBase($config->language());
+        $this->preview = new Preview($authContext, fn (): RoleService => $this->roles(), fn (): UserDirectory => $this->users);
         $this->authContext = $this->preview;
         $this->env = new PreviewEnvironment($env, $this->preview);
         // Eigene Bereichsnamen der Installation (Issue #362) gehen überall vor kompanie.json.
+        // In einer weiteren Sprache die Namen, die der Admin für sie eingetragen hat (TranslationService).
         $config->overrideSections(fn (): array => $this->navigation()->sectionOverrides(
             $this->features()->enabled('directory'),
             $this->features()->enabled('offices'),
+            I18n::locale(),
         ));
     }
 
@@ -247,6 +267,12 @@ final class App
         } catch (\Throwable $e) {
             error_log('Kompanie-App: Recht „Galerie verwalten“ nicht ergänzt: ' . $e->getMessage());
         }
+        // News im Editor der WordPress-Seite schreiben: Standardrolle „News verwalten“ einmalig auch für die Quelle site
+        try {
+            $this->newsService()->initialize();
+        } catch (\Throwable $e) {
+            error_log('Kompanie-App: Rolle „News verwalten“ nicht angelegt: ' . $e->getMessage());
+        }
         // Fehlermeldungen zuerst an die Admins: Benachrichtigungen dazu einmalig auf bestehenden Geräten einschalten
         try {
             $this->bugReports()->initialize();
@@ -285,6 +311,8 @@ final class App
         $wanted = [
             GalleryService::TASK => $gallery,
             GalleryService::PROCESS_TASK => $gallery,
+            // Einreichungen und hochgeladene Bilder nach Google Drive: stündlich als Rückfall, nach dem Hochladen vorgezogen.
+            GalleryDriveService::TASK => $gallery && $this->gallery()->driveConfigured(),
             // Termine der App liest der Kalender direkt aus der Datenbank: nichts zu erneuern.
             CalendarService::TASK => $this->features()->enabled('calendar') && $this->calendar()->isConfigured() && !$this->calendar()->inApp(),
             UpdateService::TASK => $this->updates()->configured(),
@@ -304,6 +332,8 @@ final class App
             PollService::TASK => $this->features()->enabled('polls'),
             // Geburtstage: stündlich, benachrichtigt aber erst ab der eingestellten Stunde (Standard 7 Uhr) Ortszeit und je Geburtstag einmal am Tag.
             BirthdayService::TASK => $this->features()->enabled('birthdays'),
+            // Geburtstage der Passiven: stündlich, erinnert ab derselben Stunde, nur mit eingestellten Altern.
+            PassiveMemberService::TASK => $this->features()->enabled(PassiveMemberService::FEATURE) && $this->passives()->birthdayAges() !== [],
             // Fehlermeldungen (Issue #64): stündlich als Rückfall, nach dem Weiterleiten vorgezogen; räumt auch ohne
             // Empfänger den Eingang auf (erledigte Meldungen nach 30 Tagen).
             BugReportService::TASK => true,
@@ -376,11 +406,21 @@ final class App
                 $this->gallery()->runProcessTask(25);
                 $this->gallerySubmissions()->pruneOrphans();
                 $this->videoUploads()->prune();
+                // Fertig aufbereitete Uploads in Alben aus Drive dorthin bringen (eigene Aufgabe mit eigenem Zeitbudget)
+                if ($this->galleryDrive()->hasWaiting()) {
+                    $this->scheduler->runSoon(GalleryDriveService::TASK);
+                }
+            } elseif ($task === GalleryDriveService::TASK && $this->features()->enabled('gallery')) {
+                $this->galleryDrive()->runTask();
+                if ($this->galleryDrive()->hasWaiting()) {
+                    $this->scheduler->runSoon(GalleryDriveService::TASK);
+                }
             } elseif ($task === CalendarService::TASK && $this->features()->enabled('calendar')) {
                 $error = $this->calendar()->refreshIfStale();
                 if ($error !== null) {
                     $this->telemetry()->record(Code::CalendarFetch, Detail::of($this->calendar()->source(), Detail::fromMessage($error)), $error);
                 }
+                $this->eventResponses()->cleanup();
             } elseif ($task === UpdateService::TASK) {
                 $this->updateUploads()->prune();
                 $last = $this->updates()->status()['last'] ?? null;
@@ -409,6 +449,8 @@ final class App
                 $this->polls()->remind();
             } elseif ($task === BirthdayService::TASK && $this->features()->enabled('birthdays')) {
                 $this->birthdays()->notifyToday();
+            } elseif ($task === PassiveMemberService::TASK) {
+                $this->passives()->remindBirthdays();
             } elseif ($task === BugReportService::TASK) {
                 $this->bugReports()->runTask();
             } elseif ($task === BackupUploadService::TASK) {
@@ -597,13 +639,13 @@ final class App
 
     public function events(): EventService
     {
-        return $this->service(EventService::class, fn () => new EventService(new EventRepository($this->db), $this->time()));
+        return $this->service(EventService::class, fn () => new EventService(new EventRepository($this->db), $this->time(), false, fn (): ContentTranslations => $this->contentTranslations()));
     }
 
     /** Termine des internen Kalenders in der App (Quelle „app“), getrennt von den öffentlichen. */
     public function internalEvents(): EventService
     {
-        return $this->service('internal_events', fn () => new EventService(new EventRepository($this->db, EventRepository::INTERNAL), $this->time()));
+        return $this->service('internal_events', fn () => new EventService(new EventRepository($this->db, EventRepository::INTERNAL), $this->time(), true, fn (): ContentTranslations => $this->contentTranslations()));
     }
 
     public function scores(): ScoreService
@@ -632,6 +674,23 @@ final class App
     public function attendance(): AttendanceService
     {
         return $this->service(AttendanceService::class, fn () => new AttendanceService($this));
+    }
+
+    /** Zu- und Absagen bei Terminen des internen Kalenders. */
+    public function eventResponses(): EventResponseService
+    {
+        return $this->service(EventResponseService::class, fn () => new EventResponseService($this));
+    }
+
+    public function eventKinds(): EventKindService
+    {
+        return $this->service(EventKindService::class, fn () => new EventKindService($this));
+    }
+
+    /** Aufnahmen: Anwärter, die die Voraussetzung für die Aufnahme als Mitglied erfüllen */
+    public function admissions(): AdmissionService
+    {
+        return $this->service(AdmissionService::class, fn () => new AdmissionService($this));
     }
 
     public function board(): BoardService
@@ -713,6 +772,30 @@ final class App
         return $this->service(JoinYearService::class, fn () => new JoinYearService($this));
     }
 
+    /** Eigene Namen je weiterer Sprache (Plan „Mehrsprachigkeit“) */
+    public function translations(): TranslationService
+    {
+        return $this->service(TranslationService::class, fn () => new TranslationService($this));
+    }
+
+    /** Inhalte je weiterer Sprache (Plan „Mehrsprachigkeit“, PR 9b) */
+    public function contentTranslations(): ContentTranslations
+    {
+        return $this->service(ContentTranslations::class, fn () => new ContentTranslations($this));
+    }
+
+    /** Sprachen der App: eingeschaltete und die Wahl je Konto (Plan „Mehrsprachigkeit“) */
+    public function languages(): LanguageService
+    {
+        return $this->service(LanguageService::class, fn () => new LanguageService($this->settings, new UserSettings($this->db)));
+    }
+
+    /** Anordnung der Kacheln: persönlich je Konto und Vorgabe für alle */
+    public function tileLayouts(): TileLayoutService
+    {
+        return $this->service(TileLayoutService::class, fn () => new TileLayoutService(new UserSettings($this->db), $this->settings));
+    }
+
     public function memberPhotos(): MemberPhotoService
     {
         return $this->service(MemberPhotoService::class, fn () => new MemberPhotoService($this));
@@ -751,6 +834,17 @@ final class App
         return $this->service(SponsorService::class, fn () => new SponsorService($this));
     }
 
+    /** Passive (Bereich passive): eigene Einträge ohne Konto, mit Betreuer */
+    public function passives(): PassiveMemberService
+    {
+        return $this->service(PassiveMemberService::class, fn () => new PassiveMemberService($this));
+    }
+
+    public function passiveImport(): PassiveImportService
+    {
+        return $this->service(PassiveImportService::class, fn () => new PassiveImportService($this));
+    }
+
     /** Kompanieliste (Issue #280, Bereich companies) */
     public function companies(): CompanyService
     {
@@ -774,6 +868,7 @@ final class App
             $this->memberContacts(),
             $this->time(),
             new UserSettings($this->db),
+            fn (int $id, string $old, string $new) => $this->admissions()->baseRoleSet($id, $old, $new),
         ));
     }
 
@@ -827,7 +922,7 @@ final class App
 
     public function navigation(): NavigationService
     {
-        return $this->service(NavigationService::class, fn () => new NavigationService($this->settings));
+        return $this->service(NavigationService::class, fn () => new NavigationService($this->settings, $this->translations()));
     }
 
     public function settingsService(): SettingsService
@@ -861,6 +956,12 @@ final class App
     public function personalData(): PersonalDataExport
     {
         return $this->service(PersonalDataExport::class, fn () => new PersonalDataExport($this));
+    }
+
+    /** Bericht als PDF: Daten mehrerer Bereiche für einen Zeitraum */
+    public function reports(): ReportService
+    {
+        return $this->service(ReportService::class, fn () => new ReportService($this));
     }
 
     /** Sicherungen automatisch in Google Drive */
@@ -904,6 +1005,7 @@ final class App
             $this->scheduler,
             $this->cache,
             $this->mediaStore(),
+            fn (): ContentTranslations => $this->contentTranslations(),
         ));
     }
 
@@ -924,6 +1026,12 @@ final class App
         return $this->service(PageService::class, fn () => new PageService($this));
     }
 
+    /** Website for visitors (Issue #273, area website) */
+    public function website(): \KompanieApp\Core\Domain\WebsiteService
+    {
+        return $this->service(\KompanieApp\Core\Domain\WebsiteService::class, fn () => new \KompanieApp\Core\Domain\WebsiteService($this));
+    }
+
     /** Vorgefertigte Blöcke (eigene Seiten): Typen, Prüfung, Ausgabe. */
     public function blocks(): Blocks
     {
@@ -940,6 +1048,12 @@ final class App
     public function videoUploads(): VideoUploadService
     {
         return $this->service(VideoUploadService::class, fn () => new VideoUploadService($this));
+    }
+
+    /** Einreichungen und hochgeladene Bilder in Google Drive ablegen (mit vollem Drive-Zugriff) */
+    public function galleryDrive(): GalleryDriveService
+    {
+        return $this->service(GalleryDriveService::class, fn () => new GalleryDriveService($this));
     }
 
     public function gallerySubmissions(): GallerySubmissionService

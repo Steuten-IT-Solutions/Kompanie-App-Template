@@ -1,11 +1,14 @@
 import { useState, type ReactNode } from 'react';
 import { defaultSections } from '../generated/brand';
 import { adminTabs, adminTileCatalog } from '../adminNav';
-import { api, applyNavigation, config, type Feature, type NavigationAdmin, type PageSummary } from '../api';
+import { t } from '../i18n';
+import { api, applyNavigation, config, levelLabel, type Capability, type Feature, type NavigationAdmin, type PageSummary } from '../api';
 import { useDragSort } from '../dragSort';
 import {
   draftError,
   draftOf,
+  guestDraftOf,
+  INTERN_TARGETS,
   internOrderOf,
   isPageTarget,
   mergeOrder,
@@ -16,10 +19,12 @@ import {
   moveTo,
   NAV_ICONS,
   NAV_TARGETS,
+  pageAllowedForGuests,
   pageTarget,
   placeOf,
   removeMenu,
   startChoices,
+  targetAllowed,
   targetIcon,
   unplaced,
   type FixedTarget,
@@ -34,44 +39,30 @@ import {
 import { ErrorBox, Loading, useAsync } from '../ui';
 import { confirmAsk } from '../ask';
 
-/** Bereiche der App, ohne die ein Punkt der Navigation für niemanden erscheint. */
-const FEATURES: Record<FixedTarget, Feature[]> = {
-  termine: ['events', 'calendar', 'birthdays'],
-  news: ['news'],
-  galerie: ['gallery'],
-  kompanien: ['companies'],
-  sponsoren: ['sponsors'],
-  mitglieder: ['directory', 'offices'],
-  dokumente: ['documents'],
-  brett: ['board'],
-  dienstgrade: ['ranks'],
-  punktekatalog: ['points'],
-};
-
 const ICON_LABELS: Record<string, string> = {
-  ordner: 'Ordner',
-  termine: 'Kalender',
-  news: 'Zeitung',
-  galerie: 'Bild',
-  kompanien: 'Schild',
-  sponsoren: 'Herz',
-  mitglieder: 'Personen',
-  dokumente: 'Dokument',
-  brett: 'Brett',
-  dienstgrade: 'Abzeichen',
-  punktekatalog: 'Liste',
-  seiten: 'Seite',
-  stern: 'Stern',
-  info: 'Info',
-  karte: 'Karte',
-  musik: 'Musik',
-  pokal: 'Pokal',
-  glocke: 'Glocke',
-  fahne: 'Fahne',
-  kamera: 'Kamera',
-  haus: 'Haus',
-  buch: 'Buch',
-  uhr: 'Uhr',
+  ordner: t('Ordner'),
+  termine: t('Kalender'),
+  news: t('Zeitung'),
+  galerie: t('Bild'),
+  kompanien: t('Schild'),
+  sponsoren: t('Herz'),
+  mitglieder: t('Personen'),
+  dokumente: t('Dokument'),
+  brett: t('Brett'),
+  dienstgrade: t('Abzeichen'),
+  punktekatalog: t('Liste'),
+  seiten: t('Seite'),
+  stern: t('Stern'),
+  info: t('Info'),
+  karte: t('Karte'),
+  musik: t('Musik'),
+  pokal: t('Pokal'),
+  glocke: t('Glocke'),
+  fahne: t('Fahne'),
+  kamera: t('Kamera'),
+  haus: t('Haus'),
+  buch: t('Buch'),
+  uhr: t('Uhr'),
 };
 
 /** Ab so vielen Punkten unten (mit Verwaltung und Meins) wird es auf schmalen Handys eng (Issue #362). */
@@ -97,9 +88,18 @@ function defaultLabel(t: string, pages: PageSummary[]): string {
   return fixed[t] ?? pages.find((p) => pageTarget(p.id) === t)?.title ?? t;
 }
 
-const isOn = (t: NavTarget): boolean => (isPageTarget(t) ? !!config?.features.pages : FEATURES[t].some((f) => !!config?.features[f]));
+const featureOn = (f: Feature): boolean => !!config?.features[f];
+
+/** Ist der Bereich an (sieht ihn mit den nötigen Rechten überhaupt jemand)? Sonst steht er für niemanden in der Leiste. */
+const isOn = (t: NavTarget): boolean => (isPageTarget(t) ? featureOn('pages') : targetAllowed(t, () => true, featureOn));
+
+/** Rechte der Rolle Gast; sie gelten auch ohne Anmeldung. */
+const guestCan = (cap: Capability): boolean => (config?.guestCapabilities ?? []).includes(cap);
 
 type Labels = Record<string, string | undefined>;
+
+/** Bezeichnung der Rolle Gast in dieser Installation. */
+const GUEST_LABEL = (): string => levelLabel('guest');
 
 /**
  * Einstellungen → Navigation (Issue #277): Hauptpunkte der Tab-Leiste ordnen, Bereiche in Untermenüs schieben oder
@@ -112,12 +112,20 @@ export default function NavigationEinstellen({ onToast }: { onToast: (msg: strin
   const pagesOn = !!config?.features.pages;
   const pages = useAsync(pagesOn ? api.pages : () => Promise.resolve([] as PageSummary[]), [pagesOn]);
   if ((loading && !data) || (pages.loading && !pages.data)) return <Loading shape="form" />;
-  if (error || !data) return <ErrorBox message={error ?? 'Die Navigation konnte nicht geladen werden.'} onRetry={reload} />;
+  if (error || !data) return <ErrorBox message={error ?? t('Die Navigation konnte nicht geladen werden.')} onRetry={reload} />;
   if (pages.error || !pages.data)
-    return <ErrorBox message={pages.error ?? 'Die Seiten konnten nicht geladen werden.'} onRetry={pages.reload} />;
+    return <ErrorBox message={pages.error ?? t('Die Seiten konnten nicht geladen werden.')} onRetry={pages.reload} />;
   return (
     <Editor
-      key={JSON.stringify([data.navigation, data.names, data.start, data.show_labels, data.intern_order, data.admin_order])}
+      key={JSON.stringify([
+        data.navigation,
+        data.guest_navigation,
+        data.names,
+        data.start,
+        data.show_labels,
+        data.intern_order,
+        data.admin_order,
+      ])}
       data={data}
       pages={pages.data}
       onSaved={setData}
@@ -152,6 +160,24 @@ function Editor({
   const [adminStart, setAdminStart] = useState<string[]>(() => startOrder(data.admin_order));
   const [adminSetup, setAdminSetup] = useState<string[]>(() => setupOrder(data.admin_order));
   const [draft, setDraft] = useState<NavigationSetting>(initial);
+  // Leiste für Gäste (ohne Anmeldung und mit der Grundrolle Gast): eigene oder dieselbe wie für Angemeldete.
+  const savedGuest = data.guest_navigation ?? null;
+  const [who, setWho] = useState<'member' | 'guest'>('member');
+  const [guestOwn, setGuestOwn] = useState(savedGuest !== null);
+  const [guestDraft, setGuestDraft] = useState<NavigationSetting>(() =>
+    savedGuest !== null ? draftOf(savedGuest) : guestDraftOf(initial),
+  );
+  const editingGuest = who === 'guest';
+  // Sehen Gäste den Punkt (Bereich an, Recht der Rolle Gast, bei eigenen Seiten deren Zielgruppe)?
+  const audience = new Map<string, string>(pages.map((p) => [pageTarget(p.id), p.audience]));
+  const forGuests = (t: NavTarget): boolean =>
+    isPageTarget(t) ? featureOn('pages') && pageAllowedForGuests(audience.get(t), guestCan) : targetAllowed(t, guestCan, featureOn);
+  // Zur Auswahl steht nur, was in der gerade bearbeiteten Leiste erscheinen kann. Der Rest behält im Entwurf seinen Platz
+  // (auch gespeicherte Punkte), erscheint aber nicht: Wird der Bereich eingeschaltet bzw. bekommt Gast das Recht, steht er
+  // wieder hier.
+  const avail = (t: string): t is NavTarget => known(t) && (editingGuest ? forGuests(t) : isOn(t));
+  // Entwurf, den die Liste gerade zeigt und ändert
+  const cur = editingGuest ? guestDraft : draft;
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const custom = data.navigation !== null;
@@ -162,17 +188,27 @@ function Editor({
   const labels: Labels = Object.fromEntries(
     [...NAV_TARGETS, ...pageTargets, 'intern'].map((t) => [t, names[t]?.label?.trim() || defaultLabel(t, pages)]),
   );
-  const problem = draftError(draft, data.label_max) ?? namesError(names, data.label_max);
-  const menus = draft.items.filter((i): i is NavMenuSetting => typeof i !== 'string');
-  const newOnes = unplaced(draft, pageTargets);
-  const mainCount = (keepDefault ? 5 : draft.items.length + newOnes.length) + 2;
+  const guestProblem = guestOwn ? draftError(guestDraft, data.label_max) : null;
+  const problem =
+    draftError(draft, data.label_max) ??
+    (guestProblem ? t('Leiste für Gäste: {problem}', { problem: guestProblem }) : null) ??
+    namesError(names, data.label_max);
+  const menus = cur.items.filter((i): i is NavMenuSetting => typeof i !== 'string');
+  const newOnes = unplaced(cur, pageTargets).filter(avail);
+  // Hauptpunkte in der Liste: Bereiche, die erscheinen können, und alle Untermenüs (ein leeres meldet draftError)
+  const shownItems = cur.items.filter((i) => typeof i !== 'string' || avail(i));
+  const shownCount = shownItems.filter((i) => typeof i === 'string' || i.items.length === 0 || i.items.some(avail)).length;
+  // Nicht aufgeführt, weil sie in dieser Leiste nicht erscheinen können
+  const unavailable = [...NAV_TARGETS, ...pageTargets].filter((t) => !avail(t));
+  // Punkte unten: Angemeldete haben dazu Verwaltung und Meins, Gäste ohne Anmeldung keins von beiden.
+  const mainCount = editingGuest ? shownCount + newOnes.length : (keepDefault ? 5 : shownCount + newOnes.length) + 2;
   const duplicates = duplicateNames(
-    Object.fromEntries(Object.entries(labels).filter(([k]) => k !== 'intern' && known(k) && isOn(k) && !draft.hidden.includes(k))),
-    keepDefault ? [labels.intern ?? ''] : menus.map((m) => m.label.trim()),
+    Object.fromEntries(Object.entries(labels).filter(([k]) => k !== 'intern' && avail(k) && !cur.hidden.includes(k))),
+    keepDefault && !editingGuest ? [labels.intern ?? ''] : menus.map((m) => m.label.trim()),
   );
 
   const change = (next: NavigationSetting) => {
-    setDraft(next);
+    (editingGuest ? setGuestDraft : setDraft)(next);
     setSaveError(null);
   };
   const rename = (key: string, patch: { label?: string; icon?: string }) => {
@@ -194,9 +230,10 @@ function Editor({
     const standardIntern = typeof std === 'object' ? std.items : [];
     const ownIntern = keepDefault && internOrder.join() !== standardIntern.join() ? internOrder : null;
     const body = reset
-      ? { navigation: null, names: {}, start: {}, show_labels: true, intern_order: null }
+      ? { navigation: null, guest_navigation: null, names: {}, start: {}, show_labels: true, intern_order: null }
       : {
           navigation: keepDefault ? null : draft,
+          guest_navigation: guestOwn ? guestDraft : null,
           names: clean,
           start,
           show_labels: showLabels,
@@ -209,7 +246,7 @@ function Editor({
       const next = await api.saveNavigation(body);
       applyNavigation(next);
       onSaved(next);
-      onToast(reset ? 'Standardnavigation wiederhergestellt' : 'Navigation gespeichert');
+      onToast(reset ? t('Standardnavigation wiederhergestellt') : t('Navigation gespeichert'));
       if (reload) setTimeout(() => window.location.reload(), 800);
     } catch (err) {
       setSaveError((err as Error).message);
@@ -219,17 +256,31 @@ function Editor({
   }
 
   /** Startseite: Auswahl aus dem, was in der Leiste steht (für Angemeldete auch „Meins“). */
-  const startLabel = (t: string): string => {
-    if (t === 'meins') return 'Meins';
-    if (t === 'intern') return labels.intern ?? defaultLabel('intern', pages);
-    const m = /^menue\/(\d+)$/.exec(t);
-    if (m) return `Untermenü „${menus[Number(m[1]) - 1]?.label.trim() || `Menü ${m[1]}`}“`;
-    return labels[t] ?? t;
+  const startLabel = (target: string): string => {
+    if (target === 'meins') return t('Meins');
+    if (target === 'intern') return labels.intern ?? defaultLabel('intern', pages);
+    return labels[target] ?? target;
   };
   const startSelect = (who: 'guest' | 'member', title: string) => {
-    const choices = startChoices(keepDefault ? null : draft, who === 'member', pageTargets).filter(
-      (t) => !known(t) || (isOn(t) && !draft.hidden.includes(t)),
-    );
+    // Gäste: ihre eigene Leiste, sonst die der Angemeldeten
+    const own = who === 'guest' && guestOwn;
+    const nav = own ? guestDraft : draft;
+    const navMenus = nav.items.filter((i): i is NavMenuSetting => typeof i !== 'string');
+    // Nur, was diese Personen sehen können: Gäste mit den Rechten der Rolle Gast, Angemeldete alles, was an ist.
+    const ok = (t: string): boolean => known(t) && (who === 'guest' ? forGuests(t) : isOn(t));
+    const standard = !own && keepDefault;
+    const choices = startChoices(own ? guestDraft : keepDefault ? null : draft, who === 'member', pageTargets).filter((t) => {
+      if (known(t)) return ok(t) && !nav.hidden.includes(t);
+      const menu = /^menue\/(\d+)$/.exec(t);
+      if (menu) return navMenus[Number(menu[1]) - 1]?.items.some(ok) ?? false;
+      // „Intern“ der Standardnavigation: nur mit dem Recht „Intern“ (Gäste: das der Rolle Gast) und etwas darin
+      if (t === 'intern') return standard && (who === 'member' || guestCan('view_intern')) && INTERN_TARGETS.some(ok);
+      return true;
+    });
+    const menuLabel = (n: number): string => {
+      const m = navMenus[n - 1];
+      return t('Untermenü „{name}“', { name: m?.label.trim() || t('Menü {n}', { n }) });
+    };
     return (
       <label className="field">
         <span>{title}</span>
@@ -241,10 +292,10 @@ function Editor({
             setSaveError(null);
           }}
         >
-          <option value="">Erster Punkt der Leiste</option>
+          <option value="">{t('Erster Punkt der Leiste')}</option>
           {choices.map((t) => (
             <option key={t} value={t}>
-              {startLabel(t)}
+              {/^menue\/\d+$/.test(t) ? menuLabel(Number(t.slice(6))) : startLabel(t)}
             </option>
           ))}
         </select>
@@ -255,8 +306,8 @@ function Editor({
   function updateMenu(index: number, patch: Partial<NavMenuSetting>) {
     let m = -1;
     change({
-      ...draft,
-      items: draft.items.map((i) => {
+      ...cur,
+      items: cur.items.map((i) => {
         if (typeof i === 'string') return i;
         m++;
         return m === index ? { ...i, ...patch } : i;
@@ -265,27 +316,27 @@ function Editor({
   }
 
   function addMenu() {
-    change({ ...draft, items: [...draft.items, { label: `Menü ${menus.length + 1}`, icon: 'ordner', items: [] }] });
+    change({ ...cur, items: [...cur.items, { label: `Menü ${menus.length + 1}`, icon: 'ordner', items: [] }] });
   }
 
   /** Auswahl „Platz“ eines Bereichs: unten, in einem Untermenü oder nicht in der Navigation. */
-  const placeSelect = (t: NavTarget) => (
+  const placeSelect = (target: NavTarget) => (
     <select
-      aria-label={`Platz von ${labels[t]}`}
-      value={String(placeOf(draft, t))}
+      aria-label={t('Platz von {name}', { name: labels[target] ?? target })}
+      value={String(placeOf(cur, target))}
       disabled={busy}
       onChange={(e) => {
         const v = e.target.value;
-        change(moveTo(draft, t, (v === 'main' || v === 'hidden' ? v : Number(v)) as NavPlace));
+        change(moveTo(cur, target, (v === 'main' || v === 'hidden' ? v : Number(v)) as NavPlace));
       }}
     >
-      <option value="main">Unten in der Leiste</option>
+      <option value="main">{t('Unten in der Leiste')}</option>
       {menus.map((m, i) => (
         <option key={i} value={i}>
-          Im Untermenü „{m.label.trim() || `Menü ${i + 1}`}“
+          {t('Im Untermenü „{name}“', { name: m.label.trim() || t('Menü {n}', { n: i + 1 }) })}
         </option>
       ))}
-      <option value="hidden">Nicht in der Navigation</option>
+      <option value="hidden">{t('Nicht in der Navigation')}</option>
     </select>
   );
 
@@ -294,9 +345,9 @@ function Editor({
     const standard = defaultLabel(key, pages);
     return (
       <details className="nav-rename">
-        <summary>Umbenennen{names[key]?.label?.trim() ? ` (Standard: ${standard})` : ''}</summary>
+        <summary>{names[key]?.label?.trim() ? t('Umbenennen (Standard: {name})', { name: standard }) : t('Umbenennen')}</summary>
         <label className="field">
-          <span>{isPageTarget(key) ? 'Name im Tab (leer = Titel der Seite)' : 'Eigener Name (leer = Standard)'}</span>
+          <span>{isPageTarget(key) ? t('Name im Tab (leer = Titel der Seite)') : t('Eigener Name (leer = Standard)')}</span>
           <input
             type="text"
             value={names[key]?.label ?? ''}
@@ -307,9 +358,9 @@ function Editor({
           />
         </label>
         <label className="field">
-          <span>Symbol</span>
+          <span>{t('Symbol')}</span>
           <select value={names[key]?.icon ?? ''} disabled={busy} onChange={(e) => rename(key, { icon: e.target.value || undefined })}>
-            <option value="">Standard ({ICON_LABELS[fallbackIcon] ?? fallbackIcon})</option>
+            <option value="">{t('Standard ({icon})', { icon: ICON_LABELS[fallbackIcon] ?? fallbackIcon })}</option>
             {NAV_ICONS.map((i) => (
               <option key={i} value={i}>
                 {ICON_LABELS[i] ?? i}
@@ -321,119 +372,196 @@ function Editor({
     );
   };
 
-  const targetRow = (t: NavTarget) => (
+  const targetRow = (target: NavTarget) => (
     <div className="row-main">
-      <span className="row-title">{labels[t]}</span>
-      {isPageTarget(t) && <span className="row-sub row-kind">Eigene Seite</span>}
-      {!isOn(t) && <div className="row-sub">Der Bereich ist ausgeschaltet und erscheint erst, wenn er an ist.</div>}
-      {placeSelect(t)}
-      {renameFields(t, targetIcon(t))}
+      <span className="row-title">{labels[target]}</span>
+      {isPageTarget(target) && <span className="row-sub row-kind">{t('Eigene Seite')}</span>}
+      {placeSelect(target)}
+      {renameFields(target, targetIcon(target))}
     </div>
   );
 
   return (
     <section className="card settings-section" id="einstellungen-navigation">
-      <h3>Navigation</h3>
-      <p className="small">
-        {custom
-          ? 'Zurzeit gilt eure eigene Navigation.'
-          : `Zurzeit gilt die Standardnavigation: Wer das Recht „Intern“ hat, findet die Bereiche unter „${labels.intern}“ gesammelt, alle anderen sehen ${labels.mitglieder} und ${labels.dokumente} als eigene Punkte.`}
-      </p>
-
-      <h4>Unten in der Leiste</h4>
-      <p className="small muted">
-        Zum Ändern der Reihenfolge am Griff ziehen. Je mehr Punkte unten stehen, desto kleiner werden Schrift und Symbole.
-      </p>
-      {mainCount >= CROWDED && (
-        <p className="small muted" role="note">
-          Mit {mainCount} Punkten (mit Verwaltung und Meins) wird es auf schmalen Handys eng.
+      <h3>{t('Navigation')}</h3>
+      <div className="segmented" role="group" aria-label={t('Leiste für')}>
+        {(
+          [
+            ['member', t('Für Angemeldete')],
+            ['guest', t('Für Gäste')],
+          ] as const
+        ).map(([k, text]) => (
+          <button
+            key={k}
+            type="button"
+            className={who === k ? 'active' : ''}
+            aria-pressed={who === k}
+            disabled={busy}
+            onClick={() => setWho(k)}
+          >
+            {text}
+          </button>
+        ))}
+      </div>
+      {editingGuest ? (
+        <>
+          <p className="small">
+            {t('Gäste sind alle ohne Anmeldung und Angemeldete mit der Rolle {guest} (z. B. ehemalige Mitglieder).', {
+              guest: GUEST_LABEL(),
+            })}
+          </p>
+          <label className="toggle">
+            <input
+              type="checkbox"
+              checked={guestOwn}
+              disabled={busy}
+              onChange={(e) => {
+                setGuestOwn(e.target.checked);
+                // Neu eingeschaltet: Kopie der Leiste der Angemeldeten, Mitglieder und Dokumente unten
+                if (e.target.checked && savedGuest === null) setGuestDraft(guestDraftOf(draft));
+                setSaveError(null);
+              }}
+            />
+            <span>{t('Eigene Leiste für Gäste')}</span>
+          </label>
+          {!guestOwn && (
+            <p className="small muted">{t('Gäste sehen dieselbe Leiste wie Angemeldete, jeder nur die Bereiche, die er sehen darf.')}</p>
+          )}
+        </>
+      ) : (
+        <p className="small">
+          {custom
+            ? t('Zurzeit gilt eure eigene Navigation.')
+            : t(
+                'Zurzeit gilt die Standardnavigation: Wer das Recht „Intern“ hat, findet die Bereiche unter „{intern}“ gesammelt, alle anderen sehen {members} und {documents} als eigene Punkte.',
+                { intern: labels.intern ?? '', members: labels.mitglieder ?? '', documents: labels.dokumente ?? '' },
+              )}
         </p>
       )}
-      <MainList
-        draft={draft}
-        onMove={(items) => change({ ...draft, items })}
-        disabled={busy}
-        labels={labels}
-        render={(item, index) => {
-          if (typeof item === 'string') return known(item) ? targetRow(item) : null;
-          return (
-            <div className="row-main nav-menu">
-              <label className="field">
-                <span>Name des Untermenüs</span>
-                <input
-                  type="text"
-                  value={item.label}
-                  maxLength={data.label_max}
-                  disabled={busy}
-                  onChange={(e) => updateMenu(index, { label: e.target.value })}
-                />
-              </label>
-              <label className="field">
-                <span>Symbol</span>
-                <select value={item.icon} disabled={busy} onChange={(e) => updateMenu(index, { icon: e.target.value })}>
-                  {NAV_ICONS.map((i) => (
-                    <option key={i} value={i}>
-                      {ICON_LABELS[i] ?? i}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <SubList
-                items={item.items.filter(known)}
-                disabled={busy}
-                onMove={(next) => updateMenu(index, { items: next })}
-                render={targetRow}
-                labels={labels}
-              />
-              {item.items.length === 0 && <p className="small muted">Noch leer: Wähle bei einem Bereich „Im Untermenü …“.</p>}
-              <button
-                type="button"
-                className="btn btn-small btn-secondary"
-                disabled={busy}
-                onClick={() => change(removeMenu(draft, index))}
-              >
-                Untermenü entfernen
-              </button>
-            </div>
-          );
-        }}
-      />
-      <button type="button" className="btn btn-secondary btn-block" disabled={busy} onClick={addMenu}>
-        Untermenü hinzufügen
-      </button>
 
-      {(draft.hidden.length > 0 || newOnes.length > 0) && (
+      {(!editingGuest || guestOwn) && (
         <>
-          <h4>Nicht in der Navigation</h4>
-          <ul className="card-list">
-            {draft.hidden.filter(known).map((t) => (
-              <li key={t} className="card row">
-                {targetRow(t)}
-              </li>
-            ))}
-            {newOnes.map((t) => (
-              <li key={t} className="card row">
-                <div className="row-main">
-                  <span className="row-title">{labels[t]}</span>
-                  <div className="row-sub">Neu: erscheint hinten in der Leiste, bis du ihm einen Platz gibst.</div>
-                  {placeSelect(t)}
+          <h4>{t('Unten in der Leiste')}</h4>
+          <p className="small muted">
+            {t('Zum Ändern der Reihenfolge am Griff ziehen. Je mehr Punkte unten stehen, desto kleiner werden Schrift und Symbole.')}
+          </p>
+          {mainCount >= CROWDED && (
+            <p className="small muted" role="note">
+              {editingGuest
+                ? t('Mit {count} Punkten wird es auf schmalen Handys eng.', { count: mainCount })
+                : t('Mit {count} Punkten (mit Verwaltung und Meins) wird es auf schmalen Handys eng.', { count: mainCount })}
+            </p>
+          )}
+          <MainList
+            items={shownItems}
+            onMove={(items) => change({ ...cur, items: mergeOrder(cur.items, items) })}
+            disabled={busy}
+            labels={labels}
+            render={(item, index) => {
+              if (typeof item === 'string') return known(item) ? targetRow(item) : null;
+              return (
+                <div className="row-main nav-menu">
+                  <label className="field">
+                    <span>{t('Name des Untermenüs')}</span>
+                    <input
+                      type="text"
+                      value={item.label}
+                      maxLength={data.label_max}
+                      disabled={busy}
+                      onChange={(e) => updateMenu(index, { label: e.target.value })}
+                    />
+                  </label>
+                  <label className="field">
+                    <span>{t('Symbol')}</span>
+                    <select value={item.icon} disabled={busy} onChange={(e) => updateMenu(index, { icon: e.target.value })}>
+                      {NAV_ICONS.map((i) => (
+                        <option key={i} value={i}>
+                          {ICON_LABELS[i] ?? i}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <SubList
+                    items={item.items.filter(avail)}
+                    disabled={busy}
+                    onMove={(next) => updateMenu(index, { items: mergeOrder(item.items, next) })}
+                    render={targetRow}
+                    labels={labels}
+                  />
+                  {item.items.length === 0 ? (
+                    <p className="small muted">{t('Noch leer: Wähle bei einem Bereich „Im Untermenü …“.')}</p>
+                  ) : (
+                    !item.items.some(avail) && (
+                      <p className="small muted">
+                        {editingGuest
+                          ? t('Darin ist zurzeit nichts, was Gäste sehen dürfen: Das Untermenü erscheint nicht.')
+                          : t('Die Bereiche darin sind ausgeschaltet: Das Untermenü erscheint nicht.')}
+                      </p>
+                    )
+                  )}
+                  <button
+                    type="button"
+                    className="btn btn-small btn-secondary"
+                    disabled={busy}
+                    onClick={() => change(removeMenu(cur, index))}
+                  >
+                    {t('Untermenü entfernen')}
+                  </button>
                 </div>
-              </li>
-            ))}
-          </ul>
+              );
+            }}
+          />
+          <button type="button" className="btn btn-secondary btn-block" disabled={busy} onClick={addMenu}>
+            {t('Untermenü hinzufügen')}
+          </button>
+
+          {(cur.hidden.some(avail) || newOnes.length > 0) && (
+            <>
+              <h4>{t('Nicht in der Navigation')}</h4>
+              <ul className="card-list">
+                {cur.hidden.filter(avail).map((t) => (
+                  <li key={t} className="card row">
+                    {targetRow(t)}
+                  </li>
+                ))}
+                {newOnes.map((target) => (
+                  <li key={target} className="card row">
+                    <div className="row-main">
+                      <span className="row-title">{labels[target]}</span>
+                      <div className="row-sub">{t('Neu: erscheint hinten in der Leiste, bis du ihm einen Platz gibst.')}</div>
+                      {placeSelect(target)}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          {unavailable.length > 0 && (
+            <p className="small muted" role="note">
+              {editingGuest
+                ? t(
+                    'Nicht zur Auswahl, weil Gäste sie nicht sehen dürfen oder der Bereich aus ist: {list}. Was Gäste sehen, stellst du bei der Rolle {guest} unter Einstellungen → Rollen ein.',
+                    { list: unavailable.map((x) => labels[x]).join(', '), guest: GUEST_LABEL() },
+                  )
+                : t('Nicht zur Auswahl, weil der Bereich aus ist: {list}. Schaltest du einen ein, steht er wieder hier.', {
+                    list: unavailable.map((x) => labels[x]).join(', '),
+                  })}
+            </p>
+          )}
         </>
       )}
 
-      {!custom && (
+      {!custom && !editingGuest && (
         <>
-          <h4>Untermenü der Standardnavigation</h4>
+          <h4>{t('Untermenü der Standardnavigation')}</h4>
           <ul className="card-list">
             <li className="card row">
               <div className="row-main">
                 <span className="row-title">{labels.intern ?? defaultLabel('intern', pages)}</span>
                 <div className="row-sub">
-                  Sammelt in der Standardnavigation die internen Bereiche. Ihre Reihenfolge änderst du oben im Untermenü am Griff; die
-                  Standardnavigation bleibt dabei erhalten.
+                  {t(
+                    'Sammelt in der Standardnavigation die internen Bereiche. Ihre Reihenfolge änderst du oben im Untermenü am Griff; die Standardnavigation bleibt dabei erhalten.',
+                  )}
                 </div>
                 {renameFields('intern', 'intern')}
               </div>
@@ -442,15 +570,16 @@ function Editor({
         </>
       )}
 
-      <h4>Startseite</h4>
+      <h4>{t('Startseite')}</h4>
       <p className="small muted">
-        Was beim Öffnen der App erscheint. Wer die Startseite nicht sehen darf, landet auf dem ersten Punkt, den er sehen darf. Geteilte
-        Links und Benachrichtigungen öffnen weiter ihre eigene Seite.
+        {t(
+          'Was beim Öffnen der App erscheint. Wer die Startseite nicht sehen darf, landet auf dem ersten Punkt, den er sehen darf. Geteilte Links und Benachrichtigungen öffnen weiter ihre eigene Seite.',
+        )}
       </p>
-      {startSelect('guest', 'Ohne Anmeldung')}
-      {startSelect('member', 'Angemeldet')}
+      {startSelect('guest', t('Für Gäste'))}
+      {startSelect('member', t('Angemeldet'))}
 
-      <h4>Darstellung</h4>
+      <h4>{t('Darstellung')}</h4>
       <label className="toggle">
         <input
           type="checkbox"
@@ -461,17 +590,18 @@ function Editor({
             setSaveError(null);
           }}
         />
-        <span>Namen unter den Symbolen zeigen</span>
+        <span>{t('Namen unter den Symbolen zeigen')}</span>
       </label>
-      {!showLabels && <p className="small muted">Unten stehen nur die Symbole; die Namen stehen weiter oben auf jeder Seite.</p>}
+      {!showLabels && <p className="small muted">{t('Unten stehen nur die Symbole; die Namen stehen weiter oben auf jeder Seite.')}</p>}
 
-      <h4>Verwaltung</h4>
+      <h4>{t('Verwaltung')}</h4>
       <p className="small muted">
-        Reihenfolge der Knöpfe in der Verwaltung, für alle gleich. Zum Ändern am Griff ziehen. Jede Person sieht weiter nur die Knöpfe, die
-        sie nutzen darf.
+        {t(
+          'Reihenfolge der Knöpfe in der Verwaltung, für alle gleich. Zum Ändern am Griff ziehen. Jede Person sieht weiter nur die Knöpfe, die sie nutzen darf.',
+        )}
       </p>
       <AdminOrderList
-        title="Startseite der Verwaltung"
+        title={t('Startseite der Verwaltung')}
         ids={adminStart}
         disabled={busy}
         onChange={(next) => {
@@ -480,7 +610,7 @@ function Editor({
         }}
       />
       <AdminOrderList
-        title="Einrichtungen"
+        title={t('Einrichtungen')}
         ids={adminSetup}
         disabled={busy}
         onChange={(next) => {
@@ -499,13 +629,13 @@ function Editor({
             setSaveError(null);
           }}
         >
-          Standardreihenfolge der Verwaltung
+          {t('Standardreihenfolge der Verwaltung')}
         </button>
       )}
 
       {duplicates.length > 0 && (
         <p className="small muted" role="note">
-          Mehrere Punkte heißen gleich: {duplicates.map((d) => `„${d}“`).join(', ')}.
+          {t('Mehrere Punkte heißen gleich: {list}.', { list: duplicates.map((d) => t('„{name}“', { name: d })).join(', ') })}
         </p>
       )}
       {(problem || saveError) && (
@@ -514,9 +644,10 @@ function Editor({
         </p>
       )}
       <button type="button" className="btn btn-block" disabled={busy || !!problem} onClick={() => void save(false)}>
-        {busy ? 'Speichert …' : 'Navigation speichern'}
+        {busy ? t('Speichert …') : t('Navigation speichern')}
       </button>
       {(custom ||
+        savedGuest !== null ||
         Object.keys(savedNames).length > 0 ||
         Object.keys(savedStart).length > 0 ||
         !data.show_labels ||
@@ -528,13 +659,15 @@ function Editor({
           onClick={async () => {
             if (
               await confirmAsk(
-                'Alles in der Navigation wird zurückgesetzt: Reihenfolge und Untermenüs, eigene Namen und Symbole, Startseiten und die Namen unter den Symbolen. Danach gilt wieder die Standardnavigation.',
+                t(
+                  'Alles in der Navigation wird zurückgesetzt: Reihenfolge und Untermenüs (auch die Leiste für Gäste), eigene Namen und Symbole, Startseiten und die Namen unter den Symbolen. Danach gilt wieder die Standardnavigation.',
+                ),
               )
             )
               void save(true);
           }}
         >
-          Standardnavigation wiederherstellen
+          {t('Standardnavigation wiederherstellen')}
         </button>
       )}
     </section>
@@ -547,7 +680,7 @@ type Item = string | NavMenuSetting;
 function namesError(names: NavNames, labelMax: number): string | null {
   for (const v of Object.values(names)) {
     const label = v?.label?.trim() ?? '';
-    if (label.length > labelMax) return `Ein Name darf höchstens ${labelMax} Zeichen lang sein („${label}“).`;
+    if (label.length > labelMax) return t('Ein Name darf höchstens {max} Zeichen lang sein („{name}“).', { max: labelMax, name: label });
   }
   return null;
 }
@@ -564,28 +697,29 @@ function duplicateNames(labels: Labels, menuLabels: string[]): string[] {
 
 /** Hauptpunkte: per Ziehen am Griff ordnen. */
 function MainList({
-  draft,
+  items,
   onMove,
   disabled,
   render,
   labels,
 }: {
-  draft: NavigationSetting;
+  /** Die gezeigten Hauptpunkte (ohne die, die in dieser Leiste nicht erscheinen können) */
+  items: Item[];
   labels: Labels;
   onMove: (items: Item[]) => void;
   disabled: boolean;
   /** index: Nummer des Untermenüs (ab 0), bei Bereichen -1 */
   render: (item: Item, index: number) => ReactNode;
 }) {
-  const sort = useDragSort(draft.items, onMove, disabled);
+  const sort = useDragSort(items, onMove, disabled);
   let menu = -1;
   return (
     <ul className="card-list">
-      {draft.items.map((item, i) => {
+      {items.map((item, i) => {
         if (typeof item !== 'string') menu++;
         return (
           <li key={typeof item === 'string' ? item : `menu-${i}`} {...sort.itemProps(i, 'card row')}>
-            {draft.items.length > 1 && sort.handle(i, typeof item === 'string' ? (labels[item] ?? item) : item.label)}
+            {items.length > 1 && sort.handle(i, typeof item === 'string' ? (labels[item] ?? item) : item.label)}
             {render(item, typeof item === 'string' ? -1 : menu)}
           </li>
         );
@@ -640,7 +774,7 @@ function AdminOrderList({
   const catalog = adminTileCatalog();
   const shown = ids.filter((id) => catalog[id]?.on);
   const sort = useDragSort(shown, (next) => onChange(mergeOrder(ids, next)), disabled);
-  const own = new Set(adminTabs().map((t) => t.id));
+  const own = new Set(adminTabs().map((tab) => tab.id));
   if (shown.length === 0) return null;
   return (
     <>
@@ -653,7 +787,7 @@ function AdminOrderList({
             {shown.length > 1 && sort.handle(i, catalog[id]?.label ?? id)}
             <div className="row-main">
               <span className="row-title">{catalog[id]?.label ?? id}</span>
-              {id !== SETUP && !own.has(id) && <div className="row-sub">Siehst du selbst nicht (fehlendes Recht).</div>}
+              {id !== SETUP && !own.has(id) && <div className="row-sub">{t('Siehst du selbst nicht (fehlendes Recht).')}</div>}
             </div>
           </li>
         ))}

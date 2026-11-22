@@ -94,7 +94,7 @@ Empfehlung: neuer Bereich `companies` (Bezeichnung „Kompanien“, über `label
 | --- | --- | --- |
 | `name`, `short_name` | Name ja |  |
 | `logo` | nein | Bild wie bei Abzeichen der Dienstgrade, SVG über `SvgSanitizer` |
-| `founded_year` | nein | ab 1800, wie bei den Ämtern |
+| `founded_year` | nein | ganze Zahl ab 1, nicht in der Zukunft |
 | `description` | nein | formatierter Text (`RichText`) |
 | `website_url`, `app_url` | nein | nur `https:` |
 | `office_group_id` | nein | Verknüpfung mit einer Gruppe in *Ämter*, z. B. „Vorstand Kompanie X“; zeigt Hauptmann usw. ohne doppelte Pflege |

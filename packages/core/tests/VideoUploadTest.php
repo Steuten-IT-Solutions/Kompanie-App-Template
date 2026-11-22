@@ -10,6 +10,8 @@ use KompanieApp\Core\Domain\GalleryService;
 use KompanieApp\Core\Domain\VideoUploadService;
 use KompanieApp\Core\Http\Request;
 use KompanieApp\Core\Http\Response;
+use KompanieApp\Core\Push\PushService;
+use KompanieApp\Core\Push\WebPushCrypto;
 use KompanieApp\Core\Storage\Backup;
 use KompanieApp\Core\Tests\Support\FakeUsers;
 use KompanieApp\Core\Tests\Support\TestApp;
@@ -39,7 +41,7 @@ final class VideoUploadTest extends TestCase
         $this->sub = $this->users->add('einreicher', Roles::MEMBER);
         $this->rev = $this->users->add('pruefer', Roles::MEMBER);
         $this->app->roles()->setOverrides($this->users->find($this->admin), $this->sub, ['submit_gallery'], []);
-        $this->app->roles()->setOverrides($this->users->find($this->admin), $this->rev, ['review_gallery'], []);
+        $this->app->roles()->setOverrides($this->users->find($this->admin), $this->rev, ['view_submissions', 'review_gallery'], []);
         $this->users->current = $this->admin;
         $this->ok('PATCH', '/admin/settings', ['gallery_source' => 'server', 'gallery_submissions' => '1']);
         $this->album = (int) $this->ok('POST', '/admin/gallery/albums', ['title' => 'Sommerfest', 'year' => 2026])['id'];
@@ -239,7 +241,38 @@ final class VideoUploadTest extends TestCase
         $this->assertSame($video, $res['body']);
     }
 
-    /** Schaltet der Admin das Einreichen während des Hochladens aus, wird das Video keine Einreichung. */
+    /** Freigabe und Ablehnung eines eingereichten Videos sprechen vom Video, nicht vom Bild. */
+    public function testSubmitterNotificationNamesTheVideo(): void
+    {
+        $key = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'prime256v1']);
+        $this->assertNotFalse($key);
+        $keys = ['p256dh' => WebPushCrypto::b64uEncode(WebPushCrypto::rawPublic($key)), 'auth' => WebPushCrypto::b64uEncode(random_bytes(16))];
+        $this->app->push()->subscribe($this->users->find($this->sub), 'https://fcm.googleapis.com/fcm/send/sub', $keys, [PushService::TYPE_GALLERY_SUBMISSIONS], null, '1.2.3.4');
+
+        $this->users->current = $this->sub;
+        $ids = [];
+        foreach (['Umzug.mp4' => 3000, 'Probe.mp4' => 3100] as $name => $bytes) {
+            $upload = $this->send($this->mp4($bytes), 'submission', $name);
+            $ids[] = (int) $this->ok('POST', '/gallery/video-uploads/finish', ['upload' => $upload, 'poster' => $this->poster(), 'consent' => true])['id'];
+        }
+        $this->users->current = $this->rev;
+        $this->ok('POST', '/gallery/review/' . $ids[0] . '/approve', ['intern' => false]);
+        $res = $this->call('POST', '/gallery/review/' . $ids[1] . '/reject', ['reason' => '']);
+        $this->assertSame(400, $res->status);
+        $this->assertStringContainsString('warum das Video nicht freigegeben wird', (string) json_encode($res->data, JSON_UNESCAPED_UNICODE));
+        $this->ok('POST', '/gallery/review/' . $ids[1] . '/reject', ['reason' => 'Zu dunkel']);
+
+        $msgs = array_map(
+            static fn (string $p): array => json_decode($p, true),
+            array_column($this->app->db->select('SELECT q.payload FROM {push_queue} q JOIN {push_subscriptions} s ON s.id = q.subscription_id WHERE s.user_id = ? ORDER BY q.id', [$this->sub]), 'payload'),
+        );
+        $this->assertSame([
+            ['Galerie: Video freigegeben', 'Dein Video „Umzug.mp4“ ist jetzt im Album „Sommerfest“.'],
+            ['Galerie: Video abgelehnt', 'Dein Video „Probe.mp4“ wurde nicht freigegeben: Zu dunkel'],
+        ], array_map(static fn (array $m): array => [$m['title'], $m['body']], $msgs));
+    }
+
+        /** Schaltet der Admin das Einreichen während des Hochladens aus, wird das Video keine Einreichung. */
     public function testSubmissionSwitchedOffDuringUpload(): void
     {
         $this->users->current = $this->sub;

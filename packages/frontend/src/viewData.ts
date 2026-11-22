@@ -72,6 +72,7 @@ export const sources = {
   catalogAll: source('catalog-all', () => api.catalog(true)),
   ranksAll: source('ranks-all', () => api.ranks(true)),
   promotions: source('promotions', api.promotions),
+  admissions: source('admissions', api.admissions),
   titles: source('titles', api.titles),
   attendanceOverview: source('attendance-overview', loadAttendanceOverview),
   polls: source('polls', () => api.polls()),
@@ -80,6 +81,7 @@ export const sources = {
   lists: source('lists', api.lists),
   list: (id: number) => source('list', () => api.list(id), [id]),
   events: source('events', api.events),
+  eventsSource: source('events-source', api.eventsSource),
   calendarEntries: source('calendar-entries', api.calendarEntries),
   // Einstellungen (/admin/…: nur im Speicher der App, nie im Service Worker)
   settings: source('settings', () => api.settings()),
@@ -121,6 +123,7 @@ export function menuSources(menu: 'meins' | 'verwaltung' | 'einstellungen', id: 
       katalog: [s.catalogAll],
       dienstgrade: [s.ranksAll],
       befoerderungen: [s.promotions],
+      aufnahmen: [s.admissions],
       titel: [s.titles],
       aemter: [s.offices],
       sponsoren: [s.sponsors],

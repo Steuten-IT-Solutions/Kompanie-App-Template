@@ -70,6 +70,7 @@ export function helpSlug(path: string[], ctx: HelpContext): string | null {
           strafen: 'meine-strafen',
           dienstgrad: 'mein-dienstgrad',
           anwesenheit: 'meine-anwesenheit',
+          passive: 'meine-passiven',
           konto: 'anmelden-und-konto',
         }[sub ?? (ctx.can('member') ? 'uebersicht' : 'konto')] ?? 'meins-uebersicht'
       );
@@ -99,6 +100,7 @@ export function helpSlug(path: string[], ctx: HelpContext): string | null {
           bereiche: 'admin-bereiche',
           navigation: 'admin-navigation',
           rechtliches: 'admin-rechtliches',
+          sprachen: 'admin-sprachen',
           rollen: 'admin-rollen-und-mitglieder',
           zugang: 'admin-zugang',
           benachrichtigungen: 'admin-benachrichtigungen',
@@ -132,10 +134,13 @@ function adminSlug([sub, arg, page]: string[], ctx: HelpContext): string | null 
     strafe: 'strafen-verwalten',
     dienstgrade: 'dienstgrade-verwalten',
     befoerderungen: 'befoerderungen',
+    aufnahmen: 'aufnahmen',
     titel: 'titel-verwalten',
     aemter: 'aemter-verwalten',
     sponsoren: 'sponsoren-verwalten',
     seiten: 'seiten-verwalten',
+    webseite: 'webseite-verwalten',
+    passive: 'passive-verwalten',
     kompanien: 'kompanien-verwalten',
     neu: 'mitglieder-anlegen',
     'neu-mehrere': 'mitglieder-mehrere-anlegen',
@@ -143,6 +148,7 @@ function adminSlug([sub, arg, page]: string[], ctx: HelpContext): string | null 
     anfragen: 'anfragen-freigeben',
     meldungen: 'fehlermeldungen-bearbeiten',
     aenderungen: 'admin-aenderungen',
+    bericht: 'bericht-erstellen',
   };
   // „Einrichtungen“ sammelt nur Knöpfe der Startseite; ihre Anleitung steht dort.
   if (!sub || sub === 'einrichtungen') return 'verwaltung';

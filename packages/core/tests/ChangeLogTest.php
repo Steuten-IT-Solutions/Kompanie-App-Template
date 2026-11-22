@@ -33,7 +33,7 @@ final class ChangeLogTest extends TestCase
     {
         $this->users = new FakeUsers();
         $this->clock = new FixedClock(new \DateTimeImmutable('2026-11-12 10:00:00', new \DateTimeZone('Europe/Berlin')));
-        $this->app = TestApp::create(TestApp::connection(), $this->users, clock: $this->clock);
+        $this->app = TestApp::create(TestApp::connection(), $this->users, clock: $this->clock, websiteHost: new \KompanieApp\Core\Tests\Support\FakeWebsiteHost());
         $this->admin = $this->users->add('admin', Roles::ADMIN);
         $this->member = $this->users->add('mitglied', Roles::MEMBER);
         $this->users->current = $this->admin;
@@ -92,7 +92,7 @@ final class ChangeLogTest extends TestCase
 
     public function testRoleRightsAndOwnAccount(): void
     {
-        $role = $this->app->roles()->create(['label' => 'Kassierer', 'capabilities' => [...Roles::TEMPLATES[Roles::MEMBER], 'manage_penalties']]);
+        $role = $this->app->roles()->create(['label' => 'Kassierer', 'capabilities' => [...Roles::TEMPLATES[Roles::MEMBER], 'view_penalties', 'manage_penalties']]);
         $this->assertSame(200, $this->call('PATCH', "/members/{$this->member}/role", ['level' => $role['key']])->status);
         $this->assertSame(200, $this->call('PUT', "/members/{$this->member}/rights", ['grant' => ['view_personal'], 'revoke' => []])->status);
         [$rights, $level] = $this->entries();
@@ -278,7 +278,7 @@ final class ChangeLogTest extends TestCase
 
     public function testRolesAreLogged(): void
     {
-        $res = $this->call('POST', '/admin/roles', ['label' => 'Schriftführer', 'capabilities' => ['member', 'send_mail']]);
+        $res = $this->call('POST', '/admin/roles', ['label' => 'Schriftführer', 'capabilities' => ['member', 'view_mail', 'send_mail']]);
         $this->assertSame(201, $res->status, (string) json_encode($res->data));
         $key = array_search('Schriftführer', array_column($this->app->roles()->all(), 'label', 'key'), true);
         $this->assertSame(200, $this->call('PATCH', "/admin/roles/{$key}", ['label' => 'Schriftführerin'])->status);

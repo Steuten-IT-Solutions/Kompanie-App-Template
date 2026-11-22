@@ -9,6 +9,7 @@ use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Config\KompanieConfig;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\Settings;
 use KompanieApp\Core\Port\UserDirectory;
 use KompanieApp\Core\Storage\MemberRoleRepository;
@@ -55,8 +56,14 @@ final class RoleService
     public const VIEW_SETTING = 'roles_view_split';
     /** Gesetzt, sobald Rollen mit create_users die Rechte für persönliche Angaben haben (migratePersonalRights). */
     public const PERSONAL_SETTING = 'roles_personal_split';
+    /** Gesetzt, sobald Rollen mit create_users das Recht manage_former haben (migrateFormerRights). */
+    public const FORMER_SETTING = 'roles_former_split';
+    /** Gesetzt, sobald Rollen mit dem internen Kalender das Recht respond_calendar haben (migrateRespondRights). */
+    public const RESPOND_SETTING = 'roles_respond_added';
     /** Rechte aus Roles::ADDED_VIEW, die die Rollen schon bekommen haben (migrateAddedViewRights). */
     public const ADDED_VIEW_SETTING = 'roles_view_added';
+    /** Schreibrechte aus Capability::READ_OF, deren Leserecht die Rollen schon bekommen haben (migrateReadRights). */
+    public const READ_SPLIT_SETTING = 'roles_read_split';
     public const LABEL_MAX = 30;
     public const MAX_ROLES = 30;
     public const FACTOR_MAX = 10.0;
@@ -146,18 +153,24 @@ final class RoleService
 
     /**
      * Für die Seite eines Mitglieds: Rechte ihrer Rollen, Ausnahmen und welche Rechte $actor ändern darf.
-     * null, wenn es für die Person keine Ausnahmen gibt (Admin, Gast) oder $actor sie nicht ändern darf.
+     * null, wenn es für die Person keine Ausnahmen gibt (Admin, Gast) oder $actor sie nicht sehen darf (view_accounts,
+     * Grenzen wie canHandleUser); ohne promote_users ist nichts änderbar.
      *
      * @return array{role: string[], grant: string[], revoke: string[], editable: string[]}|null
      */
     public function overridesView(User $actor, User $target): ?array
     {
-        if (!$actor->can(Capability::PromoteUsers) || $actor->id === $target->id || !self::overridable($target->role)
+        if (!$actor->can(Capability::ViewAccounts) || $actor->id === $target->id || !self::overridable($target->role)
             || !$this->canHandleUser($actor, $target)) {
             return null;
         }
         $base = $this->grantedFor($target->id, $target->role);
-        return $this->view($actor, $base, self::normalized($base, $this->loadOverrides()[$target->id] ?? self::NO_OVERRIDES));
+        $view = $this->view($actor, $base, self::normalized($base, $this->loadOverrides()[$target->id] ?? self::NO_OVERRIDES));
+        // Nur sehen (view_accounts ohne promote_users): nichts änderbar.
+        if (!$actor->can(Capability::PromoteUsers)) {
+            $view['editable'] = [];
+        }
+        return $view;
     }
 
     /**
@@ -171,22 +184,22 @@ final class RoleService
     public function setOverrides(User $actor, int $id, mixed $grant, mixed $revoke): array
     {
         if ($actor->id === $id) {
-            throw ApiError::invalid('Die eigenen Rechte kann man nicht selbst ändern.');
+            throw ApiError::invalid(I18n::t('Die eigenen Rechte kann man nicht selbst ändern.'));
         }
-        $target = $this->users->find($id) ?? throw ApiError::notFound('Benutzer nicht gefunden.');
+        $target = $this->users->find($id) ?? throw ApiError::notFound(I18n::t('Benutzer nicht gefunden.'));
         if ($target->isAdmin()) {
-            throw ApiError::invalid('Admins haben immer alle Rechte.');
+            throw ApiError::invalid(I18n::t('Admins haben immer alle Rechte.'));
         }
         if (!self::overridable($target->role)) {
-            throw ApiError::invalid('Gäste haben keine Rechte in der App. Bitte zuerst eine Rolle geben.');
+            throw ApiError::invalid(I18n::t('Gäste haben keine Rechte in der App. Bitte zuerst eine Rolle geben.'));
         }
         if (!$this->canHandleUser($actor, $target)) {
-            throw ApiError::forbidden('Die Rechte dieser Person darfst du nicht ändern.');
+            throw ApiError::forbidden(I18n::t('Die Rechte dieser Person darfst du nicht ändern.'));
         }
         $grant = self::validCapabilityList($grant);
         $revoke = self::validCapabilityList($revoke);
         if (array_intersect($grant, $revoke) !== []) {
-            throw ApiError::invalid('Ein Recht lässt sich nicht zugleich geben und entziehen.');
+            throw ApiError::invalid(I18n::t('Ein Recht lässt sich nicht zugleich geben und entziehen.'));
         }
         $base = $this->grantedFor($id, $target->role);
         $next = self::normalized($base, ['grant' => $grant, 'revoke' => $revoke]);
@@ -207,7 +220,7 @@ final class RoleService
         );
         $editable = self::values($this->editableBy($actor));
         if (array_diff($changed, $editable) !== []) {
-            throw ApiError::forbidden('Rechte, die du selbst nicht hast, sowie „Mitglieder anlegen“ und „Rollen vergeben“ ändert nur ein Admin.');
+            throw ApiError::forbidden(I18n::t('Rechte, die du selbst nicht hast, sowie „Mitglieder anlegen“ und „Rollen vergeben“ ändert nur ein Admin.'));
         }
         $this->storeOverrides($id, $next);
         return $this->view($actor, $base, $next);
@@ -321,9 +334,12 @@ final class RoleService
     /** Fehlermeldung, wenn die Voraussetzung eines Rechts fehlt. */
     private static function missingRequired(Capability $needed): ApiError
     {
-        return $needed === Capability::Member
-            ? ApiError::invalid('Rechte zum Verwalten und die eigenen Punkte, Strafen, Dienstgrade und Anwesenheit gibt es nur mit „Mitglied der Kompanie“.')
-            : ApiError::invalid('„Persönliche Angaben pflegen“ gibt es nur zusammen mit „Persönliche Angaben sehen“.');
+        return match ($needed) {
+            Capability::Member => ApiError::invalid(I18n::t('Rechte zum Verwalten und die eigenen Punkte, Strafen, Dienstgrade und Anwesenheit gibt es nur mit „Mitglied der Kompanie“.')),
+            Capability::Calendar => ApiError::invalid(I18n::t('Zu- und absagen gibt es nur zusammen mit dem internen Kalender.')),
+            Capability::ViewPersonal => ApiError::invalid(I18n::t('„Persönliche Angaben pflegen“ gibt es nur zusammen mit „Persönliche Angaben sehen“.')),
+            default => ApiError::invalid(I18n::t('Ein Recht zum Ändern gibt es nur zusammen mit dem passenden Recht zum Sehen.')),
+        };
     }
 
     /**
@@ -365,7 +381,7 @@ final class RoleService
         }
         return array_values(array_filter(
             Roles::GRANTABLE,
-            static fn (Capability $c): bool => $actor->can($c) && $c !== Capability::PromoteUsers && $c !== Capability::CreateUsers,
+            static fn (Capability $c): bool => $actor->can($c) && !in_array($c, Capability::accountRights(), true),
         ));
     }
 
@@ -438,12 +454,12 @@ final class RoleService
             return [];
         }
         if (!is_array($raw)) {
-            throw ApiError::invalid('Rechte als Liste angeben.');
+            throw ApiError::invalid(I18n::t('Rechte als Liste angeben.'));
         }
         foreach ($raw as $c) {
             $cap = is_string($c) ? Capability::tryFrom($c) : null;
             if ($cap === null || !in_array($cap, Roles::GRANTABLE, true)) {
-                throw ApiError::invalid('Unbekanntes oder nicht vergebbares Recht: ' . (is_scalar($c) ? (string) $c : '?') . '.');
+                throw ApiError::invalid(I18n::t('Unbekanntes oder nicht vergebbares Recht: {value}.', ['value' => is_scalar($c) ? (string) $c : '?']));
             }
         }
         return self::ordered($raw);
@@ -545,8 +561,9 @@ final class RoleService
      */
     public function extraRolesOf(User $user): array
     {
-        // Vorschau (Issue #63): genau die gewählte Rolle, nicht die gespeicherten Zusatzrollen des Admin-Kontos.
-        return $user->preview ? [] : $this->extraRoles($user->id, $user->role);
+        // Vorschau (Issue #63) als Rolle: genau die gewählte Rolle, nicht die gespeicherten Zusatzrollen des Admin-Kontos.
+        // Als Person sind ID und Grundrolle die der Person: dann ihre Zusatzrollen.
+        return $user->preview && !$user->previewPerson ? [] : $this->extraRoles($user->id, $user->role);
     }
 
     /** Kann eine Person mit dieser Grundrolle Zusatzrollen haben? Nur mit Mitgliederbereich und nicht als Admin. */
@@ -574,7 +591,7 @@ final class RoleService
     public function setExtraRoles(int $userId, array $keys): void
     {
         if ($this->memberRoles === null) {
-            throw ApiError::invalid('Zusatzrollen gibt es hier nicht.');
+            throw ApiError::invalid(I18n::t('Zusatzrollen gibt es hier nicht.'));
         }
         $current = $this->assignments()[$userId] ?? [];
         $keys = array_values(array_unique($keys));
@@ -584,6 +601,16 @@ final class RoleService
         } else {
             $this->extra[$userId] = $keys;
         }
+    }
+
+    /**
+     * Seit wann jemand eine Zusatzrolle hat (UTC, Domain\AdmissionService „Anwärter seit“).
+     *
+     * @return array<int, array<string, string>> Benutzer-ID => Rolle => assigned_at
+     */
+    public function extraAssignedAt(): array
+    {
+        return $this->memberRoles?->assignedAt() ?? [];
     }
 
     /**
@@ -608,7 +635,8 @@ final class RoleService
         return array_values(array_map(
             fn (array $r): array => [
                 'key' => $r['key'],
-                'label' => $r['label'],
+                // Feste Rollen unter ihrem Vorgabenamen in der Sprache der Anfrage („Mitglied“ → „Member“), eigene Namen bleiben
+                'label' => $this->config->localized('roles', $r['key'], $r['label']),
                 'points_factor' => $r['points_factor'],
                 'extra' => self::canBeExtra($r['key']),
                 // Gehört zur Kompanie (Mitgliederbereich, nicht Admin): nur dazu gibt es Zusatzrollen
@@ -666,7 +694,10 @@ final class RoleService
             $this->migrateCandidate();
             $this->migrateViewRights();
             $this->migratePersonalRights();
+            $this->migrateFormerRights();
+            $this->migrateRespondRights();
             $this->migrateAddedViewRights();
+            $this->migrateReadRights();
             return;
         }
         $roles = $this->templates();
@@ -674,7 +705,7 @@ final class RoleService
             $admin = $roles[Roles::ADMIN];
             unset($roles[Roles::ADMIN]);
             foreach (Roles::LEGACY as $key => $caps) {
-                $roles[$key] = self::role($key, $this->config->roleLabel($key), self::ordered($caps));
+                $roles[$key] = self::role($key, $this->sourceLabel($key), self::ordered($caps));
             }
             $roles[Roles::ADMIN] = $admin;
         }
@@ -682,7 +713,9 @@ final class RoleService
         $this->settings->set(self::CANDIDATE_SETTING, true);
         $this->settings->set(self::VIEW_SETTING, true);
         $this->settings->set(self::PERSONAL_SETTING, true);
+        $this->settings->set(self::RESPOND_SETTING, true);
         $this->settings->set(self::ADDED_VIEW_SETTING, Roles::ADDED_VIEW);
+        $this->settings->set(self::READ_SPLIT_SETTING, array_keys(Capability::READ_OF));
     }
 
     /**
@@ -704,7 +737,7 @@ final class RoleService
                 if ($u->role === Roles::CANDIDATE) {
                     // Vor migrateViewRights mit den Rechten von damals (die Migration ergänzt sie).
                     $caps = $this->settings->get(self::VIEW_SETTING) ? self::ordered(Roles::CANDIDATE_DEFAULTS) : [Capability::Calendar->value];
-                    $role = self::role(Roles::CANDIDATE, $this->freeLabel($this->config->roleLabel(Roles::CANDIDATE), $roles), $caps);
+                    $role = self::role(Roles::CANDIDATE, $this->freeLabel($this->sourceLabel(Roles::CANDIDATE), $roles), $caps);
                     break;
                 }
             }
@@ -776,16 +809,90 @@ final class RoleService
      */
     private function migratePersonalRights(): void
     {
-        if ($this->settings->get(self::PERSONAL_SETTING)) {
+        $this->migrateFromCreateUsers(self::PERSONAL_SETTING, [Capability::ViewPersonal->value, Capability::ManagePersonal->value]);
+    }
+
+    /**
+     * Einmalig nach dem Update: Ehemalige verwaltete früher, wer Mitglieder anlegt (create_users); jetzt gibt es dafür
+     * manage_former. Jede Rolle mit create_users bekommt es, ebenso jede Person, der create_users zusätzlich gegeben ist;
+     * wem es entzogen ist, dem wird auch dieses entzogen. Danach darf jede Person bei den Ehemaligen dasselbe wie vorher.
+     */
+    private function migrateFormerRights(): void
+    {
+        $this->migrateFromCreateUsers(self::FORMER_SETTING, [Capability::ManageFormer->value]);
+    }
+
+    /**
+     * Einmalig nach dem Update: Zu- und Absagen bei Terminen (respond_calendar) ist neu. Jede Rolle mit dem internen
+     * Kalender außer Gast bekommt es, ebenso jede Person, der der Kalender zusätzlich gegeben ist; so können Mitglieder
+     * und Anwärter gleich zusagen. Gäste bekommen es nur, wenn der Admin es ihnen gibt.
+     */
+    private function migrateRespondRights(): void
+    {
+        $this->migrateFrom(self::RESPOND_SETTING, Capability::Calendar, [Capability::RespondCalendar->value], false);
+    }
+
+    /**
+     * Rechte, die von create_users abgetrennt wurden, einmalig (gemerkt unter $setting) jeder Rolle mit create_users geben
+     * und den Ausnahmen einzelner Personen folgen lassen: zusätzlich gegeben bzw. entzogen wie create_users.
+     *
+     * @param list<string> $added
+     */
+    private function migrateFromCreateUsers(string $setting, array $added): void
+    {
+        $this->migrateFrom($setting, Capability::CreateUsers, $added, true);
+    }
+
+    /**
+     * Rechte einmalig (gemerkt unter $setting) jeder Rolle mit $source geben (außer Admin, ohne $guest auch außer Gast) und
+     * den Ausnahmen einzelner Personen folgen lassen: zusätzlich gegeben bzw. entzogen wie $source.
+     *
+     * @param list<string> $added
+     */
+    private function migrateFrom(string $setting, Capability $source, array $added, bool $guest): void
+    {
+        if ($this->settings->get($setting)) {
             return;
         }
-        $create = Capability::CreateUsers->value;
-        $personal = [Capability::ViewPersonal->value, Capability::ManagePersonal->value];
+        $this->grantAlong($source, $added, $guest);
+        $this->settings->set($setting, true);
+    }
+
+    /**
+     * Einmalig je Paar nach dem Update (Rechte in Lesen und Schreiben aufgeteilt, 17.11.2026): Wer ein Schreibrecht aus
+     * Capability::READ_OF hat, sah bisher auch, was es zeigt. Jede Rolle mit dem Schreibrecht (auch Gast) bekommt das
+     * Leserecht, ebenso jede Person, der das Schreibrecht zusätzlich gegeben ist; wem es entzogen ist, dem wird auch das
+     * Leserecht entzogen. Danach sieht und ändert jede Person dasselbe wie vorher. Welche Paare schon verteilt sind, steht
+     * in READ_SPLIT_SETTING: Ein später ergänztes Paar wird so ebenfalls genau einmal verteilt.
+     */
+    private function migrateReadRights(): void
+    {
+        $done = $this->settings->get(self::READ_SPLIT_SETTING);
+        $done = is_array($done) ? array_values(array_filter($done, 'is_string')) : [];
+        $todo = array_diff(array_keys(Capability::READ_OF), $done);
+        if ($todo === []) {
+            return;
+        }
+        foreach ($todo as $write) {
+            $this->grantAlong(Capability::from($write), [Capability::READ_OF[$write]], true);
+        }
+        $this->settings->set(self::READ_SPLIT_SETTING, [...$done, ...array_values($todo)]);
+    }
+
+    /**
+     * $added jeder Rolle mit $source geben (außer Admin, ohne $guest auch außer Gast) und den Ausnahmen einzelner Personen
+     * folgen lassen: zusätzlich gegeben bzw. entzogen wie $source.
+     *
+     * @param list<string> $added
+     */
+    private function grantAlong(Capability $source, array $added, bool $guest): void
+    {
+        $create = $source->value;
         $roles = $this->all();
         $changed = false;
         foreach ($roles as $key => $r) {
-            if ($key !== Roles::ADMIN && in_array($create, $r['capabilities'], true)) {
-                $roles[$key]['capabilities'] = self::ordered([...$r['capabilities'], ...$personal]);
+            if ($key !== Roles::ADMIN && ($guest || $key !== Roles::GUEST) && in_array($create, $r['capabilities'], true)) {
+                $roles[$key]['capabilities'] = self::ordered([...$r['capabilities'], ...$added]);
                 $changed = true;
             }
         }
@@ -794,16 +901,15 @@ final class RoleService
         }
         foreach ($this->loadOverrides() as $id => $o) {
             $u = $this->users->find($id);
-            if ($u === null || !self::overridable($u->role)) {
+            if ($u === null || !self::overridable($u->role) || (!$guest && $u->role === Roles::GUEST)) {
                 continue;
             }
-            $grant = in_array($create, $o['grant'], true) ? [...$o['grant'], ...$personal] : $o['grant'];
-            $revoke = in_array($create, $o['revoke'], true) ? [...$o['revoke'], ...$personal] : $o['revoke'];
+            $grant = in_array($create, $o['grant'], true) ? [...$o['grant'], ...$added] : $o['grant'];
+            $revoke = in_array($create, $o['revoke'], true) ? [...$o['revoke'], ...$added] : $o['revoke'];
             if ($grant !== $o['grant'] || $revoke !== $o['revoke']) {
                 $this->storeOverrides($id, self::normalized($this->grantedFor($id, $u->role), ['grant' => self::ordered($grant), 'revoke' => self::ordered($revoke)]));
             }
         }
-        $this->settings->set(self::PERSONAL_SETTING, true);
     }
 
     /**
@@ -914,7 +1020,7 @@ final class RoleService
     {
         $roles = $this->all();
         if (count($roles) >= self::MAX_ROLES) {
-            throw ApiError::invalid(sprintf('Mehr als %d Rollen sind nicht möglich.', self::MAX_ROLES));
+            throw ApiError::invalid(I18n::t('Mehr als {max} Rollen sind nicht möglich.', ['max' => self::MAX_ROLES]));
         }
         $label = $this->validLabel($in['label'] ?? null, null);
         $role = self::role('', $label, self::validCapabilities($in['capabilities'] ?? [], null));
@@ -939,7 +1045,7 @@ final class RoleService
     {
         $roles = $this->all();
         if (!isset($roles[$key])) {
-            throw ApiError::notFound('Rolle nicht gefunden.');
+            throw ApiError::notFound(I18n::t('Rolle nicht gefunden.'));
         }
         $role = $roles[$key];
         if (array_key_exists('label', $in)) {
@@ -948,21 +1054,21 @@ final class RoleService
         $fixed = Roles::isSystem($key);
         if (array_key_exists('capabilities', $in)) {
             if ($key === Roles::ADMIN) {
-                throw ApiError::invalid('Admins haben immer alle Rechte.');
+                throw ApiError::invalid(I18n::t('Admins haben immer alle Rechte.'));
             }
             $role['capabilities'] = self::validCapabilities($in['capabilities'], $fixed ? $key : null);
         }
         if (array_key_exists('points_factor', $in)) {
             // Punkte bekommen nur Personen mit Mitgliederbereich (Admins haben ihn immer).
             if ($key === Roles::GUEST) {
-                throw ApiError::invalid('Gäste haben keinen Punktefaktor.');
+                throw ApiError::invalid(I18n::t('Gäste haben keinen Punktefaktor.'));
             }
             $role['points_factor'] = self::validFactor($in['points_factor']);
         }
         foreach (['new_accounts', 'promotable'] as $flag) {
             if (array_key_exists($flag, $in)) {
                 if ($fixed) {
-                    throw ApiError::invalid('Das lässt sich nur bei eigenen Rollen einstellen.');
+                    throw ApiError::invalid(I18n::t('Das lässt sich nur bei eigenen Rollen einstellen.'));
                 }
                 $role[$flag] = self::validFlag($in[$flag]);
             }
@@ -982,10 +1088,10 @@ final class RoleService
     {
         $roles = $this->all();
         if (!isset($roles[$key])) {
-            throw ApiError::notFound('Rolle nicht gefunden.');
+            throw ApiError::notFound(I18n::t('Rolle nicht gefunden.'));
         }
         if (Roles::isSystem($key)) {
-            throw ApiError::invalid('Diese Rolle lässt sich nicht löschen.');
+            throw ApiError::invalid(I18n::t('Diese Rolle lässt sich nicht löschen.'));
         }
         $users = $this->users->list(true);
         $assigned = array_filter($users, static fn (User $u): bool => $u->role === $key);
@@ -994,10 +1100,10 @@ final class RoleService
         $changed = [];
         if ($assigned !== [] || $extra !== []) {
             if ($replacement === null || $replacement === '') {
-                throw ApiError::invalid(sprintf('Dieser Rolle sind noch %d Personen zugeordnet. Bitte eine Rolle wählen, die sie stattdessen bekommen.', count($assigned) + count($extra)));
+                throw ApiError::invalid(I18n::tn('Dieser Rolle sind noch {count} Personen zugeordnet. Bitte eine Rolle wählen, die sie stattdessen bekommen.', 'Dieser Rolle sind noch {count} Personen zugeordnet. Bitte eine Rolle wählen, die sie stattdessen bekommen.', count($assigned) + count($extra)));
             }
             if ($replacement === $key || !isset($roles[$replacement]) || $replacement === Roles::ADMIN) {
-                throw ApiError::invalid('Ungültige Ersatzrolle.');
+                throw ApiError::invalid(I18n::t('Ungültige Ersatzrolle.'));
             }
             foreach ($assigned as $u) {
                 try {
@@ -1037,7 +1143,7 @@ final class RoleService
         $roles = $this->all();
         if (!is_array($keys) || !array_is_list($keys) || array_filter($keys, 'is_string') !== $keys
             || count(array_unique($keys)) !== count($keys) || count($keys) !== count($roles) || array_diff(array_keys($roles), $keys) !== []) {
-            throw ApiError::invalid('Bitte alle Rollen in der neuen Reihenfolge angeben.');
+            throw ApiError::invalid(I18n::t('Bitte alle Rollen in der neuen Reihenfolge angeben.'));
         }
         $next = [];
         foreach ($keys as $k) {
@@ -1113,8 +1219,9 @@ final class RoleService
 
     /**
      * Darf $actor einer Person diese Rolle geben bzw. ihre Rolle ändern (oder ihr Passwort zurücksetzen)?
-     * Admins immer. Sonst nur Rollen, deren Rechte er selbst hat, und keine Rollen, die Konten anlegen
-     * oder Rollen vergeben dürfen: Diese Rechte weitergeben bleibt den Admins vorbehalten.
+     * Admins immer. Sonst nur Rollen, deren Rechte er selbst hat, und keine Rollen mit Rechten über Konten anderer
+     * (Capability::accountRights: Konten anlegen, Ehemalige verwalten, Rollen vergeben): Diese Rechte weitergeben bleibt
+     * den Admins vorbehalten.
      */
     public function canHandle(User $actor, string $key): bool
     {
@@ -1125,7 +1232,7 @@ final class RoleService
             return false;
         }
         foreach ($this->capabilities($key) as $cap) {
-            if (!$actor->can($cap) || $cap === Capability::PromoteUsers || $cap === Capability::CreateUsers) {
+            if (!$actor->can($cap) || in_array($cap, Capability::accountRights(), true)) {
                 return false;
             }
         }
@@ -1145,7 +1252,7 @@ final class RoleService
             return false;
         }
         foreach ($target->capabilities as $cap) {
-            if (!$actor->can($cap) || $cap === Capability::PromoteUsers || $cap === Capability::CreateUsers) {
+            if (!$actor->can($cap) || in_array($cap, Capability::accountRights(), true)) {
                 return false;
             }
         }
@@ -1160,11 +1267,20 @@ final class RoleService
     }
 
     /** @return array<string, array{key: string, label: string, capabilities: string[], points_factor: float, new_accounts: bool, promotable: bool}> */
+    /**
+     * Vorgabename einer festen Rolle auf Deutsch, wie er gespeichert wird (die Anzeige übersetzt ihn erst bei der Ausgabe,
+     * publicList), auch wenn die Anfrage eine andere Sprache hat.
+     */
+    private function sourceLabel(string $key): string
+    {
+        return (string) I18n::in(I18n::SOURCE_LOCALE, fn (): string => $this->config->roleLabel($key));
+    }
+
     private function templates(): array
     {
         $out = [];
         foreach (Roles::TEMPLATES as $key => $caps) {
-            $out[$key] = self::role($key, $this->config->roleLabel($key), self::ordered($caps));
+            $out[$key] = self::role($key, $this->sourceLabel($key), self::ordered($caps));
         }
         return $out;
     }
@@ -1243,7 +1359,7 @@ final class RoleService
             }
             $out[$key] = [
                 'key' => $key,
-                'label' => is_string($r['label'] ?? null) && $r['label'] !== '' ? $r['label'] : $this->config->roleLabel($key),
+                'label' => is_string($r['label'] ?? null) && $r['label'] !== '' ? $r['label'] : $this->sourceLabel($key),
                 'capabilities' => $caps,
                 'points_factor' => $key === Roles::GUEST ? 1.0 : (is_numeric($r['points_factor'] ?? null) ? (float) $r['points_factor'] : 1.0),
                 'new_accounts' => !$system && ($r['new_accounts'] ?? false) === true,
@@ -1257,7 +1373,7 @@ final class RoleService
             }
             // Fehlende feste Rolle (z. B. nach einem Update): Heißt schon eine eigene Rolle so, bekommt die feste einen
             // anderen Namen.
-            $role = self::role($key, $this->freeLabel($this->config->roleLabel($key), $front + $out), self::ordered($caps));
+            $role = self::role($key, $this->freeLabel($this->sourceLabel($key), $front + $out), self::ordered($caps));
             if ($key === Roles::ADMIN) {
                 $out[$key] = $role;
             } else {
@@ -1289,10 +1405,10 @@ final class RoleService
     {
         $label = is_string($raw) ? trim((string) preg_replace('/\s+/u', ' ', $raw)) : '';
         if ($label === '') {
-            throw ApiError::invalid('Bitte einen Namen für die Rolle angeben.');
+            throw ApiError::invalid(I18n::t('Bitte einen Namen für die Rolle angeben.'));
         }
         if (mb_strlen($label) > self::LABEL_MAX) {
-            throw ApiError::invalid(sprintf('Der Name darf höchstens %d Zeichen lang sein.', self::LABEL_MAX));
+            throw ApiError::invalid(I18n::t('Der Name darf höchstens {max} Zeichen lang sein.', ['max' => self::LABEL_MAX]));
         }
         // Unveränderter Name: nicht prüfen (sonst ließen sich Rechte einer Rolle mit doppeltem Namen nicht mehr ändern).
         if ($key !== null && ($this->find($key)['label'] ?? null) === $label) {
@@ -1300,7 +1416,7 @@ final class RoleService
         }
         foreach ($this->all() as $k => $r) {
             if ($k !== $key && mb_strtolower($r['label']) === mb_strtolower($label)) {
-                throw ApiError::invalid('Eine Rolle mit diesem Namen gibt es schon.');
+                throw ApiError::invalid(I18n::t('Eine Rolle mit diesem Namen gibt es schon.'));
             }
         }
         return $label;
@@ -1330,22 +1446,22 @@ final class RoleService
     private static function validCapabilities(mixed $raw, ?string $system): array
     {
         if (!is_array($raw)) {
-            throw ApiError::invalid('Rechte als Liste angeben.');
+            throw ApiError::invalid(I18n::t('Rechte als Liste angeben.'));
         }
         $out = [];
         foreach ($raw as $c) {
             $cap = is_string($c) ? Capability::tryFrom($c) : null;
             if ($cap === null || !in_array($cap, Roles::GRANTABLE, true)) {
-                throw ApiError::invalid('Unbekanntes oder nicht vergebbares Recht: ' . (is_scalar($c) ? (string) $c : '?') . '.');
+                throw ApiError::invalid(I18n::t('Unbekanntes oder nicht vergebbares Recht: {value}.', ['value' => is_scalar($c) ? (string) $c : '?']));
             }
             $out[$cap->value] = $cap->value;
         }
         if ($system !== null) {
             if ($system === Roles::GUEST && isset($out[Capability::Member->value])) {
-                throw ApiError::invalid('Gäste gehören nicht zur Kompanie; dafür gibt es die Rolle Mitglied.');
+                throw ApiError::invalid(I18n::t('Gäste gehören nicht zur Kompanie; dafür gibt es die Rolle Mitglied.'));
             }
             if ($system === Roles::MEMBER && !isset($out[Capability::Member->value])) {
-                throw ApiError::invalid('Mitglieder gehören immer zur Kompanie.');
+                throw ApiError::invalid(I18n::t('Mitglieder gehören immer zur Kompanie.'));
             }
         }
         // Gast gehört nie zur Kompanie: Bei ihm entfällt die Voraussetzung „Mitglied der Kompanie“ (Entscheidung vom
@@ -1358,11 +1474,11 @@ final class RoleService
     {
         $v = is_string($raw) ? str_replace(',', '.', trim($raw)) : $raw;
         if (!is_numeric($v)) {
-            throw ApiError::invalid('Der Punktefaktor muss eine Zahl sein, z. B. 0,5.');
+            throw ApiError::invalid(I18n::t('Der Punktefaktor muss eine Zahl sein, z. B. 0,5.'));
         }
         $f = round((float) $v, 2);
         if ($f < 0 || $f > self::FACTOR_MAX) {
-            throw ApiError::invalid(sprintf('Der Punktefaktor muss zwischen 0 und %s liegen.', str_replace('.', ',', (string) self::FACTOR_MAX)));
+            throw ApiError::invalid(I18n::t('Der Punktefaktor muss zwischen 0 und {max} liegen.', ['max' => str_replace('.', ',', (string) self::FACTOR_MAX)]));
         }
         return $f;
     }
@@ -1370,7 +1486,7 @@ final class RoleService
     private static function validFlag(mixed $raw): bool
     {
         if (!is_bool($raw)) {
-            throw ApiError::invalid('Bitte ja oder nein (true/false) angeben.');
+            throw ApiError::invalid(I18n::t('Bitte ja oder nein (true/false) angeben.'));
         }
         return $raw;
     }
@@ -1384,7 +1500,7 @@ final class RoleService
     private static function checkPromotable(array $role): void
     {
         if ($role['promotable'] && in_array(Capability::Member->value, $role['capabilities'], true)) {
-            throw ApiError::invalid('Zum Mitglied machen lässt sich nur eine Rolle, die nicht zur Kompanie gehört.');
+            throw ApiError::invalid(I18n::t('Zum Mitglied machen lässt sich nur eine Rolle, die nicht zur Kompanie gehört.'));
         }
     }
 }

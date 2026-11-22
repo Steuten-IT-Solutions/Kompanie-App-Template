@@ -4,6 +4,10 @@
  * prüfen wie immer. „Verwaltung“ und „Meins“ hängt App.tsx fest hinten an.
  */
 
+import type { Capability, Feature } from './api';
+import { t } from './i18n';
+import { nameIn } from './names';
+
 /** Bereiche, die in der Navigation stehen können (wie NavigationService::TARGETS im Kern), in der Standardreihenfolge. */
 export const NAV_TARGETS = [
   'termine',
@@ -123,10 +127,62 @@ export function orderBy<T extends string>(list: readonly T[], wanted: readonly s
  * Teilliste neu geordnet in die ganze Liste zurückschreiben: Die Einträge von part belegen nacheinander die Plätze, an
  * denen sie in full standen; alle anderen bleiben, wo sie sind. So ordnet man nur die sichtbaren Einträge.
  */
-export function mergeOrder<T extends string>(full: readonly T[], part: readonly T[]): T[] {
+export function mergeOrder<T>(full: readonly T[], part: readonly T[]): T[] {
   const inPart = new Set(part);
   let n = 0;
   return full.map((t) => (inPart.has(t) ? part[n++] : t));
+}
+
+/**
+ * Darf jemand mit diesen Rechten (has) den Bereich in der Navigation sehen, bei diesen eingeschalteten Bereichen (on)?
+ * Die eine Regel für die Tab-Leiste (App.tsx) und für Einstellungen → Navigation (mit allen Rechten: ist der Bereich an;
+ * mit den Rechten der Rolle Gast: sehen ihn Gäste). Die Server prüfen wie immer selbst.
+ */
+export function targetAllowed(t: FixedTarget, has: (cap: Capability) => boolean, on: (feature: Feature) => boolean): boolean {
+  switch (t) {
+    // Termine: öffentliche Liste, interner Kalender oder (nur sie) die Geburtstage
+    case 'termine':
+      return (on('events') && has('view_events')) || (on('calendar') && has('calendar')) || (on('birthdays') && has('view_birthdays'));
+    case 'news':
+      return on('news') && has('view_news');
+    case 'galerie':
+      return on('gallery') && (has('view_gallery') || has('view_gallery_internal'));
+    case 'kompanien':
+      return on('companies') && (has('view_companies') || has('manage_companies'));
+    case 'sponsoren':
+      return on('sponsors') && (has('view_sponsors') || has('manage_sponsors'));
+    // Mitgliederliste, Ehemalige und Ämter unter einem Punkt
+    case 'mitglieder':
+      return (on('directory') && (has('view_directory') || has('view_former'))) || (on('offices') && has('view_offices'));
+    case 'dokumente':
+      return on('documents') && (has('view_documents') || has('view_restricted_documents'));
+    // In der Navigation nur mit allen internen Nachrichten (wie boardVisible)
+    case 'brett':
+      return on('board') && has('view_board');
+    case 'dienstgrade':
+      return on('ranks') && has('view_ranks');
+    case 'punktekatalog':
+      return on('points') && has('view_catalog');
+  }
+}
+
+/**
+ * Sehen Gäste eine eigene Seite (wie PageService::canRead im Kern)? Öffentliche alle; die für Mitglieder nur Angemeldete
+ * mit view_board oder manage_pages, also mit der Grundrolle Gast nur, wenn die Rolle Gast eines davon hat.
+ */
+export function pageAllowedForGuests(audience: string | undefined, has: (cap: Capability) => boolean): boolean {
+  return audience === 'public' || has('view_board') || has('manage_pages');
+}
+
+/** Sieht die Person die Leiste der Gäste? Ohne Anmeldung und mit der Grundrolle Gast (auch in der Vorschau als Gast). */
+export const isGuestView = (user: { level: string } | null | undefined): boolean => !user || user.level === 'guest';
+
+/** Leiste, die gilt: für Gäste ihre eigene, sonst (und ohne eigene) die der Angemeldeten; null = Standardnavigation. */
+export function navigationFor(
+  config: { navigation?: NavigationSetting | null; navigation_guest?: NavigationSetting | null } | null | undefined,
+  guest: boolean,
+): NavigationSetting | null {
+  return (guest ? config?.navigation_guest : null) ?? config?.navigation ?? null;
 }
 
 const isTarget = (id: unknown): id is NavTarget =>
@@ -145,7 +201,7 @@ export function buildNav(setting: NavigationSetting | null | undefined, ctx: Nav
       const overflow = main.splice(NAV_MAX_MAIN - 1).map((e) => e.key as NavTarget);
       main.push({
         key: 'intern',
-        label: ctx.internLabel ?? 'Intern',
+        label: ctx.internLabel ?? t('Intern'),
         icon: ctx.icons?.intern ?? 'intern',
         children: orderBy([...overflow, ...intern], ctx.internOrder),
       });
@@ -164,7 +220,8 @@ export function buildNav(setting: NavigationSetting | null | undefined, ctx: Nav
     menus++;
     item.items.forEach((t) => listed.add(t));
     const children = item.items.filter(isTarget).filter(ctx.visible);
-    if (children.length > 0) out.push({ key: `menue/${menus}`, label: item.label, icon: item.icon, children });
+    // Name in der Sprache der App (eigener Name je Sprache, Kennung ist der deutsche Name)
+    if (children.length > 0) out.push({ key: `menue/${menus}`, label: nameIn('menu', item.label, item.label), icon: item.icon, children });
   }
   // Bereiche, die die Einstellung noch nicht kennt (z. B. mit einer neuen Version dazugekommen): hinten anhängen.
   for (const t of [...NAV_TARGETS, ...pages]) if (!listed.has(t) && ctx.visible(t)) out.push(view(t));
@@ -257,6 +314,20 @@ export function moveTo(draft: NavigationSetting, target: NavTarget, place: NavPl
   };
 }
 
+/**
+ * Erster Entwurf der Leiste für Gäste: eine Kopie der Leiste der Angemeldeten, in der Mitglieder und Dokumente aus
+ * Untermenüs unten in der Leiste stehen (wie in der Standardnavigation für alle ohne das Recht „Intern“). Ein Untermenü,
+ * das dadurch leer wird, fällt weg.
+ */
+export function guestDraftOf(memberDraft: NavigationSetting): NavigationSetting {
+  let next: NavigationSetting = {
+    items: memberDraft.items.map((i) => (typeof i === 'string' ? i : { ...i, items: [...i.items] })),
+    hidden: [...memberDraft.hidden],
+  };
+  for (const t of OWN_TABS) if (typeof placeOf(next, t) === 'number') next = moveTo(next, t, 'main');
+  return { ...next, items: next.items.filter((i) => typeof i === 'string' || i.items.length > 0) };
+}
+
 /** Untermenü entfernen; seine Bereiche kommen zu den ausgeblendeten (der Admin verteilt sie dann neu). */
 export function removeMenu(draft: NavigationSetting, index: number): NavigationSetting {
   let menu = -1;
@@ -275,9 +346,9 @@ export function removeMenu(draft: NavigationSetting, index: number): NavigationS
 export function draftError(draft: NavigationSetting, labelMax = 24): string | null {
   for (const i of draft.items) {
     if (typeof i === 'string') continue;
-    if (!i.label.trim()) return 'Jedes Untermenü braucht einen Namen.';
-    if (i.label.trim().length > labelMax) return `Der Name eines Untermenüs darf höchstens ${labelMax} Zeichen lang sein.`;
-    if (i.items.length === 0) return `Das Untermenü „${i.label.trim()}“ braucht mindestens einen Bereich.`;
+    if (!i.label.trim()) return t('Jedes Untermenü braucht einen Namen.');
+    if (i.label.trim().length > labelMax) return t('Der Name eines Untermenüs darf höchstens {max} Zeichen lang sein.', { max: labelMax });
+    if (i.items.length === 0) return t('Das Untermenü „{name}“ braucht mindestens einen Bereich.', { name: i.label.trim() });
   }
   return null;
 }
@@ -338,12 +409,15 @@ export const SETUP = 'einrichtungen';
 export const ADMIN_START = [
   'mitglieder',
   'ehemalige',
+  'passive',
   'anfragen',
   'meldungen',
   'aenderungen',
+  'bericht',
   'punkte',
   'strafe',
   'befoerderungen',
+  'aufnahmen',
   'anwesenheit',
   'brett',
   'umfragen',
@@ -355,7 +429,7 @@ export const ADMIN_START = [
 ] as const;
 
 /** Kacheln unter „Einrichtungen“ in der Standardreihenfolge (wie NavigationService::ADMIN_SETUP). */
-export const ADMIN_SETUP = ['katalog', 'dienstgrade', 'titel', 'aemter', 'kompanien', 'sponsoren', 'seiten'] as const;
+export const ADMIN_SETUP = ['katalog', 'dienstgrade', 'titel', 'aemter', 'kompanien', 'sponsoren', 'seiten', 'webseite'] as const;
 
 export type AdminTileId = (typeof ADMIN_START)[number] | (typeof ADMIN_SETUP)[number];
 

@@ -57,7 +57,7 @@ Mit der Leiste über dem Text gestaltest du die Nachricht wie in einem Mailprogr
 
 ### Weitere Blöcke einfügen
 - **Knopf mit Link**: Trage eine **Beschriftung** und ein **Ziel** ein: eine Webseite mit https://, eine E-Mail-Adresse mit mailto:, eine Telefonnummer mit tel: oder eine Seite der App wie #/termine. Bei **Aussehen** wählst du **Hervorgehoben** oder **Zurückhaltend**.
-- **Nächste Einträge**: Wähle eine **Überschrift** und **Wie viele Einträge** (1 bis 20). Der Block zeigt immer die nächsten Einträge ab heute aus {bereich.events}.
+- **Nächste Termine**: Wähle eine **Überschrift** und **Wie viele Termine** (1 bis 20). Der Block zeigt immer die nächsten Termine ab heute aus {bereich.events}.
 - **Ansprechpartner**: Hake bei **Ämter** die Ämter an, deren Inhaber erscheinen sollen. E-Mail-Adresse und Handynummer sehen nur Personen, die persönliche Angaben sehen dürfen.
 - **Hinweis-Kasten**: ein kurzer **Hinweis**, farbig als **Info**, **Warnung** oder **Erfolg**.
 - **Trennlinie**: eine **Linie** oder **Nur Abstand** zwischen zwei Blöcken.
@@ -70,7 +70,7 @@ Mit der Leiste über dem Text gestaltest du die Nachricht wie in einem Mailprogr
 - **Karte zur Anfahrt**: Trage einen **Ort oder eine Adresse** ein. Der Block zeigt den Ort mit dem Knopf **Karte**, der ihn in der Karten-App des Geräts öffnet, wie beim Ort eines Termins.
 
 ### Einen Countdown einfügen
-1. Wähle bei **+ Block einfügen** **Countdown**.
+1. Tippe auf **+ Block einfügen** und wähle im Fenster **Countdown**.
 2. Trage bei Bedarf eine **Überschrift** ein und wähle bei **Zählt bis** ein **Datum** (mit **Uhrzeit**) oder einen **Termin** aus den {bereich.events}. Ein verschobener Termin zählt von selbst mit.
 3. Optional: ein Ende (**Ende am**, **Ende um**) mit einem **Text, solange es läuft**, und bei **Danach** einen **Text danach** oder **Block ausblenden**.
 4. Die **Vorschau** zeigt, wie der Countdown gerade aussieht. Er zeigt immer zwei Angaben: Tage und Stunden, am letzten Tag Stunden und Minuten, in der letzten Stunde Minuten und Sekunden. Er zählt nach dem Kalender in der Zeitzone eurer App: Liegt bis dahin eine Zeitumstellung, zeigt er die Restzeit wie auf der Uhr, also z. B. von 21:47 Uhr bis 0:00 Uhr immer 2 Stunden 13 Minuten.
@@ -96,6 +96,16 @@ Schrift, Farben, Aufzählungen und Tabellen kommen mit. Bilder übernimmt die Ap
 
 ![Eine Nachricht wird bearbeitet](bild:schwarzes-brett-schreiben-bearbeiten)
 
+### Eine Nachricht auch auf Englisch schreiben
+Hat der Admin unter **Einstellungen → Sprachen** Englisch eingeschaltet, steht unter dem **Inhalt** der aufklappbare Abschnitt **Auf English schreiben (freiwillig)**.
+
+1. Tippe auf **Auf English schreiben (freiwillig)**.
+2. Trage bei **Titel auf English** den englischen Titel ein. Grau steht im Feld der deutsche.
+3. Darunter steht jeder Block mit Text noch einmal, nur mit seinen Texten. Schreibe sie auf Englisch. Beim Textblock zeigt **Deutscher Text** zum Aufklappen, was auf Deutsch steht.
+4. Veröffentliche oder speichere die Nachricht wie sonst auch.
+
+Wer die App auf Englisch nutzt, sieht die englische Fassung und bekommt Benachrichtigung und Mail auf Englisch. Was du leer lässt, erscheint auf Deutsch, mit dem Hinweis *Teilweise nur auf Deutsch verfügbar*. Ändern kannst du die englische Fassung später beim Bearbeiten im selben Abschnitt. Benachrichtigung und Mail gehen aber nur beim Veröffentlichen raus, also schreibe die englische Fassung am besten gleich mit. Laufende Nachrichten kann ein Admin auch unter **Einstellungen → Sprachen** im Abschnitt **Übersetzungen** in der Gruppe **{bereich.board}** übersetzen.
+
 ### Nachsehen, wer was geändert hat
 1. Tippe bei der Nachricht auf **Verlauf**.
 2. Du siehst jede Änderung mit Zeit und Namen. Bei Titel, Inhalt, Anhängen, Sichtbarkeit und Ende stehen der alte und der neue Stand nebeneinander (**vorher**, **nachher**). Blöcke wie ein Countdown stehen dort als Satz, Blöcke nur für Mitglieder mit **Nur für Mitglieder:** davor.
@@ -115,14 +125,17 @@ Unter **Verlauf: abgelaufene und gelöschte Nachrichten** steht sie noch 30 Tage
 - Bei **Kompanie** und **Einzeln** bekommen nur die ausgewählten Personen bzw. die Personen der ausgewählten {bereich.companies} die Benachrichtigung und die Mail, dazu du selbst. Die Zahl hinter **E-Mail senden** passt sich der Auswahl an.
 - Nachrichten für {bereich.companies} oder einzelne Personen sehen außer ihnen auch alle, die ans Brett schreiben dürfen, denn sie dürfen jede Nachricht ändern und löschen. Wer eine Nachricht für {bereich.companies} liest, sieht, für welche sie ist; wer eine Nachricht für einzelne Personen liest, sieht nur **nur für dich**, nicht, wer sie sonst noch bekommt.
 - Bei jedem Block wählst du **Für alle, die die Nachricht sehen** oder **Nur Mitglieder**. Blöcke nur für Mitglieder samt ihren Bildern fehlen bei einer öffentlichen Nachricht ohne Anmeldung und für Gäste; die Mail enthält alle Blöcke, denn sie geht nur an {rolle.member} und Personen mit dem internen Kalender.
-- Öffentlich heißt: Titel, Text, Bilder, Anhänge, Zeiten und dein Name sind für alle sichtbar, auch ohne Anmeldung (außer Blöcken nur für Mitglieder). Wer zuletzt geändert hat, der Mailversand und der Verlauf bleiben bei Personen mit diesem Recht. Schreibe in öffentliche Nachrichten keine persönlichen Angaben wie Telefonnummern oder Adressen.
+- Öffentlich heißt: Titel, Text, Bilder, Anhänge, Zeiten und dein Name sind für alle sichtbar, auch ohne Anmeldung (außer Blöcken nur für Mitglieder). Wer zuletzt geändert hat, der Mailversand und der Verlauf bleiben bei Personen mit diesem Recht oder dem Recht **{bereich.board}-Verlauf sehen**. Schreibe in öffentliche Nachrichten keine persönlichen Angaben wie Telefonnummern oder Adressen.
 - **E-Mail senden** gibt es, wenn ein {rolle.admin} den Mailversand eingerichtet hat. Die Mail geht an alle {rolle.member} und Personen mit dem internen Kalender (auch bei öffentlichen Nachrichten nur an sie), für die eine Mailadresse hinterlegt ist und die Mails vom Brett nicht abgeschaltet haben, auch an dich selbst. So siehst du, wie die Mail ankommt. Jede Person bekommt ihre eigene Mail; die Adressen der anderen sieht niemand.
 - Anhänge sehen und laden alle herunter, die die Nachricht sehen. Mit **E-Mail senden** hängen sie auch an der Mail. Eine Datei darf höchstens 20 MB groß sein (bei manchen Servern weniger; die App sagt es dann).
 - Ist die Mail mit ihren Bildern und Anhängen größer, als der Mailserver annimmt, sagt die App das vor dem Veröffentlichen. Verkleinere dann Bilder oder Anhänge oder nimm den Haken **E-Mail senden** weg.
 - Ändern verschickt keine neue Benachrichtigung und keine neue Mail, auch nicht, wenn du eine interne Nachricht öffentlich machst oder die Auswahl der {bereich.companies} oder Personen änderst. Ändern sich Titel oder Inhalt, sehen auch die die Nachricht wieder im Banner, die sie ausgeblendet hatten. Ändert sich nur das Ende oder die Sichtbarkeit, bleibt sie ausgeblendet.
-- Ändern und löschen darf jede und jeder mit diesem Recht, nicht nur, wer die Nachricht geschrieben hat. Den Verlauf sehen nur Personen mit diesem Recht.
+- Ändern und löschen darf jede und jeder mit diesem Recht, nicht nur, wer die Nachricht geschrieben hat. Den Verlauf sehen nur Personen mit diesem Recht oder dem Recht **{bereich.board}-Verlauf sehen**.
 - Eine Längengrenze für den Titel gibt es nicht, die Texte aller Blöcke zusammen dürfen bis etwa 1 MB lang sein (weit mehr als jede Nachricht). Sehr lange Titel kürzt das Banner, gespeichert wird alles. Grenzen setzt nur der Server, z. B. bei sehr großen Bildern; die App sagt dir dann, welche.
 - Nimm das {bereich.board} für Dringendes.
+
+- Aufbau, Bilder, Anhänge, **Sichtbar für** und **Sichtbar bis** gelten für alle Sprachen. Nur die Texte gibt es je Sprache. Benutzt du die App selbst auf Englisch, bearbeitest du trotzdem die deutsche Fassung, die englische steht im Abschnitt darunter.
+- Im **Verlauf** steht jede Änderung der englischen Fassung als **Übersetzung geändert**.
 
 ## Siehe auch
 - [Signatur](seite:signatur)

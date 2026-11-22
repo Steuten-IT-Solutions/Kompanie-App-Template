@@ -1,5 +1,6 @@
 import { createElement, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { DeviceStore } from './deviceStore';
+import { t } from './i18n';
 import { capture, type DomNode, type Part } from './skeletonCapture';
 
 /**
@@ -302,7 +303,7 @@ export function Loading({ shape = 'list', chunk = false }: { shape?: LoadingShap
   return (
     // data-shape: allgemeines Gerüst (die Stelle ist noch nicht gemerkt)
     <div ref={ref} className="skeleton" role="status" data-loading="" data-shape={parts ? undefined : shape}>
-      <span className="visually-hidden">Lädt …</span>
+      <span className="visually-hidden">{t('Lädt …')}</span>
       <div className="skeleton-parts" aria-hidden="true" ref={inert}>
         {parts ? parts.map(render) : shapeParts(shape)}
       </div>
@@ -328,7 +329,7 @@ export function PersonSkeleton({ status = true }: { status?: boolean }) {
   );
   return status ? (
     <div className="skeleton" role="status" data-loading="">
-      <span className="visually-hidden">Lädt …</span>
+      <span className="visually-hidden">{t('Lädt …')}</span>
       <div className="skeleton-parts" aria-hidden="true">
         {placeholders}
       </div>

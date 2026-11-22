@@ -9,7 +9,7 @@
     "dev": "npm run brand && npm run handbuch && npm run changelog && vite",
     "build": "npm run brand && npm run handbuch && npm run changelog && tsc --noEmit && vite build",
     "typecheck": "npm run brand && npm run handbuch && npm run changelog && tsc --noEmit",
-    "test": "node --test test/*.test.mjs test/*.test.ts",
+    "test": "node --import ./test/resolve-ts.mjs --test test/*.test.mjs test/*.test.ts",
     "handbuch": "php ../../scripts/handbuch.php --app=src/generated/handbuch.json",
     "changelog": "php ../../scripts/changelog.php --app=src/generated/changelog.json"
   },
@@ -31,7 +31,8 @@
     "jspdf": "^4.2.1",
     "pdfjs-dist": "^6.4.299",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "source-sans": "^3.52.0"
   },
   "devDependencies": {
     "@kompanie-app/branding": "*",

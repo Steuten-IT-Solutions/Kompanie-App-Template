@@ -2,7 +2,7 @@
 titel: Mitgliederliste
 reihenfolge: 51
 rechte: []
-einrecht: [manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, view_personal, manage_personal, create_users, promote_users]
+einrecht: [view_points, manage_points, view_penalties, manage_penalties, view_promotions, manage_ranks, view_titles, manage_titles, view_attendance, manage_attendance, view_company_members, manage_companies, view_personal, manage_personal, view_accounts, create_users, manage_former, promote_users]
 ---
 In der Mitgliederliste der Verwaltung findest du alle Personen der Kompanie und öffnest die Seite eines Mitglieds, um dort etwas zu ändern. Was in den Zeilen steht, hängt von deinen Aufgaben ab.
 
@@ -22,7 +22,7 @@ Tippe unten auf **Verwaltung** und dann auf **Mitglieder**. Ist die Mitgliederli
 ### Filtern und sortieren
 1. Tippe auf **Filter und Sortierung**.
 2. Wähle bei **Alle Rollen** eine Rolle, um nur Personen mit dieser Rolle zu sehen (als Grund- oder Zusatzrolle). Gibt es {bereich.titles}, filterst du bei **Alle {bereich.titles}** nach einem Titel.
-3. Wähle unter **Sortierung** **Nachname** oder **Vorname**. Wer Mitglieder anlegen darf, kann auch nach **Eintritt** sortieren, wer {bereich.points} vergibt, nach **{bereich.points}**.
+3. Wähle unter **Sortierung** **Nachname** oder **Vorname**. Wer Konten sieht, kann auch nach **Eintritt** sortieren, wer {bereich.points} vergibt, nach **{bereich.points}**.
 4. Tippe auf den Knopf unter **Reihenfolge**, um die Richtung umzudrehen (z. B. **A → Z** oder **Z → A**, **Früheste zuerst** oder **Neueste zuerst**, **Meiste zuerst** oder **Wenigste zuerst**).
 
 ![Aufgeklappte Filter und Sortierung](bild:mitgliederliste-filter)
@@ -36,7 +36,7 @@ Tippe unten auf **Verwaltung** und dann auf **Mitglieder**. Ist die Mitgliederli
 - Dein Gerät merkt sich die Sortierung. Öffnest du die Verwaltung später neu, beginnt die Liste wieder oben.
 - In der Liste stehen auch Personen nur mit dem internen Kalender (z. B. Anwärter). Kann man ihre Rolle als {rolle.member} aufnehmen, steht der Name der Rolle neben dem Namen wie ein Titel, ebenso in der Liste unter **{bereich.directory}**.
 - Ausgetretene und verstorbene Mitglieder stehen nicht hier, sondern unter **Ehemalige**.
-- Konten ohne Rolle in der App ({rolle.guest}) stehen nicht in der Liste. Wer Rollen vergeben darf, findet unter **Filter und Sortierung** das Häkchen **Auch Gast-Konten anzeigen (um ihnen eine Rolle zu geben)**; {rolle.guest} lässt sich bei **Alle Rollen** auch ohne das Häkchen wählen.
+- Konten ohne Rolle in der App ({rolle.guest}) stehen nicht in der Liste. Wer Konten sieht, findet unter **Filter und Sortierung** das Häkchen **Auch Gast-Konten anzeigen (um ihnen eine Rolle zu geben)**; {rolle.guest} lässt sich bei **Alle Rollen** auch ohne das Häkchen wählen.
 
 ## Siehe auch
 - [Seite eines Mitglieds](seite:mitglied-uebersicht)

@@ -9,7 +9,9 @@ use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Domain\Blocks\Blocks;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Infra\RemoteNewsSource;
+use KompanieApp\Core\Port\NewsEditor;
 use KompanieApp\Core\Port\NewsSource;
 use KompanieApp\Core\Push\PushService;
 
@@ -27,6 +29,10 @@ use KompanieApp\Core\Push\PushService;
  * - Lesen wie bisher mit view_news (auch ohne Anmeldung, wenn Gast das Recht hat). Schreiben, ändern und löschen mit
  *   manage_news, nur mit der Quelle „app“. Die Standardrolle „News verwalten“ entsteht beim Wechsel auf „app“
  *   (Features::roleOf) und verschwindet beim Wechsel weg, wenn niemand sie hat.
+ * - Beiträge der eigenen WordPress-Seite („site“) schreibt man im Editor von WordPress: Die Quelle des Adapters ist dann
+ *   ein Port\NewsEditor, die App öffnet seine Adressen (newUrl, editUrl). Wer das darf, sagt canEditSite (manage_news);
+ *   der Adapter gibt diesen Konten in WordPress die Rechte für Beiträge (alle Beiträge, keine Seiten). Auch mit dieser
+ *   Quelle gibt es die Standardrolle „News verwalten“ (managedType).
  * - Benachrichtigungen wie bei jeder Quelle über PushTriggers::checkNews (nach dem Schreiben sofort angestoßen).
  */
 final class NewsService
@@ -39,6 +45,8 @@ final class NewsService
     public const BODY_MAX = 200000;
     /** Rechte der Standardrolle „News verwalten“ (nur mit der Quelle app). */
     public const ROLE = ['member', 'manage_news'];
+    /** Gesetzt, sobald die Standardrolle auch für die Quelle site angelegt wurde (initialize). */
+    public const SITE_ROLE_SETTING = 'news_site_role_done';
 
     private ?AppNewsSource $appSource = null;
 
@@ -83,6 +91,47 @@ final class NewsService
         return $this->source()->available();
     }
 
+    /** Lassen sich die Beiträge der Quelle des Adapters in seinem Editor schreiben (WordPress, Quelle site)? */
+    public function editsSite(): bool
+    {
+        return !$this->inApp() && $this->app->news instanceof NewsEditor;
+    }
+
+    /** Gibt es mit der Quelle $type etwas zu pflegen (Standardrolle „News verwalten“)? */
+    public function managedType(string $type): bool
+    {
+        return $type === self::SOURCE_APP || ($type === self::SOURCE_SITE && $this->app->news instanceof NewsEditor);
+    }
+
+    /** Darf $user die Beiträge der WordPress-Seite in deren Editor schreiben, ändern und löschen? */
+    public function canEditSite(?User $user): bool
+    {
+        return $user !== null && $user->id > 0 && $this->editsSite() && $user->can(Capability::ManageNews)
+            && $this->app->features()->enabled('news');
+    }
+
+    /** Adresse zum Schreiben eines neuen Beitrags im Editor der Webseite; null, wenn $viewer das nicht darf. */
+    public function editorUrl(?User $viewer): ?string
+    {
+        return $this->canEditSite($viewer) && $this->app->news instanceof NewsEditor ? $this->app->news->newUrl() : null;
+    }
+
+    /**
+     * Einmalig nach dem Update: Wer die News schon aus den Beiträgen der WordPress-Seite bezieht, bekommt die
+     * Standardrolle „News verwalten“, die es bisher nur mit der Quelle „app“ gab.
+     */
+    public function initialize(): void
+    {
+        if ($this->app->settings->get(self::SITE_ROLE_SETTING, false) === true) {
+            return;
+        }
+        $features = $this->app->features();
+        if ($this->editsSite() && $features->enabled('news')) {
+            $this->app->roles()->featureChanged('news', true, $features->roleLabel('news'), self::ROLE);
+        }
+        $this->app->settings->set(self::SITE_ROLE_SETTING, true);
+    }
+
     public function canManage(?User $viewer): bool
     {
         return $viewer !== null && $viewer->id > 0 && $this->inApp() && $viewer->can(Capability::ManageNews)
@@ -97,7 +146,22 @@ final class NewsService
     public function page(int $page, int $perPage): array
     {
         $source = $this->source();
-        return $source->available() ? $source->page($page, $perPage) : ['items' => [], 'totalPages' => 0];
+        $out = $source->available() ? $source->page($page, $perPage) : ['items' => [], 'totalPages' => 0];
+        if ($this->remoteGerman()) {
+            foreach ($out['items'] as $i => $item) {
+                $out['items'][$i] += ['untranslated' => ContentTranslations::NONE];
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Beiträge einer anderen WordPress-Seite oder eines RSS-Feeds gibt es nur auf Deutsch (Plan „Mehrsprachigkeit“,
+     * PR 9f): In einer weiteren Sprache tragen sie den Hinweis „Nur auf Deutsch verfügbar“.
+     */
+    private function remoteGerman(): bool
+    {
+        return !$this->inApp() && $this->app->news instanceof RemoteNewsSource && $this->app->contentTranslations()->current() !== null;
     }
 
     /**
@@ -105,20 +169,40 @@ final class NewsService
      *
      * @return array<string, mixed>
      */
-    public function item(string $key, ?User $viewer): array
+    public function item(string $key, ?User $viewer, bool $source = false): array
     {
-        $source = $this->source();
-        $item = $source->available() ? $source->item($key) : null;
+        $news = $this->source();
+        $content = $this->app->contentTranslations();
+        // Zum Bearbeiten (source, nur wer die News pflegt): die deutsche Fassung und alle Fassungen getrennt
+        $german = $source && $this->inApp() && $this->canManage($viewer);
+        $item = $news->available() ? ($german ? I18n::in(I18n::base(), static fn (): ?array => $news->item($key)) : $news->item($key)) : null;
         if ($item === null) {
-            throw ApiError::notFound('Beitrag nicht gefunden.');
+            throw ApiError::notFound(I18n::t('Beitrag nicht gefunden.'));
+        }
+        if ($this->remoteGerman()) {
+            $item += ['untranslated' => ContentTranslations::NONE];
         }
         if ($this->inApp()) {
-            $row = $this->appSource()->row((int) $key);
+            $row = $this->appSource()->row((int) $key) ?? [];
             $blocks = Blocks::decode($row['blocks'] ?? null, (string) ($row['body'] ?? ''));
+            $current = $german ? null : $content->current();
+            if ($current !== null) {
+                [, $blocks, $total, $done] = $this->appSource()->localized($row, $content->of(AppNewsSource::KIND, (int) $key)[$current] ?? []);
+                $untranslated = ContentTranslations::untranslated($total, $done);
+                if ($untranslated !== null) {
+                    $item['untranslated'] = $untranslated;
+                }
+            }
             $item['blocks'] = $this->app->blocks()->forViewer($blocks, $viewer, $this->isMember($viewer), $this->canManage($viewer));
+            if ($german) {
+                $item['translations'] = $content->blocksSource(AppNewsSource::KIND, (int) $key);
+            }
         }
         if ($this->canManage($viewer)) {
             $item += $this->appSource()->meta((int) $key);
+        }
+        if ($this->canEditSite($viewer) && $this->app->news instanceof NewsEditor) {
+            $item['edit_url'] = $this->app->news->editUrl($key);
         }
         return $item;
     }
@@ -146,7 +230,8 @@ final class NewsService
         if ($row === null) {
             return false;
         }
-        if ($uid !== null && Blocks::imageOnlyForMembers(Blocks::decode($row['blocks'] ?? null, (string) ($row['body'] ?? '')), $uid)) {
+        $blocks = Blocks::decode($row['blocks'] ?? null, (string) ($row['body'] ?? ''));
+        if ($uid !== null && Blocks::imageOnlyForMembers($this->app->contentTranslations()->allBlocks(AppNewsSource::KIND, $newsId, $blocks), $uid)) {
             return $this->isMember($viewer);
         }
         return true;
@@ -160,7 +245,7 @@ final class NewsService
     {
         $this->requireInApp();
         if (!array_key_exists('title', $in)) {
-            throw ApiError::invalid('Bitte einen Titel für den Beitrag angeben.');
+            throw ApiError::invalid(I18n::t('Bitte einen Titel für den Beitrag angeben.'));
         }
         [$data, $blocks] = $this->validate($in);
         $now = $this->app->time()->nowUtc();
@@ -188,32 +273,47 @@ final class NewsService
     public function update(int $id, array $in, User $actor): array
     {
         $this->requireInApp();
-        $row = $this->appSource()->row($id) ?? throw ApiError::notFound('Beitrag nicht gefunden.');
+        $row = $this->appSource()->row($id) ?? throw ApiError::notFound(I18n::t('Beitrag nicht gefunden.'));
         $loaded = $in['updated_at'] ?? null;
         if (is_string($loaded) && $loaded !== Time::utcToIso((string) $row['updated_at'])) {
             $by = $row['updated_by'] !== null ? $this->app->users->find((int) $row['updated_by'])?->name : null;
-            throw new ApiError(409, 'conflict', ($by ?? 'Jemand') . ' hat den Beitrag inzwischen geändert. Bitte neu laden und deine Änderungen noch einmal eintragen.');
+            throw new ApiError(409, 'conflict', $by !== null
+                ? I18n::t('{name} hat den Beitrag inzwischen geändert. Bitte neu laden und deine Änderungen noch einmal eintragen.', ['name' => $by])
+                : I18n::t('Jemand hat den Beitrag inzwischen geändert. Bitte neu laden und deine Änderungen noch einmal eintragen.'));
         }
         [$data, $blocks] = $this->validate($in);
+        $content = $this->app->contentTranslations();
+        // Fassungen in weiteren Sprachen (Plan „Mehrsprachigkeit“), geprüft gegen die deutschen Blöcke nach dieser Änderung
+        $german = $blocks ?? Blocks::decode($row['blocks'] ?? null, (string) ($row['body'] ?? ''));
+        $translations = [];
+        foreach ($content->input($in['translations'] ?? null) as $locale => $fields) {
+            $translations[$locale] = $content->blocksInput($fields, $german, $actor, RichImageService::OWNER_NEWS, $id, self::TITLE_MAX, self::BODY_MAX);
+        }
         if ($blocks !== null) {
             $data += $this->app->blocks()->columns($blocks, $actor, RichImageService::OWNER_NEWS, $id, false);
         }
         if (array_key_exists('cover', $in)) {
             $data['cover'] = $this->claimCover($in['cover'], $actor, $id);
         }
-        $this->app->db->update('app_news', $data + ['updated_by' => $actor->id, 'updated_at' => $this->app->time()->nowUtc()], ['id' => $id]);
+        $this->app->db->transaction(function () use ($id, $data, $translations, $content, $actor): void {
+            foreach ($translations as $locale => $fields) {
+                $content->save(AppNewsSource::KIND, $id, $locale, $fields, $actor->id);
+            }
+            $this->app->db->update('app_news', $data + ['updated_by' => $actor->id, 'updated_at' => $this->app->time()->nowUtc()], ['id' => $id]);
+        });
         // Bilder, die weder in einem Block noch als Titelbild stehen, werden gelöscht (es gibt keinen Verlauf).
         $this->pruneImages($id);
-        return $this->item((string) $id, $actor);
+        return $this->item((string) $id, $actor, $translations !== []);
     }
 
     public function delete(int $id): void
     {
         $this->requireInApp();
-        $this->appSource()->row($id) ?? throw ApiError::notFound('Beitrag nicht gefunden.');
+        $this->appSource()->row($id) ?? throw ApiError::notFound(I18n::t('Beitrag nicht gefunden.'));
         $this->app->db->transaction(function () use ($id): void {
             $this->app->db->execute('DELETE FROM {app_news} WHERE id = ?', [$id]);
             $this->app->richImages()->deleteOwner(RichImageService::OWNER_NEWS, $id);
+            $this->app->contentTranslations()->delete(AppNewsSource::KIND, $id);
         });
     }
 
@@ -228,8 +328,8 @@ final class NewsService
             return;
         }
         $features = $this->app->features();
-        if ($features->enabled('news') && ($now === self::SOURCE_APP || $before === self::SOURCE_APP)) {
-            $this->app->roles()->featureChanged('news', $now === self::SOURCE_APP, $features->roleLabel('news'), self::ROLE);
+        if ($features->enabled('news') && $this->managedType($now) !== $this->managedType($before)) {
+            $this->app->roles()->featureChanged('news', $this->managedType($now), $features->roleLabel('news'), self::ROLE);
         }
         $this->app->settings->delete(PushService::NEWS_SETTING);
         if ($now === self::SOURCE_APP) {
@@ -248,10 +348,10 @@ final class NewsService
             return null;
         }
         if (!is_string($uid) || preg_match('/^[a-f0-9]{32}$/', $uid) !== 1) {
-            throw ApiError::invalid('Das Titelbild ist ungültig.');
+            throw ApiError::invalid(I18n::t('Das Titelbild ist ungültig.'));
         }
         $claimed = RichText::imageUids($this->app->richImages()->claim($actor, '<img data-image="' . $uid . '">', RichImageService::OWNER_NEWS, $id));
-        return $claimed[0] ?? throw ApiError::invalid('Das Titelbild wurde nicht gefunden. Bitte noch einmal hochladen.');
+        return $claimed[0] ?? throw ApiError::invalid(I18n::t('Das Titelbild wurde nicht gefunden. Bitte noch einmal hochladen.'));
     }
 
     /** Bilder des Beitrags löschen, die weder in einem Textblock noch als Titelbild stehen. */
@@ -271,6 +371,7 @@ final class NewsService
         if ($cover !== null) {
             $keep[] = $cover;
         }
+        array_push($keep, ...$this->app->contentTranslations()->blockImages(AppNewsSource::KIND, $id));
         $this->app->richImages()->prune(RichImageService::OWNER_NEWS, $id, $keep);
     }
 
@@ -282,7 +383,7 @@ final class NewsService
     private function requireInApp(): void
     {
         if (!$this->inApp()) {
-            throw new ApiError(409, 'not_in_app', 'Die Beiträge kommen hier nicht aus der App. Ein Admin kann das unter Einstellungen → Neuigkeiten ändern.');
+            throw new ApiError(409, 'not_in_app', I18n::t('Die Beiträge kommen hier nicht aus der App. Ein Admin kann das unter Einstellungen → Neuigkeiten ändern.'));
         }
     }
 
@@ -298,10 +399,10 @@ final class NewsService
         if (array_key_exists('title', $in)) {
             $title = Text::line(is_string($in['title']) ? $in['title'] : '', self::TITLE_MAX + 1);
             if ($title === '') {
-                throw ApiError::invalid('Bitte einen Titel für den Beitrag angeben.');
+                throw ApiError::invalid(I18n::t('Bitte einen Titel für den Beitrag angeben.'));
             }
             if (mb_strlen($title) > self::TITLE_MAX) {
-                throw ApiError::invalid(sprintf('Der Titel darf höchstens %d Zeichen lang sein.', self::TITLE_MAX));
+                throw ApiError::invalid(I18n::t('Der Titel darf höchstens {max} Zeichen lang sein.', ['max' => self::TITLE_MAX]));
             }
             $data['title'] = $title;
         }

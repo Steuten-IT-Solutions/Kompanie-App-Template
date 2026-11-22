@@ -22,6 +22,7 @@ import { formatEventWhen } from '../format';
 import { officeSingular } from '../officeName';
 import RichTextView from '../richtext/RichTextView';
 import Countdown from './Countdown';
+import { t } from '../i18n';
 
 /**
  * Inhalt aus Blöcken (eigene Seiten, News, Schwarzes Brett): jeder Block mit seiner Anzeige. Unbekannte Typen (Daten eines neueren Servers)
@@ -32,7 +33,7 @@ export default function BlocksView({ blocks, manager, textClassName }: { blocks:
     <div className="blocks">
       {blocks.map((b) => {
         const members =
-          manager && b.audience === 'members' ? <span className="badge badge-level-guest block-badge">nur Mitglieder</span> : null;
+          manager && b.audience === 'members' ? <span className="badge badge-level-guest block-badge">{t('nur Mitglieder')}</span> : null;
         let view;
         switch (b.type) {
           case 'text':
@@ -78,7 +79,7 @@ export default function BlocksView({ blocks, manager, textClassName }: { blocks:
             view = b.style === 'space' ? <div className="block-space" aria-hidden="true" /> : <hr className="block-divider" />;
             break;
           default:
-            view = manager ? <p className="muted small">Dieser Block wird von dieser Version der App nicht unterstützt.</p> : null;
+            view = manager ? <p className="muted small">{t('Dieser Block wird von dieser Version der App nicht unterstützt.')}</p> : null;
         }
         if (!view) return null;
         return (
@@ -114,7 +115,7 @@ function NextEvents({ block }: { block: EventsBlock }) {
     <section className="block-events">
       {block.title && <h3>{block.title}</h3>}
       {block.events.length === 0 ? (
-        <p className="muted">Zurzeit steht nichts an.</p>
+        <p className="muted">{t('Zurzeit steht nichts an.')}</p>
       ) : (
         <ul className="block-events-list">
           {block.events.map((e) => (
@@ -127,7 +128,7 @@ function NextEvents({ block }: { block: EventsBlock }) {
         </ul>
       )}
       <a className="btn btn-link block-events-all" href="#/termine">
-        Alle Termine
+        {t('Alle Termine')}
       </a>
     </section>
   );
@@ -139,7 +140,7 @@ function Contacts({ block }: { block: ContactsBlock }) {
     <section className="block-contacts">
       {block.title && <h3>{block.title}</h3>}
       {block.offices.length === 0 ? (
-        <p className="muted">Zurzeit keine Ansprechpartner.</p>
+        <p className="muted">{t('Zurzeit keine Ansprechpartner.')}</p>
       ) : (
         <ul className="block-contacts-list">
           {block.offices.flatMap((o) =>
@@ -148,7 +149,7 @@ function Contacts({ block }: { block: ContactsBlock }) {
                 {h && <MemberAvatar url={h.photo_url} name={h.name} size="medium" />}
                 <span className="block-contact-text">
                   <span className="muted small">{officeSingular(o)}</span>
-                  <strong>{h ? h.name : 'zurzeit nicht besetzt'}</strong>
+                  <strong>{h ? h.name : t('zurzeit nicht besetzt')}</strong>
                   {h?.email && <a href={`mailto:${h.email}`}>{h.email}</a>}
                   {h?.phone && <a href={`tel:${h.phone.replace(/\s+/g, '')}`}>{h.phone}</a>}
                 </span>
@@ -208,15 +209,17 @@ function Facts({ block }: { block: FactsBlock }) {
 /** Umfrage: Titel und Stand mit dem Weg zum Abstimmen bzw. zur Antwort. */
 function PollCard({ block }: { block: PollBlock }) {
   const p = block.poll;
-  if (!p) return <p className="muted small">Diese Umfrage gibt es nicht mehr.</p>;
+  if (!p) return <p className="muted small">{t('Diese Umfrage gibt es nicht mehr.')}</p>;
   return (
     <section className="block-poll card">
       <span className="muted small">
-        Umfrage · {p.status === 'ended' ? 'beendet' : p.ends_at ? `bis ${formatUntil(p.ends_at)}` : 'läuft'}
+        {t('Umfrage · {status}', {
+          status: p.status === 'ended' ? t('beendet') : p.ends_at ? t('bis {date}', { date: formatUntil(p.ends_at) }) : t('läuft'),
+        })}
       </span>
       <strong className="block-poll-title">{p.title}</strong>
       <a className={`btn${p.has_voted || p.status === 'ended' ? ' btn-secondary' : ''}`} href={`#/umfragen/${p.id}`}>
-        {p.has_voted || p.status === 'ended' ? 'Antwort und Ergebnis ansehen' : 'Teilnehmen'}
+        {p.has_voted || p.status === 'ended' ? t('Antwort und Ergebnis ansehen') : t('Teilnehmen')}
       </a>
     </section>
   );
@@ -225,17 +228,17 @@ function PollCard({ block }: { block: PollBlock }) {
 /** Album: einige Vorschaubilder, ein Tipp öffnet das Album in der Galerie. */
 function AlbumPreview({ block }: { block: AlbumBlock }) {
   const a = block.album;
-  if (!a) return <p className="muted small">Dieses Album gibt es nicht mehr oder es ist leer.</p>;
+  if (!a) return <p className="muted small">{t('Dieses Album gibt es nicht mehr oder es ist leer.')}</p>;
   return (
     <section className="block-album">
       <h3>{a.title}</h3>
-      <a className="block-album-grid" href={`#/galerie/${a.id}`} aria-label={`Album ${a.title} öffnen`}>
+      <a className="block-album-grid" href={`#/galerie/${a.id}`} aria-label={t('Album {title} öffnen', { title: a.title })}>
         {a.photos.map((p) => (
           <img key={p.id} src={p.thumb} alt="" loading="lazy" width={p.width} height={p.height} />
         ))}
       </a>
       <a className="btn btn-link" href={`#/galerie/${a.id}`}>
-        Alle {a.total} im Album ansehen
+        {t('Alle {count} im Album ansehen', { count: a.total })}
       </a>
     </section>
   );
@@ -246,17 +249,18 @@ function DocumentCard({ block }: { block: DocumentBlock }) {
   const d = block.document;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  if (!d) return <p className="muted small">Dieses Dokument gibt es nicht mehr oder es ist nicht für alle sichtbar.</p>;
+  if (!d) return <p className="muted small">{t('Dieses Dokument gibt es nicht mehr oder es ist nicht für alle sichtbar.')}</p>;
   const doc = d;
   async function save() {
     setBusy(true);
     setError(null);
     try {
       const res = await fetch(doc.url, { credentials: 'same-origin' });
-      if (!res.ok) throw new Error(res.status === 404 ? 'Das Dokument wurde nicht gefunden.' : `Fehler ${res.status}`);
+      if (!res.ok)
+        throw new Error(res.status === 404 ? t('Das Dokument wurde nicht gefunden.') : t('Fehler {status}', { status: res.status }));
       await saveFile(await res.blob(), `${safeFileName(doc.title, 'Dokument')}.${doc.ext}`, { title: doc.title });
     } catch (e) {
-      setError(e instanceof TypeError ? 'Keine Verbindung.' : (e as Error).message);
+      setError(e instanceof TypeError ? t('Keine Verbindung.') : (e as Error).message);
     } finally {
       setBusy(false);
     }
@@ -265,16 +269,16 @@ function DocumentCard({ block }: { block: DocumentBlock }) {
     <section className="block-document card">
       <strong>{d.title}</strong>
       <span className="muted small">
-        {d.ext.toUpperCase()} · {formatBytes(d.size)} · Stand {formatDate(d.date)}
+        {d.ext.toUpperCase()} · {formatBytes(d.size)} · {t('Stand {date}', { date: formatDate(d.date) })}
       </span>
       <div className="button-row">
         {d.kind !== 'file' && (
           <a className="btn" href={`#/dokumente/${d.id}`}>
-            Öffnen
+            {t('Öffnen')}
           </a>
         )}
         <button className="btn btn-secondary" disabled={busy} onClick={() => void save()}>
-          Herunterladen
+          {t('Herunterladen')}
         </button>
       </div>
       {error && (
@@ -288,7 +292,7 @@ function DocumentCard({ block }: { block: DocumentBlock }) {
 
 /** Sponsoren: Logos (ohne Logo der Name) in ihrer Reihenfolge, mit Link in einem neuen Tab. */
 function SponsorsRow({ block }: { block: SponsorsBlock }) {
-  if (block.sponsors.length === 0) return <p className="muted small">Noch keine Einträge.</p>;
+  if (block.sponsors.length === 0) return <p className="muted small">{t('Noch keine Einträge.')}</p>;
   return (
     <section className="block-sponsors">
       {block.title && <h3>{block.title}</h3>}
@@ -325,7 +329,7 @@ function MapPlace({ block }: { block: MapBlock }) {
       <p className="block-map-place">{block.place}</p>
       {map && (
         <a className="btn btn-secondary" href={map} {...mapLinkTarget(map)}>
-          Karte
+          {t('Karte')}
         </a>
       )}
     </section>

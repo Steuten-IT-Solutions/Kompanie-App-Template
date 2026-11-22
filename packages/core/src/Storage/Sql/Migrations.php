@@ -1929,6 +1929,308 @@ WHERE title IS NULL",
                 'mysql' => ['ALTER TABLE {change_log} ADD COLUMN batch varchar(32) NOT NULL DEFAULT \'\''],
                 'sqlite' => ['ALTER TABLE {change_log} ADD COLUMN batch TEXT NOT NULL DEFAULT \'\''],
             ],
+            // Zu- und Absagen bei Terminen des internen Kalenders (Domain\EventResponseService): eine Rückmeldung je Person und
+            // Termin (event_key = stabile Kennung des Termins in der Quelle), Titel und Datum als Momentaufnahme (Aufräumen,
+            // Auskunft). Termine der App bekommen einen optionalen Anmeldeschluss (Datum, bis zum Ende dieses Tages).
+            61 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {event_responses} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  event_key varchar(64) NOT NULL,
+  user_id bigint(20) unsigned NOT NULL,
+  status varchar(10) NOT NULL,
+  note varchar(191) NOT NULL DEFAULT \'\',
+  event_title varchar(191) NOT NULL DEFAULT \'\',
+  event_date date NOT NULL,
+  updated_by bigint(20) unsigned NOT NULL,
+  created_at datetime NOT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY event_user (event_key, user_id),
+  KEY user_id (user_id),
+  KEY event_date (event_date)
+) {options}',
+                    'ALTER TABLE {internal_events} ADD COLUMN respond_until date DEFAULT NULL',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {event_responses} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  event_key TEXT NOT NULL,
+  user_id INTEGER NOT NULL,
+  status TEXT NOT NULL,
+  note TEXT NOT NULL DEFAULT \'\',
+  event_title TEXT NOT NULL DEFAULT \'\',
+  event_date TEXT NOT NULL,
+  updated_by INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+)',
+                    'CREATE UNIQUE INDEX IF NOT EXISTS {event_responses}_event_user ON {event_responses} (event_key, user_id)',
+                    'CREATE INDEX IF NOT EXISTS {event_responses}_user_id ON {event_responses} (user_id)',
+                    'CREATE INDEX IF NOT EXISTS {event_responses}_event_date ON {event_responses} (event_date)',
+                    'ALTER TABLE {internal_events} ADD COLUMN respond_until TEXT DEFAULT NULL',
+                ],
+            ],
+            // Punkte und Strafen offline gebucht (Warteschlange der App): Kennung der Buchung (request_id, von der App erzeugt).
+            // Kommt dieselbe Buchung noch einmal (Antwort ging unterwegs verloren), liefert der Server die Einträge von damals,
+            // statt doppelt zu buchen. Eindeutig je Person: Ein gleichzeitiges zweites Senden scheitert, statt zu doppeln.
+            62 => [
+                'mysql' => [
+                    'ALTER TABLE {points} ADD COLUMN request_id varchar(36) DEFAULT NULL, ADD UNIQUE KEY request_user (request_id, user_id)',
+                    'ALTER TABLE {penalties} ADD COLUMN request_id varchar(36) DEFAULT NULL, ADD UNIQUE KEY request_user (request_id, user_id)',
+                ],
+                'sqlite' => [
+                    'ALTER TABLE {points} ADD COLUMN request_id TEXT DEFAULT NULL',
+                    'CREATE UNIQUE INDEX IF NOT EXISTS {points}_request_user ON {points} (request_id, user_id)',
+                    'ALTER TABLE {penalties} ADD COLUMN request_id TEXT DEFAULT NULL',
+                    'CREATE UNIQUE INDEX IF NOT EXISTS {penalties}_request_user ON {penalties} (request_id, user_id)',
+                ],
+            ],
+            // Passive (Bereich passive, Domain\PassiveMemberService): eigene Einträge ohne Konto, damit sie nie einen Zugang
+            // bekommen. Name, Adresse wie in member_contacts, Telefon, E-Mail, Geburtsdatum (JJJJ-MM-TT oder leer) und
+            // optional ein Mitglied als Betreuer (caretaker_id, Konto-ID). Zeiten in UTC.
+            63 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {passive_members} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  first_name varchar(100) NOT NULL,
+  last_name varchar(100) NOT NULL DEFAULT \'\',
+  street varchar(100) NOT NULL DEFAULT \'\',
+  house_number varchar(10) NOT NULL DEFAULT \'\',
+  address_extra varchar(100) NOT NULL DEFAULT \'\',
+  postal_code varchar(12) NOT NULL DEFAULT \'\',
+  city varchar(60) NOT NULL DEFAULT \'\',
+  country varchar(2) NOT NULL DEFAULT \'\',
+  country_name varchar(60) NOT NULL DEFAULT \'\',
+  phone varchar(30) NOT NULL DEFAULT \'\',
+  email varchar(100) NOT NULL DEFAULT \'\',
+  birth_date date DEFAULT NULL,
+  caretaker_id bigint(20) unsigned DEFAULT NULL,
+  created_by bigint(20) unsigned NOT NULL,
+  created_at datetime NOT NULL,
+  updated_by bigint(20) unsigned NOT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (id),
+  KEY caretaker_id (caretaker_id)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {passive_members} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  first_name TEXT NOT NULL,
+  last_name TEXT NOT NULL DEFAULT \'\',
+  street TEXT NOT NULL DEFAULT \'\',
+  house_number TEXT NOT NULL DEFAULT \'\',
+  address_extra TEXT NOT NULL DEFAULT \'\',
+  postal_code TEXT NOT NULL DEFAULT \'\',
+  city TEXT NOT NULL DEFAULT \'\',
+  country TEXT NOT NULL DEFAULT \'\',
+  country_name TEXT NOT NULL DEFAULT \'\',
+  phone TEXT NOT NULL DEFAULT \'\',
+  email TEXT NOT NULL DEFAULT \'\',
+  birth_date TEXT DEFAULT NULL,
+  caretaker_id INTEGER DEFAULT NULL,
+  created_by INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_by INTEGER NOT NULL,
+  updated_at TEXT NOT NULL
+)',
+                    'CREATE INDEX IF NOT EXISTS {passive_members}_caretaker_id ON {passive_members} (caretaker_id)',
+                ],
+            ],
+            // Titelbild eines Albums in der Galerie-Übersicht, in der App gewählt (manage_gallery). NULL: automatisch wie
+            // bisher. Ein gewähltes Bild, das nicht mehr im Album liegt oder für den Betrachter nicht sichtbar ist (intern),
+            // zählt nicht: Dann gilt die automatische Wahl (GalleryRepository::albumSummaries).
+            64 => [
+                'mysql' => [
+                    'ALTER TABLE {albums} ADD COLUMN cover_photo_id bigint(20) unsigned DEFAULT NULL',
+                ],
+                'sqlite' => [
+                    'ALTER TABLE {albums} ADD COLUMN cover_photo_id INTEGER DEFAULT NULL',
+                ],
+            ],
+            // Beitrag der Passiven: je Passivem und Jahr höchstens eine Zahlung mit Betrag, Datum und Zahlungsart
+            65 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {passive_payments} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  passive_id bigint(20) unsigned NOT NULL,
+  year smallint(5) unsigned NOT NULL,
+  amount_cents int(11) NOT NULL,
+  paid_on date NOT NULL,
+  method varchar(40) NOT NULL DEFAULT \'\',
+  created_by bigint(20) unsigned NOT NULL,
+  created_at datetime NOT NULL,
+  updated_by bigint(20) unsigned NOT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY passive_year (passive_id, year)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {passive_payments} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  passive_id INTEGER NOT NULL,
+  year INTEGER NOT NULL,
+  amount_cents INTEGER NOT NULL,
+  paid_on TEXT NOT NULL,
+  method TEXT NOT NULL DEFAULT \'\',
+  created_by INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_by INTEGER NOT NULL,
+  updated_at TEXT NOT NULL
+)',
+                    'CREATE UNIQUE INDEX IF NOT EXISTS {passive_payments}_passive_year ON {passive_payments} (passive_id, year)',
+                ],
+            ],
+            // Terminarten (z. B. Versammlung): je Termin des internen Kalenders, bei jeder Quelle in der App gespeichert
+            // (event_key wie bei den Zu- und Absagen), dazu als Momentaufnahme an jeder Anwesenheitsliste.
+            66 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {event_kinds} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  event_key varchar(64) NOT NULL,
+  kind varchar(40) NOT NULL,
+  event_title varchar(191) NOT NULL DEFAULT \'\',
+  event_date date NOT NULL,
+  updated_by bigint(20) unsigned NOT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY event_key (event_key)
+) {options}',
+                    'ALTER TABLE {attendance_lists} ADD COLUMN kind varchar(40) NOT NULL DEFAULT \'\'',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {event_kinds} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  event_key TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  event_title TEXT NOT NULL DEFAULT \'\',
+  event_date TEXT NOT NULL,
+  updated_by INTEGER NOT NULL,
+  updated_at TEXT NOT NULL
+)',
+                    'CREATE UNIQUE INDEX IF NOT EXISTS {event_kinds}_event_key ON {event_kinds} (event_key)',
+                    'ALTER TABLE {attendance_lists} ADD COLUMN kind TEXT NOT NULL DEFAULT \'\'',
+                ],
+            ],
+            // Aufnahmen (Domain\AdmissionService): „Anwärter seit“ je Person und Anwärter-Rolle; since leer = unbekannt
+            // (nachtragen).
+            67 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {candidate_since} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  user_id bigint(20) unsigned NOT NULL,
+  role_key varchar(64) NOT NULL,
+  since varchar(10) NOT NULL DEFAULT \'\',
+  updated_by bigint(20) unsigned NOT NULL DEFAULT 0,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY user_role (user_id, role_key)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {candidate_since} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  role_key TEXT NOT NULL,
+  since TEXT NOT NULL DEFAULT \'\',
+  updated_by INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL
+)',
+                    'CREATE UNIQUE INDEX IF NOT EXISTS {candidate_since}_user_role ON {candidate_since} (user_id, role_key)',
+                ],
+            ],
+            // Passive: Eintritt (Jahr, Datum oder freier Text wie „vor 2014“) und eine Bemerkung (Wunsch vom 17.11.2026, für
+            // den Import einer bestehenden Liste)
+            68 => [
+                'mysql' => [
+                    'ALTER TABLE {passive_members} ADD COLUMN joined varchar(40) NOT NULL DEFAULT \'\', ADD COLUMN note varchar(500) NOT NULL DEFAULT \'\'',
+                ],
+                'sqlite' => [
+                    'ALTER TABLE {passive_members} ADD COLUMN joined TEXT NOT NULL DEFAULT \'\'',
+                    'ALTER TABLE {passive_members} ADD COLUMN note TEXT NOT NULL DEFAULT \'\'',
+                ],
+            ],
+            // Geburtstage der Passiven (PassiveMemberService::remindBirthdays): Tag des Geburtstags, an den zuletzt erinnert
+            // wurde (JJJJ-MM-TT, leer = noch nie), damit jede Erinnerung nur einmal kommt.
+            69 => [
+                'mysql' => [
+                    'ALTER TABLE {passive_members} ADD COLUMN birthday_reminded varchar(10) NOT NULL DEFAULT \'\'',
+                ],
+                'sqlite' => [
+                    'ALTER TABLE {passive_members} ADD COLUMN birthday_reminded TEXT NOT NULL DEFAULT \'\'',
+                ],
+            ],
+            // Einreichungen der Galerie in Google Drive (GalleryDriveService): ID der Datei im Ordner „Einreichungen“, solange
+            // sie offen ist (leer: Datei liegt im MediaStore unter file_key). file_key bleibt, seine Endung zeigt Video oder Bild.
+            70 => [
+                'mysql' => ['ALTER TABLE {gallery_submissions} ADD COLUMN drive_file_id varchar(100) NOT NULL DEFAULT \'\''],
+                'sqlite' => ['ALTER TABLE {gallery_submissions} ADD COLUMN drive_file_id TEXT NOT NULL DEFAULT \'\''],
+            ],
+            // Zugang beantragen mit Bereich Kompanien (RegistrationService): Kompanien, die die Person im Antrag gewählt hat,
+            // als IDs mit Komma (leer: keine). Die Freigabe übernimmt sie als Zuordnung.
+            71 => [
+                'mysql' => ['ALTER TABLE {registration_requests} ADD COLUMN company_ids varchar(255) NOT NULL DEFAULT \'\''],
+                'sqlite' => ['ALTER TABLE {registration_requests} ADD COLUMN company_ids TEXT NOT NULL DEFAULT \'\''],
+            ],
+            // Mehrere Terminarten je Termin und Anwesenheitsliste (EventKindRepository::columns()): alle Arten mit
+            // Zeilenumbruch getrennt; kind behält die erste, damit eine ältere Version nach dem Zurückrollen weiter eine liest.
+            // Leer: nur kind zählt (Zeilen von vorher).
+            72 => [
+                'mysql' => [
+                    'ALTER TABLE {event_kinds} ADD COLUMN kinds varchar(1500) NOT NULL DEFAULT \'\'',
+                    'ALTER TABLE {attendance_lists} ADD COLUMN kinds varchar(1500) NOT NULL DEFAULT \'\'',
+                ],
+                'sqlite' => [
+                    'ALTER TABLE {event_kinds} ADD COLUMN kinds TEXT NOT NULL DEFAULT \'\'',
+                    'ALTER TABLE {attendance_lists} ADD COLUMN kinds TEXT NOT NULL DEFAULT \'\'',
+                ],
+            ],
+            // Namen je weiterer Sprache (Plan „Mehrsprachigkeit“, Storage\TranslationRepository): Art (z. B. nav, role), Kennung
+            // in dieser Art, Feld und Sprache; der deutsche Name bleibt, wo er ist. Kurze Spalten, damit der Schlüssel auch
+            // in älterem MySQL passt.
+            73 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {translations} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  kind varchar(20) NOT NULL,
+  ref varchar(100) NOT NULL,
+  field varchar(20) NOT NULL,
+  locale varchar(8) NOT NULL,
+  text text NOT NULL,
+  updated_by bigint(20) unsigned NOT NULL DEFAULT 0,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY kind_ref (kind, ref, field, locale)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {translations} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind TEXT NOT NULL,
+  ref TEXT NOT NULL,
+  field TEXT NOT NULL,
+  locale TEXT NOT NULL,
+  text TEXT NOT NULL,
+  updated_by INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL
+)',
+                    'CREATE UNIQUE INDEX IF NOT EXISTS {translations}_kind_ref ON {translations} (kind, ref, field, locale)',
+                ],
+            ],
+            // Zu- und Absagen, die offline vor dem Ende der Frist getippt wurden und erst danach ankamen (EventResponseService):
+            // Zeit des Tippens (UTC) zum Kennzeichnen „nachträglich übertragen“; NULL bei allen anderen.
+            74 => [
+                'mysql' => ['ALTER TABLE {event_responses} ADD COLUMN decided_at datetime DEFAULT NULL'],
+                'sqlite' => ['ALTER TABLE {event_responses} ADD COLUMN decided_at TEXT DEFAULT NULL'],
+            ],
+            // Inhalte je Sprache (Plan „Mehrsprachigkeit“, PR 9b): Fassungen langer Texte (eigene Seiten, später News, Brett …)
+            // stehen ebenfalls in translations; text reicht dafür in MySQL nicht (64 KB). SQLite kennt keine Grenze.
+            75 => [
+                'mysql' => ['ALTER TABLE {translations} MODIFY text mediumtext NOT NULL'],
+                'sqlite' => [],
+            ],
         ];
     }
 

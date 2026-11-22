@@ -5,7 +5,8 @@
  *   php scripts/handbuch.php --check
  *       prüft Kopfbereich, Platzhalter, Verweise und ob jeder Bereich mit eigenen Rechten eine Seite hat
  *   php scripts/handbuch.php --app=packages/frontend/src/generated/handbuch.json
- *       Seiten für die Hilfe in der App (offline, passend zur Version); gefiltert wird in der App
+ *       Seiten für die Hilfe in der App (offline, passend zur Version); gefiltert wird in der App. Daneben
+ *       handbuch.en.json mit den englischen Fassungen (Titel und Text je Seite), die die App nur auf Englisch lädt
  *   php scripts/handbuch.php --site=ordner [--brand=ordner mit brand.json und theme.css] [--bilder=ordner]
  *       statische Seiten für GitHub Pages der Kompanie (unter /handbuch/), mit ihren Bezeichnungen
  *
@@ -24,24 +25,31 @@
  *   ![Beschreibung](bild:name) als eigene Zeile für ein Bildschirmfoto (erzeugt von scripts/handbuch-bilder.sh).
  *   Platzhalter: {kompanie.name}, {bereich.events|calendar|news|gallery|points|catalog|penalties|ranks|titles|attendance|documents|board|polls|birthdays|inventory|directory|offices|lists|mail|sponsors|companies|pages|intern}, {begriff.rank},
  *   {rolle.guest|member|admin}; App und Webseite setzen die Bezeichnungen der Kompanie ein.
+ *
+ * Englisch (Plan „Mehrsprachigkeit“): docs/handbuch/en/<name>.md mit demselben Namen wie die deutsche Seite, im
+ * Kopfbereich nur titel (Rechte, Reihenfolge, Bereiche und Variante gelten wie auf Deutsch), Text wie oben; Verweise
+ * seite:… nennen die deutschen Namen. Fehlt eine Seite, zeigt die App auf Englisch die deutsche mit dem Hinweis „Nur auf
+ * Deutsch verfügbar“.
  */
 
 declare(strict_types=1);
 
 require __DIR__ . '/markdown.php';
 
-const CAPABILITIES = ['member', 'calendar', 'view_intern', 'view_events', 'view_news', 'view_gallery', 'view_companies', 'view_sponsors', 'view_gallery_internal', 'view_own_points', 'view_own_penalties', 'view_own_rank', 'view_own_attendance', 'view_birthdays', 'vote_polls', 'view_directory', 'view_offices', 'view_former', 'view_documents', 'view_board', 'view_ranks', 'view_catalog', 'manage_points', 'manage_penalties', 'manage_ranks', 'manage_titles', 'manage_attendance', 'manage_events', 'manage_calendar', 'manage_documents', 'post_board', 'manage_polls', 'manage_inventory', 'manage_offices', 'manage_lists', 'send_mail', 'manage_sponsors', 'manage_companies', 'submit_gallery', 'review_gallery', 'manage_gallery', 'manage_pages', 'manage_news', 'view_personal', 'manage_personal', 'create_users', 'promote_users', 'review_reports', 'view_activity', 'view_changes', 'manage_settings'];
+const CAPABILITIES = ['member', 'calendar', 'respond_calendar', 'view_intern', 'view_events', 'view_news', 'view_gallery', 'view_companies', 'view_sponsors', 'view_gallery_internal', 'view_own_points', 'view_own_penalties', 'view_own_rank', 'view_own_attendance', 'view_birthdays', 'vote_polls', 'view_directory', 'view_offices', 'view_former', 'view_documents', 'view_board', 'view_ranks', 'view_catalog', 'view_points', 'manage_points', 'view_penalties', 'manage_penalties', 'view_promotions', 'manage_ranks', 'view_titles', 'manage_titles', 'view_attendance', 'manage_attendance', 'manage_events', 'view_responses', 'manage_calendar', 'view_restricted_documents', 'manage_documents', 'view_board_history', 'post_board', 'view_poll_results', 'manage_polls', 'view_inventory', 'manage_inventory', 'manage_offices', 'view_lists', 'manage_lists', 'view_mail', 'send_mail', 'manage_sponsors', 'view_company_members', 'manage_companies', 'submit_gallery', 'view_submissions', 'review_gallery', 'manage_gallery', 'manage_pages', 'manage_website', 'manage_news', 'view_personal', 'manage_personal', 'view_accounts', 'create_users', 'manage_former', 'view_passive', 'manage_passive', 'promote_users', 'view_reports', 'review_reports', 'view_activity', 'view_changes', 'manage_settings'];
+/** Schreibrecht => Leserecht, das es voraussetzt (wie Capability::READ_OF im Kern): Wer schreibt, sieht auch. */
+const READ_OF = ['manage_personal' => 'view_personal', 'manage_points' => 'view_points', 'manage_penalties' => 'view_penalties', 'manage_ranks' => 'view_promotions', 'manage_titles' => 'view_titles', 'manage_attendance' => 'view_attendance', 'manage_calendar' => 'view_responses', 'manage_inventory' => 'view_inventory', 'manage_lists' => 'view_lists', 'send_mail' => 'view_mail', 'manage_passive' => 'view_passive', 'review_gallery' => 'view_submissions', 'review_reports' => 'view_reports', 'create_users' => 'view_accounts', 'promote_users' => 'view_accounts', 'manage_documents' => 'view_restricted_documents', 'manage_polls' => 'view_poll_results', 'post_board' => 'view_board_history', 'manage_companies' => 'view_company_members'];
 /** Wie Roles::PUBLIC_DEFAULTS mit ADDED_VIEW, CANDIDATE_DEFAULTS und MEMBER_DEFAULTS im Kern (Gast, Anwärter, Mitglied anfangs). */
 const PUBLIC_DEFAULTS = ['view_events', 'view_news', 'view_gallery', 'view_directory', 'view_offices', 'view_former', 'view_companies', 'view_sponsors'];
-const CANDIDATE_DEFAULTS = ['calendar', 'view_board'];
-const MEMBER_DEFAULTS = ['member', 'calendar', 'view_intern', 'view_gallery_internal', 'view_own_points', 'view_own_penalties', 'view_own_rank', 'view_own_attendance', 'view_birthdays', 'vote_polls', 'view_documents', 'view_board', 'view_ranks', 'view_catalog'];
-const FEATURES = ['events', 'calendar', 'news', 'gallery', 'points', 'penalties', 'ranks', 'titles', 'attendance', 'documents', 'board', 'polls', 'birthdays', 'inventory', 'directory', 'offices', 'lists', 'mail', 'sponsors', 'companies', 'pages'];
+const CANDIDATE_DEFAULTS = ['calendar', 'respond_calendar', 'view_board'];
+const MEMBER_DEFAULTS = ['member', 'calendar', 'respond_calendar', 'view_intern', 'view_gallery_internal', 'view_own_points', 'view_own_penalties', 'view_own_rank', 'view_own_attendance', 'view_birthdays', 'vote_polls', 'view_documents', 'view_board', 'view_ranks', 'view_catalog'];
+const FEATURES = ['events', 'calendar', 'news', 'gallery', 'points', 'penalties', 'ranks', 'titles', 'attendance', 'documents', 'board', 'polls', 'birthdays', 'inventory', 'directory', 'offices', 'lists', 'mail', 'sponsors', 'companies', 'pages', 'website', 'passive'];
 /** Bereiche mit eigenen Rechten: Jeder braucht eine Handbuchseite (siehe Domain\Features, Feld role). */
-const FEATURES_WITH_ROLE = ['events' => 'manage_events', 'calendar' => 'manage_calendar', 'points' => 'manage_points', 'penalties' => 'manage_penalties', 'ranks' => 'manage_ranks', 'titles' => 'manage_titles', 'attendance' => 'manage_attendance', 'documents' => 'manage_documents', 'board' => 'post_board', 'polls' => 'manage_polls', 'inventory' => 'manage_inventory', 'offices' => 'manage_offices', 'lists' => 'manage_lists', 'mail' => 'send_mail', 'sponsors' => 'manage_sponsors', 'companies' => 'manage_companies', 'gallery' => 'review_gallery', 'pages' => 'manage_pages'];
+const FEATURES_WITH_ROLE = ['events' => 'manage_events', 'calendar' => 'manage_calendar', 'points' => 'manage_points', 'penalties' => 'manage_penalties', 'ranks' => 'manage_ranks', 'titles' => 'manage_titles', 'attendance' => 'manage_attendance', 'documents' => 'manage_documents', 'board' => 'post_board', 'polls' => 'manage_polls', 'inventory' => 'manage_inventory', 'offices' => 'manage_offices', 'lists' => 'manage_lists', 'mail' => 'send_mail', 'sponsors' => 'manage_sponsors', 'companies' => 'manage_companies', 'gallery' => 'review_gallery', 'pages' => 'manage_pages', 'website' => 'manage_website', 'passive' => 'manage_passive'];
 /** Bereiche, die andere voraussetzen (wie Domain\Features, Feld requires): Ist der erste an, sind es auch diese. */
-const FEATURE_REQUIRES = ['polls' => ['board']];
+const FEATURE_REQUIRES = ['polls' => ['board'], 'website' => ['pages']];
 /** Rechte ohne eigenen Bereich, die eine Rolle bekommen kann: Auch dafür braucht es eine Seite. */
-const RIGHTS_WITH_PAGE = ['create_users', 'promote_users', 'review_reports', 'view_changes'];
+const RIGHTS_WITH_PAGE = ['create_users', 'manage_former', 'promote_users', 'review_reports', 'view_changes'];
 const PLACEHOLDERS = ['kompanie.name', 'bereich.events', 'bereich.calendar', 'bereich.news', 'bereich.gallery', 'bereich.points', 'bereich.penalties', 'bereich.ranks', 'bereich.titles', 'bereich.attendance', 'bereich.documents', 'bereich.board', 'bereich.polls', 'bereich.birthdays', 'bereich.inventory', 'bereich.directory', 'bereich.offices', 'bereich.lists', 'bereich.mail', 'bereich.sponsors', 'bereich.companies', 'bereich.pages', 'bereich.catalog', 'bereich.intern', 'begriff.rank', 'rolle.guest', 'rolle.member', 'rolle.admin'];
 const DEFAULT_LABELS = [
     'kompanie.name' => 'Kompanie',
@@ -163,6 +171,60 @@ function load(string $dir): array
 }
 
 /**
+ * Englische Fassungen (docs/handbuch/en): nur Seiten, die es auf Deutsch gibt, Kopfbereich nur mit titel; Verweise,
+ * Platzhalter und Bilder wie auf Deutsch geprüft. Verweise gelten zwischen den Seiten wie auf Deutsch (gleiche Rechte).
+ *
+ * @param array<string, array<string, mixed>> $pages deutsche Seiten
+ * @return array{0: array<string, array{titel: string, markdown: string}>, 1: string[]}
+ */
+function loadTranslations(string $dir, array $pages): array
+{
+    $out = [];
+    $errors = [];
+    foreach (glob($dir . '/*.md') ?: [] as $file) {
+        $slug = basename($file, '.md');
+        $name = 'en/' . $slug . '.md';
+        if (!isset($pages[$slug])) {
+            $errors[] = "$name: Eine deutsche Seite „{$slug}“ gibt es nicht (gleicher Dateiname wie auf Deutsch)";
+            continue;
+        }
+        $text = str_replace("\r\n", "\n", (string) file_get_contents($file));
+        if (!preg_match('/^---\ntitel:[ \t]*([^\n]*)\n---\n(.*)$/s', $text, $m)) {
+            $errors[] = "$name: Kopfbereich nur mit titel (--- titel: … ---)";
+            continue;
+        }
+        $titel = trim($m[1]);
+        if (preg_match('/^"(.*)"$/', $titel, $q)) {
+            $titel = $q[1];
+        }
+        if ($titel === '') {
+            $errors[] = "$name: „titel“ ist leer";
+        }
+        preg_match_all('/bild:/', $m[2], $refs);
+        preg_match_all('/^!\[[^\]]+\]\(bild:[a-z0-9-]+\)$/m', $m[2], $okImages);
+        if (count($refs[0]) !== count($okImages[0])) {
+            $errors[] = "$name: Bild nur als eigene Zeile ![Beschreibung](bild:name), Name nur mit a–z, 0–9 und -";
+        }
+        preg_match_all('/\{([a-z]+\.[a-z]+)\}/', $m[2] . ' ' . $titel, $ph);
+        foreach (array_diff(array_unique($ph[1]), PLACEHOLDERS) as $p) {
+            $errors[] = "$name: unbekannter Platzhalter {{$p}}";
+        }
+        preg_match_all('/\]\(seite:([^)]*)\)/', $m[2], $all);
+        foreach ($all[1] as $target) {
+            if (!preg_match('/^[a-z0-9-]+$/', $target)) {
+                $errors[] = "$name: ungültiger Verweis seite:{$target}";
+            } elseif (!isset($pages[$target])) {
+                $errors[] = "$name: Verweis auf fehlende Seite „{$target}“";
+            } elseif (!reachable($pages[$slug], $pages[$target])) {
+                $errors[] = "$name: Verweis auf „{$target}“, die nicht jeder sieht, der diese Seite sieht (Rechte, Bereiche oder Variante)";
+            }
+        }
+        $out[$slug] = ['titel' => $titel, 'markdown' => $m[2]];
+    }
+    return [$out, $errors];
+}
+
+/**
  * Sieht jeder, der $from sieht, auch $to? Admins (manage_settings) haben alle Rechte. Bereiche und
  * Variante des Ziels dürfen nicht enger sein; vorausgesetzte Bereiche (FEATURE_REQUIRES) zählen als eingeschaltet.
  * Von „einrecht“ der Quelle hat die Person nur irgendeines: Das Ziel braucht dann eines davon in seinem „einrecht“.
@@ -171,6 +233,11 @@ function reachable(array $from, array $to): bool
 {
     $admin = in_array('manage_settings', $from['rechte'], true);
     $held = $admin ? CAPABILITIES : $from['rechte'];
+    foreach ($held as $c) {
+        if (isset(READ_OF[$c])) {
+            $held[] = READ_OF[$c];
+        }
+    }
     // Wer die Seite sieht, wie anfangs eingerichtet (Roles im Kern; jede Rolle lässt sich enger stellen, für Verweise
     // zählt der Anfang): Das Öffentliche sieht jeder, Anwärter dazu Kalender und Brett, wer mehr braucht, ist Mitglied.
     if (array_diff($held, [...PUBLIC_DEFAULTS, ...CANDIDATE_DEFAULTS]) !== []) {
@@ -208,13 +275,15 @@ function group(array $page): string
 }
 
 [$pages, $errors] = load($src);
+[$english, $enErrors] = loadTranslations($src . '/en', $pages);
+$errors = [...$errors, ...$enErrors];
 
 if (isset($opt['check'])) {
     if ($errors) {
         fwrite(STDERR, "Handbuch:\n  - " . implode("\n  - ", $errors) . "\n");
         exit(1);
     }
-    echo 'Handbuch: ' . count($pages) . " Seiten, keine Fehler.\n";
+    echo 'Handbuch: ' . count($pages) . ' Seiten (auf Englisch ' . count($english) . "), keine Fehler.\n";
     exit(0);
 }
 if ($errors) {
@@ -241,6 +310,17 @@ if (isset($opt['app'])) {
     @mkdir(dirname($file), 0775, true);
     file_put_contents($file, json_encode(['seiten' => $out], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT) . "\n");
     echo 'Handbuch für die App: ' . count($out) . " Seiten → $file\n";
+    // Englische Fassungen daneben (handbuch.en.json): Name der Seite => Titel und Text; die App lädt sie nur auf Englisch.
+    $en = [];
+    foreach ($english as $slug => $p) {
+        $en[$slug] = [
+            'titel' => $p['titel'],
+            'html' => kompanie_markdown($p['markdown'], static fn (string $s): string => '#/hilfe/' . $s, static fn (string $n): string => 'bild:' . $n),
+        ];
+    }
+    $enFile = (string) preg_replace('/\.json$/', '', $file) . '.en.json';
+    file_put_contents($enFile, json_encode(['seiten' => (object) $en], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT) . "\n");
+    echo 'Handbuch auf Englisch: ' . count($en) . " Seiten → $enFile\n";
 }
 
 if (isset($opt['site'])) {

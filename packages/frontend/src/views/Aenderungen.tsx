@@ -6,9 +6,10 @@ import { formatDate, todayYmd } from '../format';
 import { toCsv } from '../lists';
 import { ErrorBox, Loading, Sheet, useAsync } from '../ui';
 import { confirmAsk } from '../ask';
+import { localeTag, t, tn } from '../i18n';
 
-const time = (ts: number) => new Date(ts * 1000).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-const dateTime = (ts: number) => new Date(ts * 1000).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' });
+const time = (ts: number) => new Date(ts * 1000).toLocaleTimeString(localeTag(), { hour: '2-digit', minute: '2-digit' });
+const dateTime = (ts: number) => new Date(ts * 1000).toLocaleString(localeTag(), { dateStyle: 'medium', timeStyle: 'short' });
 /** Tag eines Eintrags (JJJJ-MM-TT, Ortszeit des Geräts) für die Gruppen der Liste */
 const dayOf = (ts: number) => {
   const d = new Date(ts * 1000);
@@ -50,21 +51,22 @@ export function Aenderungen({ onToast }: { onToast: (msg: string) => void }) {
   for (const e of log.entries) if (e.actor_id > 0) actors.set(e.actor_id, e.actor_name);
   return (
     <div className="changes stack">
-      <h2 className="section-title">Änderungen</h2>
+      <h2 className="section-title">{t('Änderungen')}</h2>
       <p className="small muted">
-        Wer wann was angelegt, geändert oder gelöscht hat. Tippe auf einen Eintrag für die alten und neuen Werte. Was auf einmal geändert
-        wurde (z. B. Punkte für mehrere Mitglieder), steht in einer Zeile.
+        {t(
+          'Wer wann was angelegt, geändert oder gelöscht hat. Tippe auf einen Eintrag für die alten und neuen Werte. Was auf einmal geändert wurde (z. B. Punkte für mehrere Mitglieder), steht in einer Zeile.',
+        )}
       </p>
       {!log.enabled && (
         <p className="small">
-          <strong>Das Änderungsprotokoll ist ausgeschaltet.</strong> Es wird nichts aufgezeichnet.
+          <strong>{t('Das Änderungsprotokoll ist ausgeschaltet.')}</strong> {t('Es wird nichts aufgezeichnet.')}
         </p>
       )}
       <section className="card settings-section" aria-labelledby="changes-filter-title">
-        <h3 id="changes-filter-title">Auswahl</h3>
+        <h3 id="changes-filter-title">{t('Auswahl')}</h3>
         <div className="usage-range">
           <label className="field">
-            <span>Von</span>
+            <span>{t('Von')}</span>
             <input
               type="date"
               value={range.from}
@@ -73,7 +75,7 @@ export function Aenderungen({ onToast }: { onToast: (msg: string) => void }) {
             />
           </label>
           <label className="field">
-            <span>Bis</span>
+            <span>{t('Bis')}</span>
             <input
               type="date"
               value={range.to}
@@ -83,9 +85,9 @@ export function Aenderungen({ onToast }: { onToast: (msg: string) => void }) {
           </label>
         </div>
         <label className="field">
-          <span>Wer</span>
+          <span>{t('Wer')}</span>
           <select value={actor} onChange={(e) => setActor(Number(e.target.value))}>
-            <option value={0}>Alle</option>
+            <option value={0}>{t('Alle')}</option>
             {[...actors.entries()]
               .sort((a, b) => a[1].localeCompare(b[1], 'de'))
               .map(([id, name]) => (
@@ -96,9 +98,9 @@ export function Aenderungen({ onToast }: { onToast: (msg: string) => void }) {
           </select>
         </label>
         <label className="field">
-          <span>Bereich</span>
+          <span>{t('Bereich')}</span>
           <select value={area} onChange={(e) => setArea(e.target.value)}>
-            <option value="">Alle</option>
+            <option value="">{t('Alle')}</option>
             {log.areas.map((a) => (
               <option key={a.area} value={a.area}>
                 {a.label}
@@ -124,7 +126,7 @@ export function Aenderungen({ onToast }: { onToast: (msg: string) => void }) {
 
 /** Einträge nach Tagen, neueste zuerst; Einträge einer Aktion (batch) als eine Zeile. */
 function Entries({ log, onOpen }: { log: ChangeLog; onOpen: (group: ChangeEntry[]) => void }) {
-  if (log.entries.length === 0) return <p className="muted">Im Zeitraum wurde nichts geändert.</p>;
+  if (log.entries.length === 0) return <p className="muted">{t('Im Zeitraum wurde nichts geändert.')}</p>;
   const days: { day: string; groups: ChangeEntry[][] }[] = [];
   for (const g of groupEntries(log.entries)) {
     const day = dayOf(g[0].at);
@@ -155,14 +157,18 @@ function Entries({ log, onOpen }: { log: ChangeLog; onOpen: (group: ChangeEntry[
           </ul>
         </section>
       ))}
-      {log.truncated && <p className="small muted">Nur die neuesten {log.entries.length} Einträge. Wähle einen kürzeren Zeitraum.</p>}
+      {log.truncated && (
+        <p className="small muted">
+          {t('Nur die neuesten {count} Einträge. Wähle einen kürzeren Zeitraum.', { count: log.entries.length })}
+        </p>
+      )}
     </>
   );
 }
 
 /** Werte eines Eintrags */
 function Fields({ entry: e }: { entry: ChangeEntry }) {
-  if (e.changes.length === 0) return <p className="small">Keine einzelnen Werte gespeichert.</p>;
+  if (e.changes.length === 0) return <p className="small">{t('Keine einzelnen Werte gespeichert.')}</p>;
   return (
     <dl className="change-fields">
       {e.changes.map((c) => (
@@ -202,7 +208,7 @@ function Detail({ group, onClose }: { group: ChangeEntry[]; onClose: () => void 
 /** Alle Einträge der Auswahl als CSV-Datei, eine Zeile je Feld. */
 function CsvExport({ log, onToast }: { log: ChangeLog; onToast: (msg: string) => void }) {
   function download() {
-    const header = ['Zeit', 'Wer', 'Bereich', 'Art', 'Eintrag', 'Aktion', 'Feld', 'Vorher', 'Nachher'];
+    const header = [t('Zeit'), t('Wer'), t('Bereich'), t('Art'), t('Eintrag'), t('Aktion'), t('Feld'), t('Vorher'), t('Nachher')];
     const blob = new Blob([toCsv(header, csvRows(log.entries, dateTime, capLabel))], { type: 'text/csv;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -211,16 +217,20 @@ function CsvExport({ log, onToast }: { log: ChangeLog; onToast: (msg: string) =>
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-    onToast(log.truncated ? `CSV-Datei mit den neuesten ${log.entries.length} Einträgen heruntergeladen` : 'CSV-Datei heruntergeladen');
+    onToast(
+      log.truncated
+        ? t('CSV-Datei mit den neuesten {count} Einträgen heruntergeladen', { count: log.entries.length })
+        : t('CSV-Datei heruntergeladen'),
+    );
   }
   return (
     <>
       <div className="button-row">
         <button type="button" className="btn btn-secondary" onClick={download}>
-          Als CSV-Datei herunterladen
+          {t('Als CSV-Datei herunterladen')}
         </button>
       </div>
-      <p className="small muted">Enthält Namen und Werte. Die Datei nach Gebrauch bitte löschen.</p>
+      <p className="small muted">{t('Enthält Namen und Werte. Die Datei nach Gebrauch bitte löschen.')}</p>
     </>
   );
 }
@@ -256,29 +266,28 @@ function ChangeLogSettings({
     }
   }
   async function toggle(on: boolean) {
-    if (!on && !(await confirmAsk('Änderungen nicht mehr protokollieren? Alle bisherigen Einträge werden sofort gelöscht.'))) return;
-    await save({ enabled: on }, on ? 'Änderungsprotokoll eingeschaltet' : 'Änderungsprotokoll ausgeschaltet');
+    if (!on && !(await confirmAsk(t('Änderungen nicht mehr protokollieren? Alle bisherigen Einträge werden sofort gelöscht.')))) return;
+    await save({ enabled: on }, on ? t('Änderungsprotokoll eingeschaltet') : t('Änderungsprotokoll ausgeschaltet'));
   }
   const n = Number(days);
   const valid = Number.isInteger(n) && n >= log.keep_min && n <= log.keep_max;
   return (
     <section className="card settings-section" aria-labelledby="changes-settings-title">
-      <h3 id="changes-settings-title">Einstellungen</h3>
+      <h3 id="changes-settings-title">{t('Einstellungen')}</h3>
       <label className="toggle">
         <input type="checkbox" checked={log.enabled} disabled={busy} onChange={(e) => void toggle(e.target.checked)} />
-        <span>Änderungen protokollieren (wer, wann, was, mit alten und neuen Werten)</span>
+        <span>{t('Änderungen protokollieren (wer, wann, was, mit alten und neuen Werten)')}</span>
       </label>
       <form
         className="change-keep"
         onSubmit={(e) => {
           e.preventDefault();
-          if (valid && n !== log.keep_days) void save({ keep_days: n }, `Einträge werden nach ${n} Tagen gelöscht`);
+          if (valid && n !== log.keep_days)
+            void save({ keep_days: n }, tn('Einträge werden nach {count} Tag gelöscht', 'Einträge werden nach {count} Tagen gelöscht', n));
         }}
       >
         <label className="field">
-          <span>
-            Einträge löschen nach (Tage, {log.keep_min} bis {log.keep_max})
-          </span>
+          <span>{t('Einträge löschen nach (Tage, {min} bis {max})', { min: log.keep_min, max: log.keep_max })}</span>
           <input
             type="number"
             inputMode="numeric"
@@ -289,12 +298,13 @@ function ChangeLogSettings({
           />
         </label>
         <button type="submit" className="btn btn-secondary" disabled={busy || !valid || n === log.keep_days}>
-          Frist speichern
+          {t('Frist speichern')}
         </button>
       </form>
       <p className="small muted">
-        Ältere Einträge löscht die App jeden Tag, eine kürzere Frist sofort. Das Protokoll enthält persönliche Angaben und kommt nicht in
-        die Datensicherung. Bitte nennt es in eurer Datenschutzerklärung.
+        {t(
+          'Ältere Einträge löscht die App jeden Tag, eine kürzere Frist sofort. Das Protokoll enthält persönliche Angaben und kommt nicht in die Datensicherung. Bitte nennt es in eurer Datenschutzerklärung.',
+        )}
       </p>
       {error && (
         <p className="form-error" role="alert">

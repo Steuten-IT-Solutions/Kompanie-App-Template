@@ -215,6 +215,60 @@ final class NavigationTest extends TestCase
         $this->assertSame(['galerie' => ['label' => 'Fotos']], $this->app->navigation()->names());
         $this->assertSame(['member' => 'galerie'], $this->app->navigation()->start());
     }
+    public function testGuestNavigationIsSeparate(): void
+    {
+        $this->assertNull($this->call('GET', '/config')->data['navigation_guest'], 'ohne Einstellung wie Angemeldete');
+        $this->assertNull($this->call('GET', '/admin/navigation')->data['guest_navigation']);
+
+        // Unabhängig: Angemeldete behalten die Standardnavigation, Gäste bekommen eine eigene Leiste.
+        $guest = ['items' => ['termine', 'mitglieder', 'galerie'], 'hidden' => ['brett']];
+        $res = $this->call('PUT', '/admin/navigation', ['navigation' => null, 'guest_navigation' => $guest, 'start' => ['guest' => 'mitglieder']]);
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $this->assertNull($res->data['navigation']);
+        $this->assertSame($guest, $res->data['guest_navigation']);
+        foreach ([$this->member, null] as $who) {
+            $this->users->current = $who;
+            $config = $this->call('GET', '/config')->data;
+            $this->assertSame($guest, $config['navigation_guest'], 'für alle in /config, die App wählt die Leiste');
+            $this->assertNull($config['navigation']);
+        }
+
+        // Ohne Angabe bleibt die Leiste der Gäste, wie sie ist.
+        $this->users->current = $this->admin;
+        $res = $this->save(['items' => ['news']]);
+        $this->assertSame($guest, $res->data['guest_navigation']);
+
+        // Die Startseite der Gäste prüft ihre eigene Leiste, die der Angemeldeten deren.
+        $bad = [
+            'ausgeblendet bei Gästen' => ['start' => ['guest' => 'brett']],
+            'Intern bei eigener Leiste der Gäste' => ['start' => ['guest' => 'intern']],
+            'Untermenü fehlt bei Gästen' => ['start' => ['guest' => 'menue/1']],
+            'ungültige Leiste der Gäste' => ['guest_navigation' => ['items' => ['verwaltung']]],
+        ];
+        foreach ($bad as $name => $body) {
+            $this->assertSame(400, $this->call('PUT', '/admin/navigation', $body + ['navigation' => null])->status, $name);
+        }
+        $this->assertSame($guest, $this->app->navigation()->guest(), 'nichts gespeichert');
+        $this->assertSame(['guest' => 'mitglieder'], $this->app->navigation()->start());
+        $ok = $this->call('PUT', '/admin/navigation', ['navigation' => null, 'start' => ['guest' => 'galerie', 'member' => 'intern']]);
+        $this->assertSame(200, $ok->status, 'Intern geht für Angemeldete mit Standardnavigation');
+
+        // null: wieder dieselbe Leiste wie für Angemeldete
+        $res = $this->call('PUT', '/admin/navigation', ['navigation' => null, 'guest_navigation' => null, 'start' => ['guest' => 'intern']]);
+        $this->assertSame(200, $res->status, 'Intern auch für Gäste, wenn für alle die Standardnavigation gilt');
+        $this->assertNull($res->data['guest_navigation']);
+        $this->assertNull($this->app->settings->get('navigation_guest'));
+    }
+
+    public function testDeletedPageLeavesBothNavigations(): void
+    {
+        $this->app->settings->set('navigation', ['items' => ['termine', 'seiten/7'], 'hidden' => []]);
+        $this->app->settings->set('navigation_guest', ['items' => ['seiten/7', ['label' => 'Mehr', 'icon' => 'ordner', 'items' => ['seiten/7']]], 'hidden' => ['news']]);
+        $this->app->navigation()->removeTarget('seiten/7');
+        $this->assertSame(['items' => ['termine'], 'hidden' => []], $this->app->navigation()->get());
+        $this->assertSame(['items' => [], 'hidden' => ['news']], $this->app->navigation()->guest(), 'leeres Untermenü fällt mit weg');
+    }
+
     public function testInternAndAdminOrder(): void
     {
         $res = $this->call('GET', '/admin/navigation');

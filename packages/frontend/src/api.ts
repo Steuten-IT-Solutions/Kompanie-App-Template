@@ -4,11 +4,17 @@
 import type { Address } from './address';
 import { readBase64 } from './backupFile';
 import { dataCache } from './dataCache';
+import { LOCALE_HEADER, SOURCE_LOCALE, locale, t, type Locale } from './i18n';
 import { PREVIEW_HEADER, previewRole, stopPreview } from './preview';
 import brand from './generated/brand';
 import { noteError } from './lastError';
 import { rememberRoute } from './share';
+import { markSaved } from './unsaved';
+import { noteResponse } from './connection';
 import type { AdminOrder, NavigationSetting, NavNames, NavStart } from './navigation';
+import type { TileLayouts, TilePlace } from './tileGrid';
+import { nameIn, setNameTranslations, type NameKind, type NameTranslations } from './names';
+import { presetRoleLabel } from './brandLocale';
 
 /** Schlüssel einer Rolle: guest, member, admin, früher fest (organizer, manager, candidate) oder vom Admin angelegt (r1, r2, …). */
 export type Level = string;
@@ -28,6 +34,7 @@ export type Capability =
   | 'view_own_attendance'
   | 'view_birthdays'
   | 'vote_polls'
+  | 'respond_calendar'
   | 'view_directory'
   | 'view_offices'
   | 'view_former'
@@ -35,31 +42,51 @@ export type Capability =
   | 'view_board'
   | 'view_ranks'
   | 'view_catalog'
+  | 'view_points'
   | 'manage_points'
+  | 'view_penalties'
   | 'manage_penalties'
+  | 'view_promotions'
   | 'manage_ranks'
+  | 'view_titles'
   | 'manage_titles'
+  | 'view_attendance'
   | 'manage_attendance'
   | 'manage_events'
+  | 'view_responses'
   | 'manage_calendar'
+  | 'view_restricted_documents'
   | 'manage_documents'
+  | 'view_board_history'
   | 'post_board'
+  | 'view_poll_results'
   | 'manage_polls'
+  | 'view_inventory'
   | 'manage_inventory'
   | 'manage_offices'
+  | 'view_lists'
   | 'manage_lists'
+  | 'view_mail'
   | 'send_mail'
   | 'manage_sponsors'
+  | 'view_company_members'
   | 'manage_companies'
   | 'submit_gallery'
+  | 'view_submissions'
   | 'review_gallery'
   | 'manage_gallery'
   | 'manage_pages'
+  | 'manage_website'
   | 'manage_news'
   | 'view_personal'
   | 'manage_personal'
+  | 'view_accounts'
   | 'create_users'
+  | 'manage_former'
+  | 'view_passive'
+  | 'manage_passive'
   | 'promote_users'
+  | 'view_reports'
   | 'review_reports'
   | 'view_activity'
   | 'view_changes'
@@ -85,7 +112,9 @@ export type Feature =
   | 'mail'
   | 'sponsors'
   | 'companies'
-  | 'pages';
+  | 'pages'
+  | 'website'
+  | 'passive';
 
 export interface AppUser {
   id: number;
@@ -99,6 +128,8 @@ export interface AppUser {
   capabilities: Capability[];
   /** Eigenes Foto (128 Pixel), null ohne; fehlt bei älteren Servern */
   photo_url?: string | null;
+  /** Sprache am Konto (PUT /me/locale), null = nichts gewählt; fehlt bei älteren Servern */
+  locale?: Locale | null;
   /** Rollen, die die Person beim Anlegen vergeben darf (nur mit create_users); fehlt bei älteren Servern */
   create_roles?: Level[];
   /** Zusatzrollen, die die Person beim Anlegen vergeben darf (nur mit create_users) */
@@ -110,6 +141,10 @@ export interface AppConfig {
   appUrl: string;
   swUrl: string;
   siteUrl: string | null;
+  /** Sprachen, die die App anbietet (Basissprache zuerst; nur sie = kein Umschalter); fehlt bei älteren Servern */
+  languages?: Locale[];
+  /** Basissprache der Kompanie: Sprache der Inhalte und eigenen Namen; fehlt bei älteren Servern (dann Deutsch) */
+  base_language?: Locale;
   variant: 'wordpress' | 'standalone';
   version: string;
   csrf: { header: string; token: string; refreshUrl: string };
@@ -121,14 +156,29 @@ export interface AppConfig {
   legal?: { imprint: string | null; privacy: string | null };
   /** „Fehler melden“ möglich (Issue #64); Meldungen gehen zuerst an die Admins */
   reports?: boolean;
-  /** Offene Fehlermeldungen; nur für Angemeldete mit review_reports, sonst null */
+  /** Offene Fehlermeldungen; nur für Angemeldete mit view_reports, sonst null */
   openReports?: number | null;
   /** Zugang beantragen (Issue #314) eingeschaltet: Link „Zugang beantragen“ für Gäste; fehlt bei älteren Servern */
   registration?: boolean;
   /** Offene Anfragen auf einen Zugang; nur für Angemeldete mit create_users, sonst null */
   pendingRegistrations?: number | null;
+  /**
+   * Anwärter, die die Voraussetzung für die Aufnahme erfüllen (Kachel „Aufnahmen“); nur für create_users mit dem Bereich
+   * Anwesenheit und einer Anwärter-Rolle, sonst null (keine Kachel). Fehlt bei älteren Servern.
+   */
+  admissionsDue?: number | null;
+  /** Anwärter kurz vor der Aufnahme (noch nicht erfüllt): zweiter Kreis an der Kachel „Aufnahmen“; null ohne Recht */
+  admissionsSoon?: number | null;
   /** Einreichen von Bildern und Videos erlaubt (Einstellungen → Galerie); fehlt bei älteren Servern (dann erlaubt) */
   gallerySubmissions?: boolean;
+  /** Zu- und Absagen bei Terminen eingeschaltet (Einstellungen → Kalender); fehlt bei älteren Servern (dann an) */
+  eventResponses?: boolean;
+  /** Terminarten (Einstellungen → Kalender), z. B. Versammlung; fehlt bei älteren Servern */
+  eventKinds?: string[];
+  /** Terminarten ohne Schild neben dem Titel des Termins (Einstellungen → Kalender); fehlt bei älteren Servern */
+  eventKindsHidden?: string[];
+  /** Wie viele Passive die Person betreut (Meins → Meine Passiven); 0 ohne den Bereich, fehlt bei älteren Servern */
+  caredPassives?: number;
   /** Rollen der Installation (Einstellungen → Rollen): Bezeichnung und Punktefaktor */
   roles?: RoleInfo[];
   /** null = Gast ohne Anmeldung. */
@@ -143,6 +193,8 @@ export interface AppConfig {
   maintenance?: MaintenanceInfo;
   /** Einrichtbare Navigation (Issue #277): null bzw. fehlt = Standardnavigation */
   navigation?: NavigationSetting | null;
+  /** Eigene Leiste für Gäste (ohne Anmeldung oder Grundrolle Gast); null bzw. fehlt = dieselbe wie für Angemeldete */
+  navigation_guest?: NavigationSetting | null;
   /** Eigene Namen und Symbole (Issue #362), je Bereich, eigener Seite oder „intern“ (leer kann als [] kommen) */
   navigation_names?: NavNames;
   /** Startseiten (Issue #362) für Gäste und Angemeldete */
@@ -153,16 +205,32 @@ export interface AppConfig {
   navigation_intern_order?: string[];
   /** Reihenfolge der Kacheln der Verwaltung je Gruppe (leer kann als [] kommen); fehlt bei älteren Servern */
   admin_order?: AdminOrder | [];
+  /** Eigene Anordnung der Kacheln je Seite (tileGrid.ts); null ohne Anmeldung und in der Vorschau, fehlt bei älteren Servern */
+  tile_layouts?: Record<string, TileLayouts> | null;
+  /** Vorgabe des Admins für die Anordnung der Kacheln je Seite (gilt ohne eigene Anordnung); fehlt bei älteren Servern */
+  tile_defaults?: Record<string, TileLayouts>;
   /** Eigene Namen als Abschnitte (brand.labels.sections), übernimmt generated/brand.ts beim Laden */
   section_labels?: Record<string, string>;
+  /** Dieselben Namen je weiterer Sprache (eingetragen, sonst deutsch); fehlt bei älteren Servern */
+  section_labels_i18n?: Partial<Record<Locale, Record<string, string>>>;
+  /** Eigene Namen je weiterer Sprache (names.ts); fehlt bei älteren Servern, leer kommt als [] an */
+  name_translations?: NameTranslations | [];
   /** Eigene Seiten (Issue #287), die die Person lesen darf, in ihrer Reihenfolge; fehlt bei älteren Servern */
-  pages?: { id: number; title: string }[];
+  pages?: { id: number; title: string; title_i18n?: Record<string, string> }[];
   /** News werden in der App geschrieben (Quelle „In der App“); fehlt bei älteren Servern */
   newsInApp?: boolean;
+  /**
+   * Beiträge der WordPress-Seite im Editor von WordPress schreiben (Quelle „Beiträge dieser WordPress-Seite“, Recht
+   * manage_news): Adresse für „Neuer Beitrag“; null oder fehlt ohne das Recht, mit anderen Quellen und bei älteren Servern
+   */
+  newsEditorUrl?: string | null;
   /** Interner Kalender wird in der App gepflegt (Quelle „In der App“); fehlt bei älteren Servern */
   calendarInApp?: boolean;
-  /** Vorschau „App als Rolle ansehen“ (Issue #63): vom Server bestätigt; role ist der Schlüssel oder @public */
-  preview?: { role: string; label: string } | null;
+  /**
+   * Vorschau „App als Rolle ansehen“ (Issue #63): vom Server bestätigt; role ist der Schlüssel, @public oder
+   * @person:<ID>. Als Person: label ist ihr Name, person ihre ID, roles ihre Rollen (Grundrolle, Zusatzrollen).
+   */
+  preview?: { role: string; label: string; person?: number; roles?: string[] } | null;
   /** Geburtstage (Issue #1): Vorlauf der Karte „Anstehende Geburtstage“ in Tagen; null ohne den Bereich, fehlt bei älteren Servern */
   birthdays?: { upcomingDays: number } | null;
 }
@@ -175,14 +243,32 @@ export interface PageSummary {
   audience: PageAudience;
   updated_at?: string;
   updated_by_name?: string | null;
+  /** Titel je weiterer Sprache, soweit eingetragen (Plan „Mehrsprachigkeit“, PR 9b) */
+  title_i18n?: Record<string, string>;
+  /** Nur für die Pflege: weitere Sprachen, in denen noch etwas fehlt */
+  untranslated_locales?: string[];
 }
+/** Fassung eines Inhalts aus Blöcken in einer weiteren Sprache: Kennung des Blocks => übersetzte Felder. */
+export type BlockTranslation = Record<string, Record<string, unknown>>;
 export interface PageDetail extends PageSummary {
   /** Text der Textblöcke für alle (für ältere Apps), Bilder als Adressen */
   body: string;
   /** Inhalt aus Blöcken, nur die für die Person sichtbaren; fehlt bei älteren Servern */
   blocks?: Block[];
+  /** Fehlt etwas in der Sprache der App: all (nichts übersetzt) oder some; dann steht dort Deutsch */
+  untranslated?: 'all' | 'some';
+  /** Nur mit pageSource: Fassungen je weiterer Sprache zum Bearbeiten */
+  translations?: Record<string, { title: string; blocks: BlockTranslation }>;
 }
-export type PageInput = { title?: string; audience?: PageAudience; body?: string; blocks?: BlockInput[]; updated_at?: string };
+export type PageInput = {
+  title?: string;
+  audience?: PageAudience;
+  body?: string;
+  blocks?: BlockInput[];
+  updated_at?: string;
+  /** Fassungen je weiterer Sprache ('' löscht ein Feld) */
+  translations?: Record<string, { title?: string; blocks?: BlockTranslation }>;
+};
 
 /** Vorgefertigte Blöcke (eigene Seiten): all für alle, die den Inhalt sehen; members nur für Mitglieder. */
 export type BlockAudience = 'all' | 'members';
@@ -354,6 +440,8 @@ export type BlockInput =
 /** Einstellungen → Navigation (Issue #277): gespeicherte Navigation und was der Server erlaubt. */
 export interface NavigationAdmin {
   navigation: NavigationSetting | null;
+  /** Leiste für Gäste; null = dieselbe wie für Angemeldete; fehlt bei älteren Servern */
+  guest_navigation?: NavigationSetting | null;
   /** Issue #362: eigene Namen und Symbole, Startseiten, Namen in der Leiste */
   names: NavNames;
   start: NavStart;
@@ -450,6 +538,44 @@ export interface ChangeLogSettings {
   keep_max: number;
 }
 
+/** Bericht als PDF (Verwaltung → Bericht): ein Abschnitt zur Auswahl; dated false = ohne Zeitbezug (Stand heute) */
+export interface ReportSectionChoice {
+  key: string;
+  title: string;
+  dated: boolean;
+}
+
+export interface ReportColumn {
+  label: string;
+  /** Zahl: rechtsbündig */
+  num: boolean;
+  /** Langer Text (Grund, Adresse): bekommt den übrigen Platz und bricht um */
+  wrap: boolean;
+}
+
+export interface ReportTable {
+  /** Überschrift über der Tabelle; leer: keine */
+  title: string;
+  columns: ReportColumn[];
+  rows: string[][];
+  /** Hinweis statt der Tabelle, wenn sie leer ist */
+  empty: string;
+}
+
+export interface ReportSection extends ReportSectionChoice {
+  /** Breite Tabelle: Seite quer */
+  landscape: boolean;
+  tables: ReportTable[];
+}
+
+export interface Report {
+  from: string;
+  to: string;
+  /** Zeitpunkt des Abrufs in der Zeit der Kompanie (TT.MM.JJJJ, HH:MM) */
+  created: string;
+  sections: ReportSection[];
+}
+
 export interface ChangeLog extends ChangeLogSettings {
   from: string;
   to: string;
@@ -465,6 +591,11 @@ declare global {
 }
 
 export const config: AppConfig | undefined = window.KOMPANIE_CONFIG;
+
+// Namen in der Sprache der App (Plan „Mehrsprachigkeit“): Die Seite bringt /config so mit, wie der Server sie beim Laden
+// kannte; die Sprache am Gerät kennt er nicht. Rollen daher hier: eingetragener Name, sonst übersetzte Vorgabe.
+setNameTranslations(config?.name_translations);
+for (const r of config?.roles ?? []) r.label = nameIn('role', r.key, presetRoleLabel(r.key, r.label));
 
 /** Bereich mit Schalter für die Ersteinrichtung und die Einstellungen der Admins. */
 export interface FeatureInfo {
@@ -499,9 +630,10 @@ export function applyBirthdayUpcomingDays(days: number): void {
 }
 
 /** Übernimmt die gespeicherte Navigation in die geladene Konfiguration und baut die Tab-Leiste neu. */
-export function applyNavigation(next: Pick<NavigationAdmin, 'navigation' | 'intern_order' | 'admin_order'>): void {
+export function applyNavigation(next: Pick<NavigationAdmin, 'navigation' | 'guest_navigation' | 'intern_order' | 'admin_order'>): void {
   if (!config) return;
   config.navigation = next.navigation;
+  config.navigation_guest = next.guest_navigation ?? null;
   config.navigation_intern_order = next.intern_order;
   config.admin_order = next.admin_order;
   window.dispatchEvent(new Event(CONFIG_CHANGED));
@@ -511,6 +643,19 @@ export function applyNavigation(next: Pick<NavigationAdmin, 'navigation' | 'inte
 export function applyPendingRegistrations(count: number): void {
   if (!config || config.pendingRegistrations == null || config.pendingRegistrations === count) return;
   config.pendingRegistrations = count;
+  window.dispatchEvent(new Event(CONFIG_CHANGED));
+}
+
+/**
+ * Zahl der Anwärter, die die Voraussetzung für die Aufnahme erfüllen, und (soon) derer kurz davor (Kachel „Aufnahmen“).
+ * Ohne soon bleibt die zweite Zahl, wie sie ist.
+ */
+export function applyAdmissionsDue(count: number, soon?: number): void {
+  if (!config || config.admissionsDue == null) return;
+  const nextSoon = soon ?? config.admissionsSoon;
+  if (config.admissionsDue === count && config.admissionsSoon === nextSoon) return;
+  config.admissionsDue = count;
+  if (nextSoon != null) config.admissionsSoon = nextSoon;
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
@@ -533,6 +678,41 @@ export function gallerySubmissionsOpen(): boolean {
   return config?.gallerySubmissions !== false;
 }
 
+/** Übernimmt den Schalter „Zu- und Absagen“ des Kalenders in die geladene Konfiguration (nach dem Speichern). */
+export function applyEventResponses(enabled: boolean): void {
+  if (!config || config.eventResponses === enabled) return;
+  config.eventResponses = enabled;
+  window.dispatchEvent(new Event(CONFIG_CHANGED));
+}
+
+/** Sind Zu- und Absagen bei Terminen eingeschaltet? Ältere Server kennen den Schalter nicht (dann ja). */
+export function eventResponsesOn(): boolean {
+  return config?.eventResponses !== false;
+}
+
+/** Eingerichtete Terminarten (Einstellungen → Kalender); leer bei älteren Servern. */
+export function eventKinds(): string[] {
+  return config?.eventKinds ?? [];
+}
+
+/** Terminarten, die nicht als Schild neben dem Titel des Termins stehen; leer bei älteren Servern (dann alle). */
+export function eventKindsHidden(): string[] {
+  return config?.eventKindsHidden ?? [];
+}
+
+/** Steht diese Art als Schild neben dem Titel des Termins? */
+export function eventKindTag(kind: string | null | undefined): boolean {
+  return !!kind && !eventKindsHidden().includes(kind);
+}
+
+/** Übernimmt die Terminarten (und die ohne Schild) in die geladene Konfiguration (nach dem Speichern). */
+export function applyEventKinds(kinds: string[], hidden?: string[]): void {
+  if (!config) return;
+  config.eventKinds = kinds;
+  if (hidden !== undefined) config.eventKindsHidden = hidden;
+  window.dispatchEvent(new Event(CONFIG_CHANGED));
+}
+
 /** Übernimmt die Einstellung „Zugang beantragen“ in die geladene Konfiguration (nach dem Speichern). */
 export function applyRegistration(enabled: boolean): void {
   if (!config) return;
@@ -545,6 +725,40 @@ export function applyMaintenance(m: MaintenanceInfo): void {
   if (!config) return;
   config.maintenance = { on: m.on, reason: m.reason, since: m.since };
   window.dispatchEvent(new Event(CONFIG_CHANGED));
+}
+
+/** Art eines übersetzbaren Namens (wie TranslationService::KINDS) */
+export type TranslationKind = NameKind | ContentKind | BlocksKind;
+/** Inhalte aus Blöcken (TranslationOverview::BLOCKS): je Inhalt ein Eintrag mit Stand, übersetzt Block für Block */
+export type BlocksKind = 'page' | 'board';
+/** Inhalte mit einfachen Feldern in der Übersicht der Übersetzungen (TranslationOverview::CONTENT) */
+export type ContentKind = 'event' | 'calendar_entry' | 'poll' | 'document' | 'document_category' | 'album';
+
+/** Ein übersetzbarer Name (GET /admin/translations) */
+export interface TranslationItem {
+  kind: TranslationKind;
+  ref: string;
+  field: string;
+  /** Text der Basissprache */
+  source: string;
+  /** Eingetragene Übersetzung ('' ohne) */
+  text: string;
+  /** Was Leser ohne Eintrag sehen (übersetzte Vorgabe oder der Text der Basissprache) */
+  fallback: string;
+  max: number;
+  /** Nur bei Inhalten: deutscher Titel (bei Terminen mit Datum), Name des Felds, mehrzeilig */
+  context?: string;
+  label?: string;
+  multiline?: boolean;
+  /** Nur bei Inhalten aus Blöcken: übersetzbare Felder samt Titel, davon übersetzt */
+  total?: number;
+  done?: number;
+}
+
+export interface TranslationOverview {
+  locale: Locale;
+  source_locale: Locale;
+  groups: { kind: TranslationKind; items: TranslationItem[] }[];
 }
 
 export interface RoleInfo {
@@ -570,6 +784,15 @@ export interface RoleAdmin extends RoleInfo {
   extra_users?: number;
   system: boolean;
   deletable: boolean;
+  /** Anwärter-Rolle (als Grund- oder Zusatzrolle, Aufnahmen); fehlen bei älteren Servern */
+  admission_extra?: boolean;
+  /** Voraussetzung für die Aufnahme: Teilnahmen an Terminen dieser Art (null: keine) … */
+  admission_kind?: string | null;
+  admission_count?: number;
+  /** … und Mindestdauer als Anwärter in Monaten (0: keine); 0/null, wenn admission_rule mehr ausdrückt */
+  admission_months?: number;
+  /** Voraussetzung als Baum aus UND/ODER-Gruppen (fehlt bei älteren Servern) */
+  admission_rule?: AdmissionRuleNode;
 }
 
 export type RoleInput = {
@@ -578,7 +801,66 @@ export type RoleInput = {
   points_factor?: number | string;
   new_accounts?: boolean;
   promotable?: boolean;
+  admission_extra?: boolean;
+  admission_kind?: string | null;
+  admission_count?: number | string;
+  admission_months?: number | string;
+  admission_rule?: AdmissionRuleNode;
 };
+
+/** Voraussetzung für die Aufnahme (Server: Domain\AdmissionRule): Gruppen mit UND/ODER, beliebig tief. */
+export type AdmissionRuleNode =
+  | { type: 'group'; op: 'and' | 'or'; items: AdmissionRuleNode[] }
+  | { type: 'attendance'; kind: string; count: number }
+  | { type: 'duration'; months: number };
+
+/** Ausgewertete Voraussetzung einer Person: jeder Knoten mit Stand, Gruppen mit ihren ausgewerteten items. */
+export interface AdmissionRuleResult {
+  type: 'group' | 'attendance' | 'duration';
+  status: 'fulfilled' | 'open' | 'unknown';
+  /** Tag, an dem der Knoten erfüllt wurde */
+  on: string | null;
+  op?: 'and' | 'or';
+  items?: AdmissionRuleResult[];
+  kind?: string;
+  count?: number;
+  attended?: number;
+  missing?: number;
+  months?: number;
+  /** Dauer: Tag, ab dem sie erfüllt ist (null ohne „Anwärter seit“) */
+  due?: string | null;
+  /** erfüllt oder bald erfüllt (höchstens 1 Teilnahme fehlt bzw. Dauer in höchstens 30 Tagen); fehlt bei älteren Servern */
+  soon?: boolean;
+}
+
+/** Stand eines Anwärters für die Aufnahme als Mitglied (GET /admissions, Mitgliedsseite). */
+export interface Admission {
+  id: number;
+  name: string;
+  /** Bezeichnung und Schlüssel der Anwärter-Rolle */
+  role: string;
+  role_key: Level;
+  /** base: Grundrolle wird Mitglied; extra: die Zusatzrolle wird entfernt */
+  way: 'base' | 'extra';
+  /** Anwärter seit (JJJJ-MM-TT); null, wenn unbekannt */
+  since: string | null;
+  kind: string | null;
+  /** Nötige Teilnahmen (0: keine) und Mindestdauer in Monaten (0: keine) */
+  count: number;
+  months: number;
+  attended: number;
+  missing: number;
+  /** Tag, ab dem die Mindestdauer erfüllt ist */
+  months_on: string | null;
+  /** Tag, an dem alles erfüllt war */
+  fulfilled_on: string | null;
+  /** fulfilled: erfüllt; open: noch nicht; none: Rolle ohne Voraussetzung */
+  status: 'fulfilled' | 'open' | 'none';
+  /** Noch nicht erfüllt, aber kurz davor („Bald erfüllt“); fehlt bei älteren Servern */
+  soon?: boolean;
+  /** Ausgewertete Voraussetzung (null ohne; fehlt bei älteren Servern) */
+  result?: AdmissionRuleResult | null;
+}
 
 export const roleInfo = (level: Level): RoleInfo | undefined => config?.roles?.find((r) => r.key === level);
 
@@ -606,7 +888,7 @@ export const levelLabel = (level: Level): string =>
   roleInfo(level)?.label ?? (brand.labels.roles as Record<string, string | undefined>)[level] ?? level;
 
 /** Überschrift für die Neuigkeiten: Standardbezeichnung „News“ ausgeschrieben, eigene Bezeichnungen unverändert. */
-export const newsTitle = (): string => (brand.labels.sections.news === 'News' ? 'Neuigkeiten' : brand.labels.sections.news);
+export const newsTitle = (): string => (brand.labels.sections.news === 'News' ? t('Neuigkeiten') : brand.labels.sections.news);
 
 /** Punktefaktor der Rolle (1 ohne Angabe). */
 export const roleFactor = (level: Level): number => roleInfo(level)?.points_factor ?? 1;
@@ -709,6 +991,169 @@ export interface PersonalInfo {
   address?: Address | null;
 }
 
+/**
+ * Ein Passiver (Bereich passive): eigener Eintrag ohne Konto. Adresse, Telefon, E-Mail und Geburtsdatum nur mit
+ * view_personal (in der Verwaltung) bzw. für den eigenen Betreuer (Meins → Meine Passiven); sonst fehlen sie.
+ */
+export interface PassiveMember {
+  id: number;
+  first_name: string;
+  last_name: string;
+  name: string;
+  caretaker: { id: number; name: string } | null;
+  address?: Address | null;
+  phone?: string;
+  email?: string;
+  /** JJJJ-MM-TT oder null */
+  birth_date?: string | null;
+  /** Eintritt als freier Text (z. B. „2023“ oder „vor 2014“); fehlt bei älteren Servern */
+  joined?: string;
+  /** Bemerkung; fehlt bei älteren Servern */
+  note?: string;
+  /** Gezahlte Beiträge, neuestes Jahr zuerst; fehlt bei älteren Servern */
+  payments?: PassivePayment[];
+}
+
+/** Zahlung des Beitrags eines Passiven für ein Jahr (je Jahr höchstens eine) */
+export interface PassivePayment {
+  id: number;
+  year: number;
+  amount_cents: number;
+  /** JJJJ-MM-TT */
+  paid_on: string;
+  /** Bezeichnung der Zahlungsart (eine der eingerichteten zur Zeit der Zahlung) */
+  method: string;
+}
+
+/** Einstellungen der Beiträge: Jahresbeitrag als Vorschlag (0 = keiner) und Zahlungsarten zur Auswahl */
+export interface PassiveSettings {
+  fee_cents: number;
+  methods: string[];
+  /** Alter, an deren Geburtstag erinnert wird (aufsteigend, leer = keine Erinnerung); fehlt bei älteren Servern */
+  birthday_ages?: number[];
+  /** So viele Tage vorher kommt die Erinnerung (0 = am Tag selbst); fehlt bei älteren Servern */
+  birthday_days?: number;
+}
+
+/** Anstehender Geburtstag eines Passiven mit einem der eingestellten Alter */
+export interface PassiveBirthday {
+  id: number;
+  name: string;
+  /** Tag des Geburtstags, JJJJ-MM-TT */
+  date: string;
+  /** Alter, das die Person an diesem Tag erreicht */
+  age: number;
+  /** Tage bis dahin (0 = heute) */
+  days: number;
+}
+
+/** Verwaltung → Passive: alle Passiven, Mitglieder zur Wahl als Betreuer und was die Person an Angaben sieht und ändert. */
+export interface PassiveList {
+  passives: PassiveMember[];
+  caretakers: { id: number; name: string }[];
+  personal: boolean;
+  manage_personal: boolean;
+  /** Jahresbeitrag als Vorschlag beim Eintragen in Cent (0 = keiner); fehlt bei älteren Servern */
+  fee_cents?: number;
+  /** Zahlungsarten zur Auswahl; fehlt bei älteren Servern */
+  methods?: string[];
+  /** Laufendes Jahr laut Server; fehlt bei älteren Servern */
+  year?: number;
+  /** Alter für die Erinnerung an Geburtstage (leer = aus); fehlt bei älteren Servern */
+  birthday_ages?: number[];
+  /** Tage vorher (0–30); fehlt bei älteren Servern */
+  birthday_days?: number;
+  /** Anstehende Geburtstage der eingestellten Alter, nur mit view_personal (sonst leer); fehlt bei älteren Servern */
+  birthdays?: PassiveBirthday[];
+}
+
+/** Anlegen und Ändern; persönliche Angaben nur mit manage_personal mitschicken. */
+export interface PassiveInput {
+  first_name?: string;
+  last_name?: string;
+  caretaker_id?: number | null;
+  address?: Address | null;
+  phone?: string;
+  email?: string;
+  birth_date?: string | null;
+  joined?: string;
+  note?: string;
+}
+
+/** Felder, denen der Import der Passiven Spalten zuordnet */
+export type PassiveImportField =
+  | 'first_name'
+  | 'last_name'
+  | 'street'
+  | 'house_number'
+  | 'extra'
+  | 'postal_code'
+  | 'city'
+  | 'country'
+  | 'phone'
+  | 'email'
+  | 'birth_date'
+  | 'joined'
+  | 'note'
+  | 'caretaker'
+  | 'amount'
+  | 'method'
+  | 'paid_on';
+
+/** Eine Zeile der Vorschau beim Import der Passiven */
+export interface PassiveImportRow {
+  line: number;
+  name: string;
+  first_name: string;
+  last_name: string;
+  existing?: boolean;
+  error?: string;
+  warnings?: string[];
+  caretaker?: { id: number; name: string } | null;
+  joined?: string;
+  note?: string;
+  address?: Address | null;
+  phone?: string;
+  email?: string;
+  birth_date?: string | null;
+  payment?: { year: number; amount_cents: number; paid_on: string; method: string } | null;
+}
+
+/** Ergebnis des Imports der Passiven (Vorschau oder übernommen) */
+export interface PassiveImportResult {
+  /** Zellen der Kopfzeile */
+  headers: string[];
+  /** Nummer der Kopfzeile in der Tabelle (ab 1) */
+  header_line: number;
+  /** Zuordnung: Feld => Nummer der Spalte (ab 0) */
+  columns: Partial<Record<PassiveImportField, number>>;
+  /** Spalten, die wie eine Zahlungsart heißen und den Betrag enthalten */
+  method_columns: { column: number; method: string }[];
+  ignored: { column: string; reason: string }[];
+  /** Ob Adresse, Telefon, E-Mail und Geburtsdatum übernommen werden (manage_personal) */
+  personal: boolean;
+  year: number;
+  /** Datum für Zahlungen ohne Datum (JJJJ-MM-TT) */
+  paid_on: string;
+  methods: string[];
+  rows: PassiveImportRow[];
+  new: number;
+  payments: number;
+  existing: number;
+  errors: number;
+  applied: boolean;
+}
+
+/** Was an den Import der Passiven geht */
+export interface PassiveImportInput {
+  csv: string;
+  apply: boolean;
+  columns?: Partial<Record<PassiveImportField, number | null>> | null;
+  year?: number;
+  paid_on?: string;
+  skip_errors?: boolean;
+}
+
 /** Eigene Kontaktangaben (Meins → Konto) */
 export type OwnAccount = PersonalInfo;
 
@@ -720,6 +1165,53 @@ export interface CalendarEvent {
   all_day: boolean;
   location: string;
   description: string;
+  /** Nur Quelle „In der App“: Anmeldeschluss (Datum) */
+  respond_until?: string | null;
+  /** Zu- und Absagen (nur internen Kalender, fehlt bei älteren Servern) */
+  responses?: EventResponses;
+  /** Erste Terminart, z. B. Versammlung (nur GET /calendar; fehlt bei älteren Servern) */
+  kind?: string | null;
+  /** Alle Terminarten (fehlt bei älteren Servern, dann nur kind) */
+  kinds?: string[];
+  /** Nur mit manage_calendar und ohne gesetzte Art: Vorschlag aus dem Titel */
+  kind_suggestion?: string | null;
+  /** Wie kind_suggestion, alle passenden Arten (fehlt bei älteren Servern) */
+  kind_suggestions?: string[];
+  /** Fehlt (ganz oder teilweise) in der Sprache der App; dann deutsch (nur Termine aus der App) */
+  untranslated?: 'all' | 'some';
+}
+
+export type ResponseStatus = 'yes' | 'no';
+
+/** Zu- und Absagen bei einem Termin des internen Kalenders */
+export interface EventResponses {
+  /** Stabile Kennung des Termins für Zu- und Absagen (bleibt bei iCal beim Verschieben); fehlt bei älteren Servern */
+  key?: string;
+  mine: ResponseStatus | null;
+  note: string;
+  yes: number;
+  no: number;
+  /** ISO 8601: bis dahin änderbar */
+  until: string;
+  open: boolean;
+  can_respond: boolean;
+  /** Sieht die Namen (view_responses) */
+  can_list: boolean;
+}
+
+export interface EventResponsePerson {
+  id: number;
+  name: string;
+  note: string;
+  /** Vor der Frist getippt, erst danach angekommen (offline vorgemerkt); fehlt bei älteren Servern */
+  late?: boolean;
+}
+
+export interface EventResponseOverview {
+  event: CalendarEvent;
+  yes: EventResponsePerson[];
+  no: EventResponsePerson[];
+  none: { id: number; name: string }[];
 }
 
 export interface CatalogItem {
@@ -737,6 +1229,17 @@ export interface PublicEvent extends Omit<CalendarEvent, 'id'> {
   end_date: string | null;
   end_time: string | null;
   url: string;
+  /** Nur Termine des internen Kalenders: Anmeldeschluss */
+  respond_until?: string | null;
+  /** Nur zum Bearbeiten (deutsche Fassung): Fassungen je weitere Sprache, leer = deutsch */
+  translations?: Partial<Record<Locale, EventTranslation>>;
+}
+
+/** Fassung eines Termins in einer weiteren Sprache (Plan „Mehrsprachigkeit“, PR 9d) */
+export interface EventTranslation {
+  title: string;
+  location: string;
+  description: string;
 }
 
 export interface EventInput {
@@ -748,6 +1251,10 @@ export interface EventInput {
   location: string;
   description: string;
   url: string;
+  /** Nur Termine des internen Kalenders: Anmeldeschluss YYYY-MM-DD oder leer */
+  respond_until?: string;
+  /** Fassungen je weitere Sprache; nur die genannten Sprachen ändern sich, leere Felder = deutsch */
+  translations?: Partial<Record<Locale, Partial<EventTranslation>>>;
 }
 
 export interface NewsItem {
@@ -768,6 +1275,13 @@ export interface NewsItem {
   /** Nur für die Pflege der News in der App (manage_news): Stand für das Speichern (409 conflict) */
   updated_at?: string | null;
   updated_by_name?: string | null;
+  /** Beiträge der WordPress-Seite, nur mit manage_news: Adresse im Editor von WordPress; fehlt sonst */
+  edit_url?: string | null;
+  /** Fehlt etwas in der Sprache der App, all oder some (dann steht dort Deutsch); Beiträge der Webseite: ohne Übersetzung
+   * in Polylang, andere Webseite oder RSS immer all */
+  untranslated?: 'all' | 'some';
+  /** Nur mit newsSource: Fassungen je weiterer Sprache zum Bearbeiten */
+  translations?: Record<string, { title: string; blocks: BlockTranslation }>;
 }
 
 /** Beitrag der News in der App: Titel und formatierter Text (RichText mit Bildern). */
@@ -778,6 +1292,17 @@ export interface NewsInput {
   /** Titelbild: Kennung aus POST /rich-images oder cover_uid; null entfernt es (Issue #351) */
   cover?: string | null;
   updated_at?: string | null;
+  /** Fassungen je weiterer Sprache ('' löscht ein Feld) */
+  translations?: Record<string, { title?: string; blocks?: BlockTranslation }>;
+}
+
+/** In der App änderbar? Ältere Server liefern kein editable: dann nur Alben der App bzw. hochgeladene Bilder. */
+export function albumEditable(a: { source?: 'app' | 'drive'; editable?: boolean }): boolean {
+  return a.editable ?? a.source === 'app';
+}
+
+export function photoEditable(p: { upload?: boolean; editable?: boolean }): boolean {
+  return p.editable ?? !!p.upload;
 }
 
 export interface GalleryAlbumSummary {
@@ -785,6 +1310,8 @@ export interface GalleryAlbumSummary {
   title: string;
   /** Album der App (in der App änderbar) oder aus Google Drive; fehlt bei älteren Servern */
   source?: 'app' | 'drive';
+  /** in der App änderbar (Alben der App, mit Drive als Ablage auch aus Drive); fehlt bei älteren Servern */
+  editable?: boolean;
   /** Bilder und Videos zusammen */
   count: number;
   /** davon Videos; fehlt bei älteren Servern */
@@ -816,6 +1343,8 @@ export interface GalleryPhoto {
   intern: boolean;
   /** in der App hochgeladen: intern/öffentlich lässt sich in der App umstellen (aus Drive nur über den Ordner); fehlt bei älteren Servern */
   upload?: boolean;
+  /** in der App verschieben, intern stellen und löschen (mit Drive als Ablage auch Bilder aus Drive); fehlt bei älteren Servern */
+  editable?: boolean;
   name: string;
   /** false: noch nicht aufbereitet; die Adressen erzeugen das Bild oder liefern vorerst einen Platzhalter */
   ready: boolean;
@@ -827,8 +1356,12 @@ export interface GalleryAlbum {
   year: string;
   /** Album der App (in der App änderbar) oder aus Google Drive; fehlt bei älteren Servern */
   source?: 'app' | 'drive';
+  /** in der App änderbar; fehlt bei älteren Servern */
+  editable?: boolean;
   /** Knöpfe zum Herunterladen zeigen (je Bild in der Großansicht, das Album als ZIP); fehlt bei älteren Servern */
   downloads?: boolean;
+  /** In der App gewähltes Titelbild der Übersicht, wenn hier zu sehen; null: automatisch; fehlt bei älteren Servern */
+  cover_id?: number | null;
   photos: GalleryPhoto[];
 }
 
@@ -851,6 +1384,8 @@ export interface MemberSummary {
   group?: Level | null;
   /** Dienstgrad (nur mit Bereich Dienstgrade) */
   rank_title?: string | null;
+  /** ID des Dienstgrads (für seinen Namen in einer weiteren Sprache; fehlt bei älteren Servern) */
+  rank_id?: number | null;
   /** Abzeichen des Dienstgrads (wie rank_title) */
   rank_badge_url?: string | null;
   /** Titel (nur mit Bereich und Recht „Titel verwalten“) */
@@ -876,6 +1411,8 @@ export interface DirectoryEntry {
   photo_url: string | null;
   /** Dienstgrad (fehlt ohne Bereich Dienstgrade) */
   rank_title?: string | null;
+  /** ID des Dienstgrads (für seinen Namen in einer weiteren Sprache; fehlt bei älteren Servern) */
+  rank_id?: number | null;
   rank_badge_url?: string | null;
   /** Titel (fehlen ohne Bereich Titel) */
   titles?: TitleRef[];
@@ -940,6 +1477,10 @@ export interface MemberDetail extends MemberSummary {
   photo_editable?: boolean;
   /** Ehemalig: Grund, Eintritt, Ausscheiden; null, wenn die Person nicht ehemalig ist (fehlt bei älteren Servern) */
   former?: FormerInfo | null;
+  /** Anwesenheit (nur mit Bereich und Recht manage_attendance) */
+  attendance?: MemberAttendance;
+  /** Stand als Anwärter (nur für create_users; null, wenn die Person kein Anwärter ist; fehlt bei älteren Servern) */
+  admission?: Admission | null;
 }
 
 /** Grund des Ausscheidens */
@@ -972,7 +1513,7 @@ export interface FormerOfficesPreview {
   }[];
 }
 
-/** Eintrag der Liste „Ehemalige“ (create_users). */
+/** Eintrag der Liste „Ehemalige“ (manage_former). */
 export interface FormerMember extends FormerInfo {
   id: number;
   name: string;
@@ -1251,6 +1792,12 @@ export interface BoardMessage {
   last_edit?: { name: string | null; at: string } | null;
   /** nur mit post_board: Mailversand (null: ohne Mail) */
   mail?: BoardMailSummary | null;
+  /** in der Sprache der App fehlt etwas (dann deutsch): all = nichts übersetzt, some = ein Teil */
+  untranslated?: 'all' | 'some';
+  /** nur mit post_board, wenn die App in einer weiteren Sprache läuft: die deutsche Fassung zum Bearbeiten */
+  source?: { title: string; blocks: Block[] };
+  /** nur mit post_board, wenn weitere Sprachen an sind: Fassungen je Sprache (Texte der Blöcke nach Kennung) */
+  translations?: Record<string, { title: string; blocks: BlockTranslation }>;
 }
 
 /** Abgelaufene oder gelöschte Nachricht im Verlauf (nur post_board). */
@@ -1285,7 +1832,16 @@ export interface BoardAudiences {
   people: { id: number; name: string }[];
 }
 
-export type BoardRevisionAction = 'created' | 'title' | 'content' | 'expires' | 'audience' | 'attachments' | 'deleted' | 'mailed';
+export type BoardRevisionAction =
+  | 'created'
+  | 'title'
+  | 'content'
+  | 'expires'
+  | 'audience'
+  | 'attachments'
+  | 'deleted'
+  | 'mailed'
+  | 'translation';
 
 /** Eintrag im Verlauf einer Nachricht. before/after: Titel, Inhalt (HTML), Enddatum oder eine Momentaufnahme. */
 export interface BoardRevision {
@@ -1329,6 +1885,8 @@ export interface BoardInput {
   mail?: boolean;
   /** Kennungen der Anhänge (eigene Entwürfe aus uploadAttachment) */
   attachments?: string[];
+  /** Fassungen in weiteren Sprachen (leerer Titel: der deutsche) */
+  translations?: Record<string, { title?: string; blocks?: BlockTranslation }>;
 }
 
 /** Dateianhang (Schwarzes Brett, E-Mails): Download über url nach Anmeldung */
@@ -1516,6 +2074,19 @@ export interface Poll {
   my_answer: { option_ids: number[]; text: string | null } | null;
   results_visible: boolean;
   results_data: PollResultData | null;
+  /** Fehlt (ganz oder teilweise) in der Sprache der App; dann deutsch */
+  untranslated?: 'all' | 'some';
+  /** Nur für die Verwaltung in einer anderen Sprache als Deutsch: die deutsche Fassung zum Bearbeiten */
+  source?: PollTranslation;
+  /** Nur für die Verwaltung: Fassungen je weitere Sprache, leer = deutsch */
+  translations?: Partial<Record<Locale, PollTranslation>>;
+}
+
+/** Fassung einer Umfrage in einer weiteren Sprache (Plan „Mehrsprachigkeit“, PR 9d); options in der Reihenfolge der deutschen */
+export interface PollTranslation {
+  title: string;
+  description: string;
+  options: string[];
 }
 
 export interface PollResultData {
@@ -1533,6 +2104,8 @@ export interface PollInput {
   results?: PollResults;
   /** „JJJJ-MM-TTTHH:MM“ in der Zeitzone der Kompanie; leer = ohne Ende */
   ends_at?: string | null;
+  /** Fassungen je weitere Sprache; options gleich viele wie auf Deutsch, leer = deutsch */
+  translations?: Partial<Record<Locale, Partial<PollTranslation>>>;
 }
 
 export type DocVisibility = 'members' | 'managers';
@@ -1541,7 +2114,12 @@ export interface DocCategory {
   id: number;
   title: string;
   sort: number;
+  /** Nur zum Bearbeiten (?source=1) mit weiteren Sprachen: Name je Sprache, '' = deutsch */
+  translations?: TitleTranslations;
 }
+
+/** Name eines Dokuments, einer Kategorie oder eines Albums je weitere Sprache ({title}; Plan „Mehrsprachigkeit“, PR 9e) */
+export type TitleTranslations = Partial<Record<Locale, Record<string, string>>>;
 
 export interface DocumentInfo {
   id: number;
@@ -1559,6 +2137,8 @@ export interface DocumentInfo {
   /** Auslieferung mit Prüfung der Anmeldung; wechselt mit jeder Fassung */
   url: string;
   updated_at: string;
+  /** Nur zum Bearbeiten (?source=1) mit weiteren Sprachen: Titel je Sprache, '' = deutsch */
+  translations?: TitleTranslations;
 }
 
 export interface DocumentMeta {
@@ -1566,6 +2146,8 @@ export interface DocumentMeta {
   category_id: number | null;
   date: string;
   visibility: DocVisibility;
+  /** Titel je weitere Sprache; nur die genannten Sprachen ändern sich */
+  translations?: TitleTranslations;
 }
 
 export interface DocumentsResponse {
@@ -1584,22 +2166,35 @@ export async function encodeFile(file: File): Promise<EncodedFile> {
 }
 
 export type AttendanceStatus = 'present' | 'excused' | 'absent';
-export const ATTENDANCE_LABELS: Record<AttendanceStatus, string> = { present: 'anwesend', excused: 'entschuldigt', absent: 'fehlt' };
+export const ATTENDANCE_LABELS: Record<AttendanceStatus, string> = {
+  present: t('anwesend'),
+  excused: t('entschuldigt'),
+  absent: t('fehlt'),
+};
 export type AttendanceCounts = Record<AttendanceStatus, number>;
 
-/** „3 anwesend · 1 entschuldigt · 0 fehlt“ */
-export const countsText = (c: AttendanceCounts): string =>
-  (['present', 'excused', 'absent'] as AttendanceStatus[]).map((s) => `${c[s]} ${ATTENDANCE_LABELS[s]}`).join(' · ');
+/** „3 anwesend · 1 entschuldigt · 0 fehlt“, mit open zusätzlich „· 5 ohne Auswahl“ */
+export const countsText = (c: AttendanceCounts, open?: number): string =>
+  (['present', 'excused', 'absent'] as AttendanceStatus[])
+    .map((s) => t('{count} {status}', { count: c[s], status: ATTENDANCE_LABELS[s] }))
+    .concat(open === undefined ? [] : [t('{count} ohne Auswahl', { count: open })])
+    .join(' · ');
 
 export interface AttendanceSummary {
   id: number;
   source: 'calendar' | 'free';
   title: string;
   date: string;
+  /** Erste Terminart der Liste (fehlt bei älteren Servern) */
+  kind?: string | null;
+  /** Alle Terminarten der Liste (fehlt bei älteren Servern, dann nur kind) */
+  kinds?: string[];
+  /** Termin nach heute: nur „entschuldigt“ möglich */
+  upcoming: boolean;
   counts: AttendanceCounts;
 }
 
-/** Termin aus dem internen Kalender zur Auswahl (letzte Wochen bis heute) */
+/** Termin aus dem internen Kalender zur Auswahl (letzte Wochen und alle kommenden, die spätesten zuerst) */
 export interface AttendanceEvent {
   key: string;
   title: string;
@@ -1607,6 +2202,14 @@ export interface AttendanceEvent {
   start: string;
   end: string;
   all_day: boolean;
+  /** Erste Terminart des Termins (fehlt bei älteren Servern) */
+  kind?: string | null;
+  /** Alle Terminarten des Termins (fehlt bei älteren Servern, dann nur kind) */
+  kinds?: string[];
+  /** Termin nach heute */
+  upcoming: boolean;
+  /** Termin heute (Zeitzone der Kompanie) */
+  today: boolean;
   list_id: number | null;
 }
 
@@ -1621,24 +2224,43 @@ export interface AttendancePerson {
   status: AttendanceStatus | null;
   /** Hat für diese Liste schon Punkte */
   booked: boolean;
+  /** Zu- oder Absage zum Termin (nur Listen aus dem Kalender, solange es den Termin gibt) */
+  response?: ResponseStatus | null;
+  response_note?: string;
+  /** Vor der Frist getippt, erst danach angekommen (offline vorgemerkt) */
+  response_late?: boolean;
+  /** Darf bei Terminen zu- und absagen (nur dann lässt sich für die Person etwas eintragen) */
+  may_respond?: boolean;
 }
 
 export interface AttendanceDetail extends AttendanceSummary {
   event_key: string | null;
+  /** null: keine Rückmeldungen (freie Liste, Termin nicht mehr im Kalender); sonst ob man noch zu- und absagen kann */
+  responses_open?: boolean | null;
   updated_by_name: string | null;
   updated_at: string;
   people: AttendancePerson[];
   counts_by_group: Record<AttendanceStatus, { group: Level; label: string; count: number }[]>;
+  /** Nach dem Speichern: wer jetzt neu die Voraussetzung für die Aufnahme erfüllt (nur für create_users) */
+  admissions_new?: { user_id: number; name: string }[];
 }
 
 export type AttendanceInput = (
-  | { id: number; title?: string; date?: string }
+  | { id: number; title?: string; date?: string; kinds?: string[] }
   | { source: 'calendar'; event_key: string }
   | { source: 'free'; title: string; date: string }
 ) & { entries?: Record<number, AttendanceStatus | null> };
 
 export interface MyAttendance {
   entries: { list_id: number; title: string; date: string; status: AttendanceStatus; updated_by_name: string | null }[];
+  counts: AttendanceCounts;
+}
+
+/** Anwesenheit einer Person auf ihrer Seite in der Verwaltung (nur mit Bereich und Recht manage_attendance) */
+export interface MemberAttendance {
+  /** Heute in der Zeitzone der Kompanie (JJJJ-MM-TT); später liegende Einträge sind kommende Termine */
+  today: string;
+  entries: { list_id: number; title: string; date: string; status: AttendanceStatus }[];
   counts: AttendanceCounts;
 }
 
@@ -1676,7 +2298,12 @@ export interface Company extends CompanyRef {
 
 /** Mitglied einer Kompanie: Eintrag wie in der Mitgliederliste; ältere Server schicken nur id und name. */
 export type CompanyMember = Pick<DirectoryEntry, 'id' | 'name'> &
-  Partial<Pick<DirectoryEntry, 'first_name' | 'last_name' | 'candidate_role' | 'photo_url' | 'rank_title' | 'rank_badge_url' | 'titles'>>;
+  Partial<
+    Pick<
+      DirectoryEntry,
+      'first_name' | 'last_name' | 'candidate_role' | 'photo_url' | 'rank_title' | 'rank_id' | 'rank_badge_url' | 'titles'
+    >
+  >;
 
 export interface CompanyInput {
   name?: string;
@@ -1689,6 +2316,32 @@ export interface CompanyInput {
 }
 
 /** Sponsor (Issue #279): Name (auch Alternativtext), Link (nur https, leer ohne), Logo. */
+/** Zustand der Einstiegsdatei der Webseite (Issue #273, eigenständige Version). */
+export type WebsiteEntryState = 'installed' | 'missing' | 'outdated' | 'occupied' | 'not_writable' | 'root';
+
+/** Verwaltung → Webseite: Startseite und Einstiegsdatei (manage_website). */
+export interface WebsiteSettings {
+  home_page_id: number | null;
+  home_page_title: string | null;
+  /** Startseite gewählt, aber gelöscht oder nicht mehr für alle sichtbar */
+  home_page_missing: boolean;
+  /** Seiten, die Startseite sein können (für alle sichtbar) */
+  pages: { id: number; title: string }[];
+  pages_enabled: boolean;
+  /** Adresse der Webseite; null, wenn die App nicht in einem eigenen Ordner liegt */
+  url: string | null;
+  entry: {
+    state: WebsiteEntryState;
+    /** andere Startseite im Ordner (bei occupied) */
+    file: string | null;
+    /** Ordner der App, z. B. app */
+    folder: string;
+    /** Inhalt der Einstiegsdatei (zum Hochladen von Hand) */
+    content: string;
+    message: string;
+  };
+}
+
 export interface Sponsor {
   id: number;
   name: string;
@@ -1966,11 +2619,19 @@ export interface RankStatus {
   reachable_rank?: RankRef | null;
   threshold_reached_since?: string | null;
   below_current_threshold?: boolean;
+  /** Bald bereit: Schwelle noch nicht erreicht, es fehlt höchstens 1 Punkt */
+  soon?: boolean;
 }
 
 export interface RankHistoryEntry {
+  /** fehlt bei älteren Servern */
+  id?: number;
+  /** Deutsche Bezeichnungen von damals */
   from: string | null;
   to: string | null;
+  /** IDs der Dienstgrade (für ihre Namen in einer weiteren Sprache; fehlen bei älteren Servern) */
+  from_rank_id?: number | null;
+  to_rank_id?: number | null;
   /** Heutiges Abzeichen des neuen Dienstgrads */
   to_badge_url?: string | null;
   kind: 'promotion' | 'demotion' | 'initial';
@@ -2079,7 +2740,7 @@ export function toLogin(): void {
 
 function sessionExpired(): never {
   toLogin();
-  throw new ApiError('Sitzung abgelaufen – bitte neu anmelden.', 401, 'not_logged_in');
+  throw new ApiError(t('Sitzung abgelaufen – bitte neu anmelden.'), 401, 'not_logged_in');
 }
 
 /** Holt ein neues CSRF-Token (nur mit dem Sitzungs-Cookie). quiet: ohne Weiterleitung zur Anmeldung. */
@@ -2088,11 +2749,11 @@ export async function refreshCsrf(quiet = false): Promise<void> {
   try {
     res = await fetch(config!.csrf.refreshUrl, { credentials: 'same-origin', headers: { Accept: 'application/json' } });
   } catch {
-    throw new ApiError('Keine Verbindung. Bitte später erneut versuchen.', 0);
+    throw new ApiError(t('Keine Verbindung. Bitte später erneut versuchen.'), 0);
   }
   const data = await res.json().catch(() => null);
   if (!res.ok || !data?.token) {
-    if (quiet) throw new ApiError('Sitzung abgelaufen.', 401, 'not_logged_in');
+    if (quiet) throw new ApiError(t('Sitzung abgelaufen.'), 401, 'not_logged_in');
     sessionExpired();
   }
   csrfToken = data.token;
@@ -2126,6 +2787,19 @@ export function inBackground<T>(start: () => Promise<T>): Promise<T> {
     background--;
   }
 }
+/** Meldung, wenn eine Änderung ohne Verbindung nicht beim Server ankam. */
+export const OFFLINE_NOT_SAVED = t('Keine Verbindung – nicht gespeichert. Deine Eingaben stehen noch hier; bitte später erneut speichern.');
+/** Meldung, wenn der Server in der Zeit (WRITE_TIMEOUT_MS) nicht geantwortet hat; ob die Änderung ankam, ist offen. */
+export const NO_ANSWER = t(
+  'Keine Antwort vom Server. Ob es gespeichert ist, ist nicht sicher; bitte später nachsehen oder erneut speichern.',
+);
+/**
+ * So lange wartet die App bei Änderungen, die sie vormerken und gefahrlos noch einmal senden kann (Zu- und Absagen,
+ * Anwesenheit, Punkte und Strafen mit request_id), auf die Antwort. Danach gilt die Anfrage als gescheitert (Status 0,
+ * Code `timeout`) und wird vorgemerkt, statt dass „Speichert …“ bei schlechtem Netz ohne Ende stehen bleibt.
+ */
+export const WRITE_TIMEOUT_MS = 20000;
+
 /** Header für den Service Worker (public/sw.js): Antwort darf zuerst aus seinem Speicher kommen. */
 const STALE_OK_HEADER = 'X-Kompanie-Stale-Ok';
 const USER_HEADER = 'X-Kompanie-User';
@@ -2140,24 +2814,31 @@ async function requestFull<T>(
   quiet = false,
   /** im Hintergrund (inBackground): wie quiet, dazu ohne Eintrag unter „Fehler melden“ */
   silent = background > 0,
+  /** > 0: nach so vielen ms abbrechen (nur für Änderungen, die sich gefahrlos wiederholen lassen, WRITE_TIMEOUT_MS) */
+  timeoutMs = 0,
 ): Promise<{ data: T; headers: Headers }> {
   quiet ||= silent;
   if (!config) {
-    throw new ApiError('Die App muss über ihre Adresse auf der Webseite geöffnet werden.', 0);
+    throw new ApiError(t('Die App muss über ihre Adresse auf der Webseite geöffnet werden.'), 0);
   }
   let res: Response;
   // Service Worker (Issue #108): gespeicherte Antwort sofort, die aus dem Netz kommt im Hintergrund nach. Was vor der
   // letzten eigenen Änderung gespeichert wurde, holt er zuerst aus dem Netz (public/sw.js). Nicht /config: Damit prüft
   // die App den aktuellen Stand (z. B. „Erneut versuchen“ auf der Wartungsseite).
   const staleOk = method === 'GET' && !previewRole() && path !== '/config';
+  const abort = timeoutMs > 0 && typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = abort ? setTimeout(() => abort.abort(), timeoutMs) : null;
   try {
     res = await fetch(url(path, query), {
       method,
+      ...(abort ? { signal: abort.signal } : {}),
       credentials: 'same-origin',
       headers: {
         Accept: 'application/json',
         // Für wen die Antwort gilt: Nur dieselbe Person bekommt sie später sofort aus dem Speicher.
-        ...(method === 'GET' ? { [USER_HEADER]: String(config.user?.id ?? 0) } : {}),
+        // Mit Sprache, wenn nicht Deutsch: Gespeicherte Antworten (Meldungen) gelten dann nur für dieselbe Sprache.
+        ...(method === 'GET' ? { [USER_HEADER]: String(config.user?.id ?? 0) + (locale() === SOURCE_LOCALE ? '' : `:${locale()}`) } : {}),
+        [LOCALE_HEADER]: locale(),
         ...(staleOk ? { [STALE_OK_HEADER]: '1' } : {}),
         ...(csrfToken ? { [config.csrf.header]: csrfToken } : {}),
         ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
@@ -2167,9 +2848,18 @@ async function requestFull<T>(
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {
+    if (abort?.signal.aborted) {
+      if (!silent) noteError('Keine Antwort vom Server');
+      throw new ApiError(NO_ANSWER, 0, 'timeout');
+    }
     if (!path.startsWith('/reports') && !silent) noteError('Keine Verbindung zum Server');
-    throw new ApiError('Keine Verbindung. Bitte später erneut versuchen.', 0);
+    // Bei Änderungen sagen, dass nichts gespeichert ist (Offline-Prüfung): Die Eingaben stehen noch in der Ansicht.
+    throw new ApiError(method === 'GET' ? t('Keine Verbindung. Bitte später erneut versuchen.') : OFFLINE_NOT_SAVED, 0);
+  } finally {
+    if (timer) clearTimeout(timer);
   }
+  // Gespeicherte Version statt einer Antwort aus dem Netz (schlechte Verbindung): Hinweis oben (connection.ts).
+  if (method === 'GET') noteResponse(res.headers);
   // Eigene Änderung (auch eine abgelehnte könnte etwas geändert haben): zwischengespeicherte Daten verwerfen.
   // Ausnahmen ohne Änderung an den angezeigten Daten: die Abfrage des Push-Status beim Start und Vorschauen ({preview: true},
   // z. B. die Frist für Ehemalige vor dem Speichern).
@@ -2180,7 +2870,7 @@ async function requestFull<T>(
 
   if (res.status === 403 && retry && CSRF_ERRORS.includes(data?.code)) {
     await refreshCsrf(quiet);
-    return requestFull<T>(method, path, body, query, false, quiet, silent);
+    return requestFull<T>(method, path, body, query, false, quiet, silent, timeoutMs);
   }
   if (res.status === 401 && config.user && !quiet) {
     sessionExpired();
@@ -2189,8 +2879,10 @@ async function requestFull<T>(
   if (res.status === 503 && data?.code === 'maintenance') {
     applyMaintenance({ on: true, reason: String(data.reason ?? ''), since: config.maintenance?.since ?? 0 });
   }
+  // Angekommen: Eingaben in Formularen gelten als gespeichert (unsaved.ts).
+  if (res.ok && method !== 'GET' && !readOnly && !silent) markSaved();
   if (!res.ok) {
-    const message: string = data?.message ?? `Fehler ${res.status}`;
+    const message: string = data?.message ?? t('Fehler {status}', { status: res.status });
     // Für „Fehler melden“ (Issue #64); Fehler des Formulars selbst nicht.
     if (!path.startsWith('/reports') && !silent) noteError(`${message} (HTTP ${res.status}${data?.code ? `, ${data.code}` : ''})`);
     throw new ApiError(message, res.status, data?.code ?? '');
@@ -2209,7 +2901,7 @@ export async function preparePreview(): Promise<string | null> {
     const next = await request<AppConfig>('GET', '/config');
     if (!next.preview) {
       stopPreview();
-      return 'Die Vorschau wurde beendet.';
+      return t('Die Vorschau wurde beendet.');
     }
     // Bereiche im selben Objekt ändern: Teile der App halten es fest (z. B. App.tsx).
     const { features, ...rest } = next;
@@ -2218,7 +2910,7 @@ export async function preparePreview(): Promise<string | null> {
     return null;
   } catch {
     stopPreview();
-    return 'Die Vorschau braucht eine Internetverbindung und wurde beendet.';
+    return t('Die Vorschau braucht eine Internetverbindung und wurde beendet.');
   }
 }
 
@@ -2226,11 +2918,38 @@ async function request<T>(method: string, path: string, body?: unknown, query?: 
   return (await requestFull<T>(method, path, body, query)).data;
 }
 
+/** Änderung, die die App bei einem Fehler vormerkt und später gefahrlos noch einmal sendet: mit Zeitlimit. */
+async function requestRepeatable<T>(method: string, path: string, body?: unknown): Promise<T> {
+  return (await requestFull<T>(method, path, body, undefined, true, false, background > 0, WRITE_TIMEOUT_MS)).data;
+}
+
 export const api = {
   me: () => request<Me>('GET', '/me'),
   myPoints: () => request<PointEntry[]>('GET', '/me/points'),
   myPenalties: () => request<Penalty[]>('GET', '/me/penalties'),
   calendar: () => request<CalendarEvent[]>('GET', '/calendar'),
+  /** decidedAt: wann offline getippt (ISO 8601); dann gilt die Antwort auch nach dem Ende der Frist */
+  respondEvent: (id: string, status: ResponseStatus, note: string, decidedAt?: string) =>
+    requestRepeatable<CalendarEvent>('PUT', `/calendar/${encodeURIComponent(id)}/response`, {
+      status,
+      note,
+      ...(decidedAt ? { decided_at: decidedAt } : {}),
+    }),
+  withdrawResponse: (id: string, decidedAt?: string) =>
+    requestRepeatable<CalendarEvent>(
+      'DELETE',
+      `/calendar/${encodeURIComponent(id)}/response`,
+      decidedAt ? { decided_at: decidedAt } : undefined,
+    ),
+  eventResponses: (id: string) => request<EventResponseOverview>('GET', `/calendar/${encodeURIComponent(id)}/responses`),
+  setKindsOfEvent: (id: string, kinds: string[]) =>
+    request<{ id: string; kind: string | null; kinds?: string[] }>('PUT', `/calendar/${encodeURIComponent(id)}/kind`, { kinds }),
+  respondFor: (id: string, userId: number, status: ResponseStatus | null) =>
+    request<{ user_id: number; status: ResponseStatus | null; note: string }>(
+      'PUT',
+      `/calendar/${encodeURIComponent(id)}/responses/${userId}`,
+      { status },
+    ),
 
   login: (username: string, password: string, remember: boolean) =>
     request<AppConfig>('POST', '/auth/login', { username, password, remember }),
@@ -2238,6 +2957,8 @@ export const api = {
   logout: () => request<{ logged_out: boolean }>('POST', '/auth/logout', {}),
 
   events: () => request<PublicEvent[]>('GET', '/events'),
+  /** Zum Bearbeiten (manage_events): deutsch, mit den Fassungen unter translations */
+  eventsSource: () => request<PublicEvent[]>('GET', '/events?source=1'),
   createEvent: (data: EventInput) => request<PublicEvent>('POST', '/events', data),
   updateEvent: (id: number, data: EventInput) => request<PublicEvent>('PATCH', `/events/${id}`, data),
   deleteEvent: (id: number) => request<{ deleted: boolean }>('DELETE', `/events/${id}`),
@@ -2252,6 +2973,8 @@ export const api = {
     return { items: data, totalPages: Number(headers.get('X-Total-Pages') ?? 1) };
   },
   newsItem: (id: string) => request<NewsItem>('GET', `/news/${encodeURIComponent(id)}`),
+  /** Zum Bearbeiten: deutsche Fassung und die Fassungen je weiterer Sprache */
+  newsSource: (id: string) => request<NewsItem>('GET', `/news/${encodeURIComponent(id)}?source=1`),
   createNews: (data: NewsInput) => request<NewsItem>('POST', '/news', data),
   updateNews: (id: string, data: NewsInput) => request<NewsItem>('PATCH', `/news/${encodeURIComponent(id)}`, data),
   deleteNews: (id: string) => request<{ deleted: boolean }>('DELETE', `/news/${encodeURIComponent(id)}`),
@@ -2278,6 +3001,15 @@ export const api = {
     }),
   /** Zum Mitglied machen (wer Mitglieder anlegen darf; nur aus Rollen, die das erlauben, z. B. Anwärter). */
   promote: (id: number) => request<{ id: number; level: Level }>('POST', `/members/${id}/promote`),
+  /** Anwärter mit Stand der Voraussetzung (create_users). */
+  admissions: () => request<Admission[]>('GET', '/admissions'),
+  /** Eigener Stand als Anwärter (null, wenn man keiner ist) */
+  myAdmission: () => request<{ admission: Admission | null }>('GET', '/me/admission'),
+  /** Als Mitglied aufnehmen: Grundrolle → Mitglied bzw. Anwärter-Zusatzrolle entfernen; Eintritt = heute, wenn leer. */
+  admit: (id: number) =>
+    request<{ id: number; level: Level; extra_roles: Level[]; join_date: string | null }>('POST', `/members/${id}/admit`),
+  /** „Anwärter seit“ ändern (TT.MM.JJJJ, leer = unbekannt). */
+  setCandidateSince: (id: number, since: string) => request<Admission>('PUT', `/members/${id}/candidate-since`, { since }),
   setRole: (id: number, level: Level) =>
     request<{ id: number; level: Level; extra_roles: Level[] }>('PATCH', `/members/${id}/role`, { level }),
   setExtraRoles: (id: number, extra_roles: Level[]) =>
@@ -2311,6 +3043,18 @@ export const api = {
   ) => request<AccountProfile>('PATCH', `/members/${id}/account`, data),
   deleteAccount: (id: number) => request<{ deleted: boolean }>('DELETE', `/members/${id}`),
   formerMembers: () => request<FormerMember[]>('GET', '/members/former'),
+  passiveMembers: () => request<PassiveList>('GET', '/passive-members'),
+  createPassive: (data: PassiveInput) => request<PassiveMember>('POST', '/passive-members', data),
+  updatePassive: (id: number, data: PassiveInput) => request<PassiveMember>('PATCH', `/passive-members/${id}`, data),
+  deletePassive: (id: number) => request<{ deleted: boolean }>('DELETE', `/passive-members/${id}`),
+  myPassives: () => request<PassiveMember[]>('GET', '/me/passive-members'),
+  addPassivePayment: (passiveId: number, data: { year: number; amount_cents: number; paid_on: string; method: string }) =>
+    request<PassivePayment>('POST', `/passive-members/${passiveId}/payments`, data),
+  updatePassivePayment: (id: number, data: { year?: number; amount_cents?: number; paid_on?: string; method?: string }) =>
+    request<PassivePayment>('PATCH', `/passive-payments/${id}`, data),
+  deletePassivePayment: (id: number) => request<{ deleted: boolean }>('DELETE', `/passive-payments/${id}`),
+  updatePassiveSettings: (data: Partial<PassiveSettings>) => request<PassiveSettings>('PATCH', '/passive-members/settings', data),
+  importPassives: (data: PassiveImportInput) => request<PassiveImportResult>('POST', '/passive-members/import', data),
   markFormer: (id: number, data: FormerInput) => request<FormerInfo & { offices_ended: number }>('PUT', `/members/${id}/former`, data),
   formerOfficesPreview: (id: number, leftOn: string) =>
     request<FormerOfficesPreview>('GET', `/members/${id}/former/offices`, undefined, { left_on: leftOn }),
@@ -2349,8 +3093,18 @@ export const api = {
     request<Rank>('PATCH', `/ranks/${id}`, data),
   deleteRank: (id: number) => request<{ deleted: boolean }>('DELETE', `/ranks/${id}`),
   reorderRanks: (ids: number[]) => request<Rank[]>('PUT', '/ranks/order', { ids }),
-  setMemberRank: (id: number, rank_id: number | null, reason: string) =>
-    request<RankStatus>('PUT', `/members/${id}/rank`, { rank_id, reason }),
+  /** date: Tag des Wechsels (JJJJ-MM-TT); leer = heute. */
+  setMemberRank: (id: number, rank_id: number | null, reason: string, date?: string) =>
+    request<RankStatus>('PUT', `/members/${id}/rank`, { rank_id, reason, ...(date ? { date } : {}) }),
+  /** Datum eines Eintrags im Verlauf nachträglich ändern (JJJJ-MM-TT); liefert den neuen Verlauf. */
+  setRankHistoryDate: (memberId: number, entryId: number, date: string) =>
+    request<RankHistoryEntry[]>('PATCH', `/members/${memberId}/rank-history/${entryId}`, { date }),
+  /** Neuen Dienstgrad eines Eintrags im Verlauf ändern (null = kein); beim neuesten auch den aktuellen. */
+  setRankHistoryRank: (memberId: number, entryId: number, rank_id: number | null) =>
+    request<{ rank: RankStatus; history: RankHistoryEntry[] }>('PUT', `/members/${memberId}/rank-history/${entryId}/rank`, { rank_id }),
+  /** Eintrag im Verlauf löschen; beim neuesten gilt wieder der Dienstgrad davor. */
+  deleteRankHistoryEntry: (memberId: number, entryId: number) =>
+    request<{ rank: RankStatus; history: RankHistoryEntry[] }>('DELETE', `/members/${memberId}/rank-history/${entryId}`),
   promotions: () => request<Promotion[]>('GET', '/promotions'),
   /** Abzeichen hochladen; bei SVG optional eine PNG-Fassung (Base64) für Benachrichtigungen. */
   uploadRankBadge: async (id: number, file: File, png?: string | null) =>
@@ -2360,6 +3114,8 @@ export const api = {
 
   // Dokumente (Issue #2)
   documents: () => request<DocumentsResponse>('GET', '/documents'),
+  /** Zum Bearbeiten (manage_documents): deutsche Namen, dazu translations */
+  documentsSource: () => request<DocumentsResponse>('GET', '/documents?source=1'),
   createDocument: async (file: File, meta: DocumentMeta) =>
     request<DocumentInfo>('POST', '/documents', { ...meta, file: await encodeFile(file) }),
   updateDocument: (id: number, meta: Partial<DocumentMeta>) => request<DocumentInfo>('PATCH', `/documents/${id}`, meta),
@@ -2367,7 +3123,9 @@ export const api = {
     request<DocumentInfo>('POST', `/documents/${id}/file`, { file: await encodeFile(file) }),
   deleteDocument: (id: number) => request<{ deleted: boolean }>('DELETE', `/documents/${id}`),
   createDocCategory: (title: string) => request<DocCategory>('POST', '/document-categories', { title }),
-  updateDocCategory: (id: number, title: string) => request<DocCategory>('PATCH', `/document-categories/${id}`, { title }),
+  /** title null: nur translations ändern */
+  updateDocCategory: (id: number, title: string | null, translations?: TitleTranslations) =>
+    request<DocCategory>('PATCH', `/document-categories/${id}`, title === null ? { translations } : { title, translations }),
   deleteDocCategory: (id: number) => request<{ deleted: boolean }>('DELETE', `/document-categories/${id}`),
   reorderDocCategories: (ids: number[]) => request<DocCategory[]>('PUT', '/document-categories/order', { ids }),
 
@@ -2376,7 +3134,9 @@ export const api = {
   postBoard: (input: BoardInput) => request<BoardMessage>('POST', '/board', input),
   updateBoard: (
     id: number,
-    changes: Partial<Pick<BoardInput, 'title' | 'blocks' | 'text' | 'expires_at' | 'audience' | 'audience_ids' | 'attachments'>>,
+    changes: Partial<
+      Pick<BoardInput, 'title' | 'blocks' | 'text' | 'expires_at' | 'audience' | 'audience_ids' | 'attachments' | 'translations'>
+    >,
   ) => request<BoardMessage>('PATCH', `/board/${id}`, changes),
   /** mit Kompanien oder Personen: Zahl der Empfänger einer Nachricht nur für diese */
   boardMailInfo: (audience?: BoardAudience, ids: number[] = []) =>
@@ -2433,6 +3193,38 @@ export const api = {
   saveMyJoinYear: (data: { date: string; profile?: ProfileVisibility }) =>
     request<{ join_year: JoinYear | null }>('PUT', '/me/join-year', data),
   deleteMyJoinYear: () => request<{ join_year: null }>('DELETE', '/me/join-year'),
+  /** Eigene Anordnung der Kacheln einer Seite für eine Spaltenzahl (tiles.tsx) */
+  saveTiles: (page: string, cols: number, tiles: TilePlace[]) =>
+    request<{ page: string; layouts: TileLayouts }>('PUT', '/me/tiles', { page, cols, tiles }),
+  /** Sprache am Konto (Plan „Mehrsprachigkeit“); null löscht die Wahl */
+  setMyLocale: (l: Locale | null) => request<{ locale: Locale | null }>('PUT', '/me/locale', { locale: l }),
+  /**
+   * Fassung eines Inhalts in einer Sprache über die Route des Inhalts (Einstellungen → Sprachen → Übersetzungen): fields
+   * wie im Editor (title, location, description bzw. bei Umfragen options als Liste); bei Kategorien geht der deutsche
+   * Name mit (title), weil die Route ihn verlangt.
+   */
+  saveContentTranslation: (kind: ContentKind, id: string, lang: Locale, fields: Record<string, string | string[]>, title: string) => {
+    const translations = { [lang]: fields };
+    const path: Record<ContentKind, string> = {
+      event: `/events/${id}`,
+      calendar_entry: `/calendar/entries/${id}`,
+      poll: `/polls/${id}`,
+      document: `/documents/${id}`,
+      document_category: `/document-categories/${id}`,
+      album: `/admin/gallery/albums/${id}`,
+    };
+    return request<unknown>('PATCH', path[kind], kind === 'document_category' ? { title, translations } : { translations });
+  },
+  /** Alle übersetzbaren Namen mit Text der Basissprache (Einstellungen → Sprachen → Übersetzungen) */
+  translationOverview: (lang: Locale) => request<TranslationOverview>('GET', '/admin/translations', undefined, { locale: lang }),
+  /** Eigene Namen in einer weiteren Sprache (Einrichten auf …); text '' löscht die Übersetzung */
+  saveTranslations: (locale: Locale, items: { kind: NameKind; ref: string; field?: string; text: string }[]) =>
+    request<{ translations: NameTranslations | [] }>('PUT', '/admin/translations', { locale, items }),
+  resetTiles: (page: string) => request<{ page: string; layouts: TileLayouts }>('DELETE', '/me/tiles', undefined, { page }),
+  /** Vorgabe für alle (manage_settings) */
+  saveTileDefault: (page: string, cols: number, tiles: TilePlace[]) =>
+    request<{ page: string; layouts: TileLayouts }>('PUT', '/admin/tiles', { page, cols, tiles }),
+  resetTileDefault: (page: string) => request<{ page: string; layouts: TileLayouts }>('DELETE', '/admin/tiles', undefined, { page }),
   setMemberJoinYear: (id: number, date: string) => request<{ join_year: JoinYear | null }>('PUT', `/members/${id}/join-year`, { date }),
   deleteMemberJoinYear: (id: number) => request<{ join_year: null }>('DELETE', `/members/${id}/join-year`),
 
@@ -2457,7 +3249,9 @@ export const api = {
   attendanceLists: () => request<AttendanceSummary[]>('GET', '/attendance'),
   attendanceEvents: () => request<AttendanceEvent[]>('GET', '/attendance/events'),
   attendance: (id: number) => request<AttendanceDetail>('GET', `/attendance/${id}`),
-  saveAttendance: (data: AttendanceInput) => request<AttendanceDetail>('PUT', '/attendance', data),
+  saveAttendance: (data: AttendanceInput) => requestRepeatable<AttendanceDetail>('PUT', '/attendance', data),
+  setEventKinds: (kinds: string[], hidden: string[]) =>
+    request<{ kinds: string[]; hidden?: string[] }>('PUT', '/admin/event-kinds', { kinds, hidden }),
   deleteAttendance: (id: number) => request<{ deleted: boolean }>('DELETE', `/attendance/${id}`),
   myAttendance: () => request<MyAttendance>('GET', '/me/attendance'),
   attendanceGroups: () => request<AttendanceGroup[]>('GET', '/attendance/groups'),
@@ -2477,10 +3271,16 @@ export const api = {
   // Eigene Seiten (Issue #287)
   pages: () => request<{ pages: PageSummary[] }>('GET', '/pages').then((r) => r.pages),
   page: (id: number) => request<PageDetail>('GET', `/pages/${id}`),
+  /** Zum Bearbeiten: deutsche Fassung und die Fassungen je weiterer Sprache */
+  pageSource: (id: number) => request<PageDetail>('GET', `/pages/${id}?source=1`),
   createPage: (data: PageInput) => request<PageDetail>('POST', '/pages', data),
   updatePage: (id: number, data: PageInput) => request<PageDetail>('PATCH', `/pages/${id}`, data),
   deletePage: (id: number) => request<{ deleted: boolean }>('DELETE', `/pages/${id}`),
   reorderPages: (ids: number[]) => request<{ pages: PageSummary[] }>('PUT', '/pages/order', { ids }).then((r) => r.pages),
+  // Webseite (Issue #273)
+  website: () => request<WebsiteSettings>('GET', '/admin/website'),
+  updateWebsite: (data: { home_page_id: number | null }) => request<WebsiteSettings>('PATCH', '/admin/website', data),
+  installWebsiteEntry: () => request<WebsiteSettings>('POST', '/admin/website/entry'),
   // Sponsoren (Issue #279)
   sponsors: () => request<Sponsor[]>('GET', '/sponsors'),
   createSponsor: (data: { name: string; url: string }) => request<Sponsor>('POST', '/sponsors', data),
@@ -2531,7 +3331,7 @@ export const api = {
   /** Einen freien Namen in allen Amtszeiten mit dem Konto verknüpfen */
   linkOfficeName: (name: string, user_id: number) => request<{ linked: number }>('POST', '/offices/link', { name, user_id }),
 
-  // Listen (Issue #121): nur mit manage_lists
+  // Listen (Issue #121): ansehen mit view_lists, ändern mit manage_lists
   lists: () => request<PrintListSummary[]>('GET', '/lists'),
   list: (id: number) => request<PrintList>('GET', `/lists/${id}`),
   createList: (data: PrintListInput) => request<PrintList>('POST', '/lists', data),
@@ -2556,11 +3356,13 @@ export const api = {
     apply_factor?: boolean;
     /** Aus dem Vorschlag einer Anwesenheitsliste: bucht nur für, wer dafür noch keine Punkte hat. */
     attendance_id?: number;
-  }) => request<PointEntry[]>('POST', '/points', data),
+    /** Kennung der Buchung (bookingOutbox.ts): dieselbe noch einmal bucht nicht doppelt. */
+    request_id?: string;
+  }) => (data.request_id ? requestRepeatable : request)<PointEntry[]>('POST', '/points', data),
   deletePoints: (id: number) => request<{ deleted: boolean }>('DELETE', `/points/${id}`),
 
-  givePenalty: (data: { user_ids: number[]; amount_cents: number; reason: string; date?: string }) =>
-    request<Penalty[]>('POST', '/penalties', data),
+  givePenalty: (data: { user_ids: number[]; amount_cents: number; reason: string; date?: string; request_id?: string }) =>
+    (data.request_id ? requestRepeatable : request)<Penalty[]>('POST', '/penalties', data),
   openPenalties: () => request<OpenPenalty[]>('GET', '/penalties/open'),
   setPenaltyStatus: (id: number, status: 'open' | 'paid') => request<Penalty>('PATCH', `/penalties/${id}`, { status }),
   deletePenalty: (id: number) => request<{ deleted: boolean }>('DELETE', `/penalties/${id}`),
@@ -2584,12 +3386,16 @@ export const api = {
       ...(q.userId ? { user_id: String(q.userId) } : {}),
       ...(q.area ? { area: q.area } : {}),
     }),
+  reportSections: () => request<ReportSectionChoice[]>('GET', '/admin/report/sections'),
+  report: (q: { from: string; to: string; sections: string[] }) =>
+    request<Report>('GET', '/admin/report', undefined, { from: q.from, to: q.to, sections: q.sections.join(',') }),
   setChangeLogSettings: (data: Partial<Pick<ChangeLogSettings, 'enabled' | 'keep_days'>>) =>
     request<ChangeLogSettings>('PUT', '/admin/changes/settings', data),
   maintenance: () => request<MaintenanceState>('GET', '/admin/maintenance'),
   navigation: () => request<NavigationAdmin>('GET', '/admin/navigation'),
   saveNavigation: (body: {
     navigation: NavigationSetting | null;
+    guest_navigation?: NavigationSetting | null;
     names?: NavNames;
     start?: NavStart;
     show_labels?: boolean;
@@ -2626,8 +3432,9 @@ export const api = {
   // Alben der App und hochgeladene Bilder (Issue #285)
   galleryAlbums: () => request<{ albums: GalleryAdminAlbum[] }>('GET', '/admin/gallery/albums'),
   galleryAdminAlbum: (id: number) => request<GalleryAdminAlbumDetail>('GET', `/admin/gallery/albums/${id}`),
-  createGalleryAlbum: (input: { title: string; year: number }) => request<GalleryAdminAlbumDetail>('POST', '/admin/gallery/albums', input),
-  updateGalleryAlbum: (id: number, input: { title?: string; year?: number }) =>
+  createGalleryAlbum: (input: { title: string; year: number; translations?: TitleTranslations }) =>
+    request<GalleryAdminAlbumDetail>('POST', '/admin/gallery/albums', input),
+  updateGalleryAlbum: (id: number, input: { title?: string; year?: number; translations?: TitleTranslations }) =>
     request<GalleryAdminAlbumDetail>('PATCH', `/admin/gallery/albums/${id}`, input),
   deleteGalleryAlbum: (id: number) => request<{ deleted: boolean }>('DELETE', `/admin/gallery/albums/${id}`),
   uploadGalleryPhoto: async (albumId: number, file: File, intern: boolean) =>
@@ -2636,6 +3443,9 @@ export const api = {
   /** Hochgeladenes Bild oder Video nachträglich intern oder öffentlich stellen (manage_gallery oder review_gallery) */
   setGalleryPhotoIntern: (id: number, intern: boolean) =>
     request<{ id: number; intern: boolean }>('PATCH', `/gallery/photos/${id}`, { intern }),
+  /** Titelbild eines Albums für die Übersicht wählen; null: automatisch (manage_gallery) */
+  setGalleryAlbumCover: (albumId: number, photoId: number | null) =>
+    request<{ id: number; cover_id: number | null }>('PUT', `/gallery/albums/${albumId}/cover`, { photo_id: photoId }),
   /** Alben als Ziel zum Verschieben (manage_gallery) */
   galleryMoveTargets: () =>
     request<{ albums: { id: number; title: string; year: string; source: 'app' | 'drive' }[] }>('GET', '/gallery/albums'),
@@ -2760,12 +3570,14 @@ export const api = {
     request<RegistrationStatus>('POST', '/registration/status', { username, password }),
   registrations: () => request<RegistrationList>('GET', '/registrations'),
   /** Freigeben: neues Konto, oder mit user_id das Mitglied ohne Zugang mit der Anfrage verbinden */
-  approveRegistration: (id: number, data: { level?: Level; username?: string; user_id?: number }) =>
-    request<{ member: { id: number; name: string; username: string; level: Level }; mailed: boolean; linked?: boolean }>(
-      'POST',
-      `/registrations/${id}/approve`,
-      data,
-    ),
+  approveRegistration: (id: number, data: { level?: Level; username?: string; user_id?: number; company_ids?: number[] }) =>
+    request<{
+      member: { id: number; name: string; username: string; level: Level };
+      mailed: boolean;
+      linked?: boolean;
+      /** Kompanien der Person nach der Freigabe; nur mit dem Bereich Kompanien */
+      companies?: { id: number; name: string }[];
+    }>('POST', `/registrations/${id}/approve`, data),
   rejectRegistration: (id: number, reason: string) =>
     request<{ rejected: boolean; mailed: boolean }>('POST', `/registrations/${id}/reject`, { reason }),
   registrationSettings: () => request<RegistrationSettings>('GET', '/admin/registration'),
@@ -2835,6 +3647,8 @@ export interface RegistrationForm {
   /** Mailversand eingerichtet: Bestätigung der Adresse und Ergebnis per Mail */
   email_confirmation: boolean;
   privacy_url: string | null;
+  /** Aktive Kompanien zum Auswählen (Bereich Kompanien); leer oder fehlt: keine Auswahl */
+  companies?: { id: number; name: string }[];
 }
 
 export interface RegistrationInput {
@@ -2846,6 +3660,10 @@ export interface RegistrationInput {
   username: string;
   password: string;
   message?: string;
+  /** Pflicht, wenn das Formular Kompanien anbietet: Kompanie(n) (company_ids), keine Kompanie oder passiv */
+  company_choice?: 'company' | 'none' | 'passive';
+  /** Gewählte Kompanien bei company_choice company */
+  company_ids?: number[];
   /** Verstecktes Feld gegen Programme (bleibt leer) */
   website?: string;
 }
@@ -2870,6 +3688,10 @@ export interface RegistrationRequest {
   expires_at: string;
   /** Mitglieder ohne Zugang, die passen könnten (beste zuerst); fehlt bei älteren Servern */
   matches?: RegistrationMatch[];
+  /** Kompanien, die die Person gewählt hat; nur mit dem Bereich Kompanien */
+  companies?: { id: number; name: string }[];
+  /** Wahl im Formular; null bei Anfragen ohne Angabe; nur mit dem Bereich Kompanien */
+  company_choice?: 'company' | 'none' | 'passive' | null;
 }
 
 /** Vorschlag zum Verbinden: gleiche E-Mail-Adresse, gleicher Name oder ähnlicher Name (gleicher Nachname, Vorname beginnt gleich) */
@@ -2885,6 +3707,8 @@ export interface RegistrationList {
   email_confirmation: boolean;
   /** Alle Mitglieder ohne Zugang zum Auswählen; fehlt bei älteren Servern */
   no_access_members?: { id: number; name: string }[];
+  /** Alle Kompanien zum Ändern beim Freigeben; nur mit dem Bereich Kompanien */
+  companies?: { id: number; name: string; active: boolean }[];
 }
 
 export interface RegistrationSettings {
@@ -2914,6 +3738,7 @@ export type PushType =
   | 'board_public'
   | 'polls'
   | 'birthdays'
+  | 'passive_birthdays'
   | 'gallery_review'
   | 'gallery_submissions'
   | 'registrations'
@@ -2925,6 +3750,7 @@ export type PushType =
   | 'titles'
   | 'events'
   | 'reminder'
+  | 'responses'
   | 'news';
 
 /** Angaben des Browsers zu seinem Push-Abo (PushSubscription.toJSON()). */
@@ -2993,6 +3819,8 @@ export interface BackupDriveStatus {
 export interface BackupUploadStats {
   bytes: number;
   chunks: number;
+  /** neue Versuche nach vorübergehenden Fehlern (z. B. HTTP 502 von Google) */
+  retries: number;
   /** Sitzung bei Google beginnen (eine kleine Anfrage: Verbindungsaufbau und Antwortzeit) */
   start_seconds: number;
   /** Datei von der Platte des Servers lesen */
@@ -3064,6 +3892,10 @@ export interface UpdateStatus {
   withdrawn: boolean;
   /** Bei zurückgezogener Version: Ziel des automatischen Wechsels (null = keins da). */
   fallback: string | null;
+  /** Wartungsabo laut Update-Liste: letzter Tag (JJJJ-MM-TT) oder „unbefristet“; null = keine Angabe. */
+  maintenance: string | null;
+  /** Das Wartungsabo ist abgelaufen: keine neuen Versionen mehr. */
+  maintenanceEnded: boolean;
   /** Nach dem Zurückrollen: latest wird nicht automatisch eingespielt. */
   skipped: boolean;
   /** Automatische Updates sind hier erlaubt (WordPress kann sie sperren). */
@@ -3149,6 +3981,8 @@ export interface AdminSettings {
     connected: boolean;
     email: string;
     calendar_access: boolean;
+    /** Voller Drive-Zugriff (Galerie schreiben); ältere Verbindungen nur lesen. Fehlt bei älteren Servern */
+    write_access?: boolean;
     service_account_email: string;
     /** Ergebnis der letzten Rückkehr von Google (Unix-Zeit in at) */
     last_result: { ok: boolean; message: string; at: number } | null;
@@ -3167,16 +4001,27 @@ export interface AdminSettings {
     google_api_key_set: boolean;
     calendar_ids: string;
     cache_minutes: number;
+    /** Zu- und Absagen eingeschaltet (Vorgabe aus); fehlt bei älteren Servern (dann immer an) */
+    responses?: boolean;
+    /** Erinnerung an alle ohne Zu- oder Absage (Push); fehlt bei älteren Servern */
+    response_reminder?: boolean;
+    /** Vorlauf der Erinnerung in Tagen vor Beginn (1 bis 30) */
+    response_reminder_days?: number;
   };
   gallery: {
     configured: boolean;
     root: string;
     /** Quelle (Issue #285): Google Drive (dazu Alben der App) oder nur der eigene Server; fehlt bei älteren Servern */
     source?: GallerySourceType;
-    /** Ablageort hochgeladener Bilder (vorerst nur der eigene Server) */
-    store?: 'server';
+    /** Ablageort hochgeladener Bilder und Einreichungen: eigener Server oder (Drive als Quelle, voller Zugriff) Google Drive */
+    store?: 'server' | 'drive';
     /** Belegter Platz der hochgeladenen Bilder in Bytes */
     media_bytes?: number;
+    /**
+     * Ablage in Google Drive: aktiv; Drive als Quelle, aber die Verbindung darf nur lesen (neu verbinden); Dateien, die
+     * noch auf dem Server auf Drive warten; letzter Fehler. Fehlt bei älteren Servern
+     */
+    drive?: { active: boolean; needs_reconnect: boolean; waiting: number; error: string };
     /** Knöpfe zum Herunterladen in der Galerie; fehlt bei älteren Servern */
     downloads?: boolean;
     /** Einreichen von Bildern und Videos durch Mitglieder erlaubt; fehlt bei älteren Servern */
@@ -3192,6 +4037,8 @@ export interface AdminSettings {
   news: { source: NewsSourceType; url: string; sources?: NewsSourceType[] } | null;
   /** Links auf Impressum und Datenschutzerklärung; leer, solange keiner eingetragen ist (fehlt bei älteren Servern) */
   legal?: { imprint_url: string; privacy_url: string };
+  /** Eingeschaltete Sprachen (Deutsch immer zuerst) und alle, die die App kann */
+  languages?: { enabled: Locale[]; available: Locale[] };
 }
 
 /** Bild der Galerie, das sich nicht aufbereiten ließ (Einstellungen → Galerie). */
@@ -3236,8 +4083,12 @@ export interface GalleryAdminAlbum {
   title: string;
   year: string;
   source: 'drive' | 'app';
+  /** in der App änderbar; fehlt bei älteren Servern */
+  editable?: boolean;
   uploads: number;
   drive_photos: number;
+  /** Mit weiteren Sprachen: Titel je Sprache, '' = deutsch */
+  translations?: TitleTranslations;
 }
 
 export interface GalleryAdminAlbumDetail {
@@ -3245,8 +4096,12 @@ export interface GalleryAdminAlbumDetail {
   title: string;
   year: string;
   source: 'drive' | 'app';
+  /** in der App änderbar; fehlt bei älteren Servern */
+  editable?: boolean;
   /** thumb '' bei einem Video ohne Standbild */
   uploads: { id: number; type: 'image' | 'video'; name: string; intern: boolean; thumb: string; status: string; error: string }[];
+  /** Mit weiteren Sprachen: Titel je Sprache, '' = deutsch */
+  translations?: TitleTranslations;
 }
 
 export interface FailedPhoto {
@@ -3263,11 +4118,16 @@ export interface FailedPhoto {
 }
 
 export interface AdminSettingsInput {
+  /** Eingeschaltete Sprachen, durch Komma getrennt (Deutsch kommt immer dazu) */
+  languages?: string;
   calendar_source?: CalendarSourceChoice;
   calendar_ics_url?: string;
   google_api_key?: string;
   calendar_ids?: string;
   calendar_cache_minutes?: number;
+  calendar_responses?: '0' | '1';
+  calendar_response_reminder?: '0' | '1';
+  calendar_response_reminder_days?: number;
   drive_service_account?: string;
   drive_oauth?: '';
   gallery_root?: string;

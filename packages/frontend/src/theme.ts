@@ -4,13 +4,14 @@
 // data-theme="light" sie abschaltet und data-theme="dark" sie auch ohne Dunkelmodus des Geräts einschaltet
 // (vite.config.ts, themeOverride).
 import { useEffect, useState } from 'react';
+import { t } from './i18n';
 
 export type ThemeChoice = 'system' | 'light' | 'dark';
 
 export const THEME_LABELS: Record<ThemeChoice, string> = {
-  system: 'Wie Gerät',
-  light: 'Hell',
-  dark: 'Dunkel',
+  system: t('Wie Gerät'),
+  light: t('Hell'),
+  dark: t('Dunkel'),
 };
 
 const KEY = 'kompanie-theme';
@@ -62,7 +63,7 @@ export function toggleTheme(): void {
 export function useTheme(): { choice: ThemeChoice; shown: 'light' | 'dark' } {
   const [, setTick] = useState(0);
   useEffect(() => {
-    const update = () => setTick((t) => t + 1);
+    const update = () => setTick((n) => n + 1);
     const media = window.matchMedia?.('(prefers-color-scheme: dark)');
     window.addEventListener(CHANGED, update);
     media?.addEventListener?.('change', update);

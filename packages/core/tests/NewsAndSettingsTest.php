@@ -9,6 +9,8 @@ use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Config\KompanieConfig;
 use KompanieApp\Core\Domain\Features;
 use KompanieApp\Core\Http\Request;
+use KompanieApp\Core\Http\Response;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Infra\ArrayCache;
 use KompanieApp\Core\Infra\GdImageResizer;
 use KompanieApp\Core\Infra\LocalFileStorage;
@@ -85,6 +87,15 @@ final class NewsAndSettingsTest extends TestCase
         $this->assertSame('<p>Lang</p>', $one->data['content']);
         $this->assertSame(404, $app->api()->handle(new Request('GET', '/news/8'))->status);
         $this->assertSame(404, $app->api()->handle(new Request('GET', '/news/abc'))->status);
+
+        // Andere Webseite: nur deutsch, in einer weiteren Sprache mit Hinweis (Plan „Mehrsprachigkeit“, PR 9f)
+        $this->assertArrayNotHasKey('untranslated', $item);
+        $app->settings->set('languages', 'de,en');
+        $en = static fn (string $path): Response => $app->api()->handle(new Request('GET', $path, [], [], [], '', null, 'en'));
+        $this->assertSame('all', $en('/news')->data[0]['untranslated']);
+        $this->assertSame(['all', '<p>Lang</p>'], [$en('/news/7')->data['untranslated'], $en('/news/7')->data['content']]);
+        I18n::setLocale(I18n::SOURCE_LOCALE);
+        $this->assertArrayNotHasKey('untranslated', $app->api()->handle(new Request('GET', '/news/7'))->data);
 
         $app->settings->set('news_url', 'https://kaputt.example');
         $http->handler = \Closure::fromCallable(static fn () => throw new \RuntimeException('Zeitüberschreitung'));

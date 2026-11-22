@@ -22,11 +22,13 @@ info:
     Mitglieder sehen nur ihre eigenen Punkte und Strafen.
 
     **Vorschau „App als Rolle ansehen“ (Issue #63):** Ein Admin kann bei jeder Anfrage den Header
-    `X-Kompanie-Preview` (Parameter `Preview`) mit dem Schlüssel einer Rolle oder `@public` (ohne Anmeldung)
+    `X-Kompanie-Preview` (Parameter `Preview`) mit dem Schlüssel einer Rolle, `@person:<ID>` (Rechte dieser Person:
+    Grundrolle, Zusatzrollen und Ausnahmen zusammen, nie mehr als die des Admins) oder `@public` (ohne Anmeldung)
     schicken; Dateien (Galeriebilder, Dokumente, Abzeichen) tragen ihn als Parameter `?vorschau=…` in der Adresse,
     die der Server in der Vorschau selbst so erzeugt. Der Server antwortet dann mit den Rechten genau dieser Rolle
-    (dieselbe Person, ohne Zusatzrollen) bzw. wie ohne Anmeldung. Für Nicht-Admins, `admin` und unbekannte Rollen
-    wird die Vorschau ignoriert (`/config.preview` ist `null`). Jede Anfrage mit Header oder Parameter, die nicht
+    (dieselbe Person, ohne Zusatzrollen), mit den Rechten der gewählten Person (weiterhin als der Admin selbst: eigene
+    ID, eigene Daten) bzw. wie ohne Anmeldung. Für Nicht-Admins, `admin`, unbekannte Rollen, unbekannte Personen,
+    Admins als Person und den Admin selbst wird die Vorschau ignoriert (`/config.preview` ist `null`). Jede Anfrage mit Header oder Parameter, die nicht
     `GET`/`HEAD` ist, lehnt der Server mit 403 `preview_readonly` ab (Antwort `PreviewReadonly`), außer
     `POST /auth/logout`.
 
@@ -49,6 +51,7 @@ tags:
   - name: Kompanien
   - name: Sponsoren
   - name: Seiten
+  - name: Webseite
   - name: Verwaltung
   - name: Schwarzes Brett
   - name: Umfragen
@@ -169,6 +172,28 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
 
+  /me/admission:
+    get:
+      tags: [Eigene Daten]
+      summary: Eigener Stand als Anwärter für die Aufnahme (Regel und was fehlt)
+      description: |
+        Jeder Angemeldete bekommt nur den eigenen Stand (`Admission`), `null`, wenn er kein Anwärter ist oder der Bereich
+        Anwesenheit aus ist. Den Stand anderer gibt es nur über `GET /admissions` (view_accounts).
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [admission]
+                properties:
+                  admission:
+                    oneOf:
+                      - $ref: '#/components/schemas/Admission'
+                      - type: 'null'
+        '401': { $ref: '#/components/responses/Error' }
+
   /me/attendance:
     get:
       tags: [Eigene Daten]
@@ -223,6 +248,25 @@ paths:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/Penalty' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /me/passive-members:
+    get:
+      tags: [Eigene Daten]
+      summary: Meine Passiven (die Passiven, die die Person betreut)
+      description: |
+        Mit allen Angaben (Adresse, Telefon, E-Mail, Geburtsdatum), auch ohne `view_personal`: bewusste Ausnahme für den
+        eigenen Betreuer, nur zum Lesen. Nach Nachname. Bereich `passive` aus → 403 `feature_disabled`.
+      x-capability: member
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PassiveMember' }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
 
@@ -452,6 +496,78 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Error' }
 
+  /me/locale:
+    put:
+      tags: [Eigene Daten]
+      summary: Sprache am Konto wählen
+      description: |
+        Gilt auf allen Geräten nach der Anmeldung und für Mails und Push an diese Person. Nur Sprachen, die der Admin
+        eingeschaltet hat (`languages` in `/config`). `null` löscht die Wahl (dann gilt die am Gerät bzw. die
+        Basissprache). Jede Anfrage der App nennt ihre Sprache im Header `X-Kompanie-Lang`; ohne ihn gilt die Wahl am
+        Konto, sonst die Basissprache. Danach richten sich die Meldungen (`message`) der Antworten.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [locale]
+              properties:
+                locale: { type: [string, 'null'], enum: [de, en, null] }
+      responses:
+        '200':
+          description: Gespeichert
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [locale]
+                properties:
+                  locale: { type: [string, 'null'], enum: [de, en, null] }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+  /me/tiles:
+    put:
+      tags: [Eigene Daten]
+      summary: Eigene Anordnung der Kacheln einer Seite für eine Spaltenzahl speichern
+      description: |
+        Für jedes angemeldete Konto. `page`: `verwaltung`, `einrichtungen`, `intern`, `menue/<n>` oder
+        `einstellungen/<gruppe>`. `cols`: Spaltenzahl des Rasters (nach seiner Breite: 2, ab 528 px 3, ab 680 px 4, ab 840 px 5); die anderen
+        Spaltenzahlen der Seite bleiben. Jede Kachel liegt mit `col` (ab 1), `row` (1 bis 200) und `span` (Breite in
+        Spalten) im Raster, ohne Überlappung, höchstens 100 Kacheln. Kennungen gerade nicht sichtbarer Kacheln bleiben
+        erlaubt; was eine Person sieht, entscheiden ihre Rechte. In der Vorschau nicht möglich (nur ansehen).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [page, cols, tiles]
+              properties:
+                page: { type: string, examples: [intern, 'einstellungen/betrieb'] }
+                cols: { type: integer, enum: [2, 3, 4, 5] }
+                tiles: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/TilePlace' } }
+      responses:
+        '200':
+          description: Gespeichert; alle Spaltenzahlen der Seite
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TileLayoutResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Eigene Daten]
+      summary: Eigene Anordnung einer Seite zurücksetzen (alle Spaltenzahlen); danach gilt die Vorgabe
+      parameters:
+        - { name: page, in: query, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Zurückgesetzt; `layouts` leer
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TileLayoutResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
   /me/password:
     post:
       tags: [Eigene Daten]
@@ -590,7 +706,7 @@ paths:
     get:
       tags: [Fehlermeldungen]
       summary: Eingang der Fehlermeldungen (offene zuerst, dann die erledigten der letzten 30 Tage)
-      x-capability: review_reports
+      x-capability: view_reports
       responses:
         '200':
           description: OK
@@ -612,7 +728,7 @@ paths:
     get:
       tags: [Fehlermeldungen]
       summary: Bildschirmfoto einer offenen Meldung
-      x-capability: review_reports
+      x-capability: view_reports
       responses:
         '200':
           description: OK
@@ -685,7 +801,8 @@ paths:
       description: |
         Zeitmarke für die Zeitfalle (frühestens `minSeconds`, spätestens 6 Stunden später absenden). Ist „Zugang
         beantragen“ aus, 404 `registration_unavailable`. `email_confirmation`: Mailversand eingerichtet, die Person
-        bestätigt ihre Adresse über einen Link und erfährt das Ergebnis per Mail.
+        bestätigt ihre Adresse über einen Link und erfährt das Ergebnis per Mail. `companies`: aktive Kompanien zum
+        Auswählen, wenn der Bereich Kompanien an ist (sonst leer).
       security: []
       responses:
         '200':
@@ -694,12 +811,21 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [token, minSeconds, email_confirmation, privacy_url]
+                required: [token, minSeconds, email_confirmation, privacy_url, companies]
                 properties:
                   token: { type: string, description: 'Zeitpunkt.HMAC; beim Absenden mitschicken' }
                   minSeconds: { type: integer }
                   email_confirmation: { type: boolean }
                   privacy_url: { type: [string, 'null'], description: Link auf die Datenschutzerklärung der Kompanie }
+                  companies:
+                    description: Aktive Kompanien in der Reihenfolge der Liste (nur Namen); leer ohne den Bereich Kompanien
+                    type: array
+                    items:
+                      type: object
+                      required: [id, name]
+                      properties:
+                        id: { type: integer }
+                        name: { type: string }
         '404': { $ref: '#/components/responses/Error' }
 
   /registration:
@@ -729,6 +855,17 @@ paths:
                 username: { type: string, pattern: '^[A-Za-z0-9._@-]{1,60}$' }
                 password: { type: string, minLength: 8, maxLength: 72 }
                 message: { type: string, maxLength: 500, description: Freiwillig, z. B. wer man ist }
+                company_choice:
+                  type: string
+                  enum: [company, none, passive]
+                  description: >-
+                    Pflicht, wenn `companies` des Formulars nicht leer ist (sonst 400): `company` mit `company_ids`, „Keine
+                    Kompanie“ (`none`) oder „Passiv“ (`passive`), dann ohne `company_ids`. Ohne Auswahl im Formular nicht
+                    beachtet.
+                company_ids:
+                  description: Bei `company_choice` `company` die gewählten Kompanien, nur aus `companies` des Formulars (sonst 400)
+                  type: array
+                  items: { type: integer }
                 website: { type: string, description: Verstecktes Feld; muss leer bleiben }
       responses:
         '201':
@@ -1005,7 +1142,7 @@ paths:
       summary: Alle Termine des internen Kalenders (Mitglieder und Anwärter)
       description: |
         Aus der gewählten Quelle: in der App gepflegt (`app`, Kennungen mit `i` davor, direkt aus der Datenbank),
-        Google Kalender oder eine iCal-Adresse. Bei Google und iCal hält der Server die letzte gute Fassung bereit (bis `calendar_cache_minutes` frisch) und erneuert sie
+        Google Kalender oder eine iCal-Adresse. Jeder Termin hat `responses` (Zu- und Absagen). Bei Google und iCal hält der Server die letzte gute Fassung bereit (bis `calendar_cache_minutes` frisch) und erneuert sie
         im Hintergrund. Ist sie veraltet und der Kalender gerade nicht erreichbar, kommt die alte Fassung
         mit 200. 502 nur, wenn es noch keine Fassung gibt; ein solcher Fehler wird etwa 60 Sekunden gemerkt.
       x-capability: calendar
@@ -1024,6 +1161,155 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+
+  /calendar/{key}/response:
+    parameters:
+      - {
+          name: key,
+          in: path,
+          required: true,
+          schema: { type: string },
+          description: 'Kennung des Termins wie in `GET /calendar` (`id`) oder seine stabile Kennung (`responses.key`)',
+        }
+    put:
+      tags: [Termine]
+      summary: Bei einem Termin zu- oder absagen (eigene Rückmeldung)
+      description: |
+        Setzt oder ändert die eigene Rückmeldung, mit kurzem Hinweis (höchstens 191 Zeichen). Geht bei jeder Quelle des
+        Kalenders bis zum Beginn des Termins (ganztägig: 0 Uhr), bei Terminen der App bis zum Ende des Anmeldeschlusses
+        (`respond_until`), wenn der früher ist; danach 409 `responses_closed`, außer `decided_at` liegt vor dem Ende der
+        Frist (offline vorgemerkt; ohne zeitliche Grenze, höchstens 5 Minuten in der Zukunft): Dann gilt die Rückmeldung
+        und ist in `GET /calendar/{key}/responses` und der Anwesenheitsliste als `late` gekennzeichnet. Bei iCal gilt die Rückmeldung auch, wenn
+        der Termin verschoben wird (stabile Kennung aus UID und ursprünglichem Beginn). Kommt nicht ins Änderungsprotokoll.
+        Sind Zu- und Absagen ausgeschaltet (Einstellungen → Kalender, `calendar_responses`), 403 – wie bei allen
+        Rückmeldungen (`/calendar/{key}/response`, `/calendar/{key}/responses`, `/calendar/{key}/responses/{id}`).
+      x-capability: respond_calendar
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: ['yes', 'no'] }
+                note: { type: string, maxLength: 191 }
+                decided_at:
+                  {
+                    type: string,
+                    format: date-time,
+                    description: 'Wann auf dem Gerät getippt (offline vorgemerkt, nur beim späteren Senden); zählt nur nach dem Ende der Frist',
+                  }
+      responses:
+        '200':
+          description: Der Termin mit der neuen Rückmeldung
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CalendarEvent' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Termine]
+      summary: Eigene Rückmeldung zurücknehmen
+      description: Wieder „keine Rückmeldung“; gleiche Frist wie beim Zusagen (sonst 409 `responses_closed`), auch mit `decided_at`.
+      x-capability: respond_calendar
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                decided_at: { type: string, format: date-time, description: 'Wann auf dem Gerät getippt (offline vorgemerkt)' }
+      responses:
+        '200':
+          description: Der Termin ohne eigene Rückmeldung
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CalendarEvent' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+
+  /calendar/{key}/responses:
+    parameters:
+      - {
+          name: key,
+          in: path,
+          required: true,
+          schema: { type: string },
+          description: 'Kennung des Termins wie in `GET /calendar` (`id`) oder seine stabile Kennung (`responses.key`)',
+        }
+    get:
+      tags: [Termine]
+      summary: Wer zu- oder abgesagt hat und wer sich noch nicht gemeldet hat
+      description: Namen und Hinweise; gezählt werden alle, die zusagen dürfen (`respond_calendar`).
+      x-capability: view_responses
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [event, 'yes', 'no', none]
+                properties:
+                  event: { $ref: '#/components/schemas/CalendarEvent' }
+                  'yes': { type: array, items: { $ref: '#/components/schemas/EventResponsePerson' } }
+                  'no': { type: array, items: { $ref: '#/components/schemas/EventResponsePerson' } }
+                  none:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        name: { type: string }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /calendar/{key}/responses/{id}:
+    parameters:
+      - {
+          name: key,
+          in: path,
+          required: true,
+          schema: { type: string },
+          description: 'Kennung des Termins wie in `GET /calendar` (`id`) oder seine stabile Kennung (`responses.key`)',
+        }
+      - { name: id, in: path, required: true, schema: { type: integer }, description: ID der Person }
+    put:
+      tags: [Termine]
+      summary: Für eine andere Person zu- oder absagen
+      description: >-
+        Z. B. nach einem Anruf, aus der Anwesenheitsliste. `status` null entfernt die Rückmeldung; ein vorhandener Hinweis
+        bleibt. Nur für Personen mit `respond_calendar` und bis zur gleichen Frist wie beim Zusagen (sonst 409
+        `responses_closed`). Steht im Änderungsprotokoll.
+      x-capability: manage_attendance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: { type: [string, 'null'], enum: ['yes', 'no', null] }
+      responses:
+        '200':
+          description: Die Rückmeldung der Person
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user_id: { type: integer }
+                  status: { type: [string, 'null'], enum: ['yes', 'no', null] }
+                  note: { type: string }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
 
   /calendar/entries:
     get:
@@ -1097,8 +1383,17 @@ paths:
     get:
       tags: [Termine]
       summary: Kommende öffentliche Termine
+      description: |
+        In einer weiteren Sprache (Header X-Kompanie-Lang) Titel, Ort und Beschreibung dieser Fassung, was fehlt, auf Deutsch
+        (untranslated).
       x-capability: 'view_events (ohne Anmeldung die Rechte der Rolle guest)'
       security: []
+      parameters:
+        - name: source
+          in: query
+          required: false
+          schema: { type: string, enum: ['1'] }
+          description: 'Nur mit manage_events, zum Bearbeiten: die deutsche Fassung und dazu translations.'
       responses:
         '200':
           description: OK
@@ -1228,8 +1523,16 @@ paths:
     get:
       tags: [News]
       summary: Einzelne Neuigkeit mit Inhalt (HTML)
-      description: 'Mit der Quelle app bekommt, wer manage_news hat, zusätzlich updated_at und updated_by_name.'
+      description: |
+        Mit der Quelle app bekommt, wer manage_news hat, zusätzlich updated_at und updated_by_name. Beiträge der App in einer
+        weiteren Sprache (Header X-Kompanie-Lang) mit Titel und Texten dieser Fassung, was fehlt, auf Deutsch (untranslated).
       security: []
+      parameters:
+        - name: source
+          in: query
+          required: false
+          schema: { type: string, enum: ['1'] }
+          description: 'Quelle app, nur mit manage_news, zum Bearbeiten: die deutsche Fassung und dazu translations.'
       responses:
         '200':
           description: OK
@@ -1255,6 +1558,10 @@ paths:
                 cover:
                   { type: [string, 'null'], pattern: '^[a-f0-9]{32}$', description: 'wie bei POST; fehlt das Feld, bleibt das Titelbild' }
                 updated_at: { type: string, format: date-time }
+                translations:
+                  type: object
+                  description: 'Fassungen je weiterer eingeschalteter Sprache wie bei Seiten (Felder optional, leer löscht); mit Fassungen antwortet der Server wie mit source.'
+                  additionalProperties: { $ref: '#/components/schemas/ContentTranslation' }
       responses:
         '200':
           description: OK
@@ -1390,7 +1697,7 @@ paths:
     get:
       tags: [Galerie]
       summary: Offene Einreichungen (älteste zuerst) und die zuletzt freigegebenen
-      x-capability: review_gallery
+      x-capability: view_submissions
       responses:
         '200':
           description: OK
@@ -1551,8 +1858,9 @@ paths:
       tags: [Galerie]
       summary: Hochgeladenes Bild oder Video intern oder öffentlich stellen
       description: |
-        Nur Bilder und Videos, die in der App hochgeladen oder über Einreichungen freigegeben wurden (`upload: true`);
-        Bilder aus Google Drive stellt der Ordner „intern“ in Drive um (400). Bei einem Wechsel löscht der Server die
+        Nur Bilder und Videos, die in der App hochgeladen oder über Einreichungen freigegeben wurden (`upload: true`),
+        mit Google Drive als Ablage (`gallery.store = drive`) auch Bilder aus Drive (`editable: true`): Die Datei zieht
+        dann in den Ordner „intern“ des Albums bzw. heraus. Sonst stellt der Ordner „intern“ in Drive um (400). Bei einem Wechsel löscht der Server die
         aufbereiteten Größen (öffentliche lagen als statische Dateien vor), vergibt neue Adressen und bereitet im
         Hintergrund neu auf; die alten öffentlichen Adressen liefern danach nichts mehr. Das Original bleibt.
       x-capability: 'manage_settings, manage_gallery oder review_gallery'
@@ -1608,6 +1916,43 @@ paths:
                         source: { type: string, enum: [app, drive] }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
+
+  /gallery/albums/{id}/cover:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [Galerie]
+      summary: Titelbild eines Albums für die Übersicht wählen
+      description: |
+        Ein Bild (kein Video) dieses Albums, auch in Alben aus Google Drive; `photo_id: null` stellt auf die automatische
+        Wahl zurück (öffentlich vor intern, Bilder vor Videos, dann nach Aufnahmezeit). Ist das gewählte Bild intern, zeigt
+        die Übersicht es nur Mitgliedern (view_gallery_internal); Gäste sehen weiter das automatisch gewählte öffentliche.
+        Liegt das Bild nicht mehr im Album (verschoben, gelöscht), gilt wieder die automatische Wahl.
+      x-capability: 'manage_settings oder manage_gallery'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [photo_id]
+              properties:
+                photo_id: { type: [integer, 'null'], description: 'Bild des Albums; null: automatisch' }
+      responses:
+        '200':
+          description: Gespeichert
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, cover_id]
+                properties:
+                  id: { type: integer }
+                  cover_id: { type: [integer, 'null'] }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
 
   /gallery/photos/move:
     post:
@@ -1947,6 +2292,9 @@ paths:
         Ohne den Bereich Punkte frei. Mit Punkten (für alle, auch Admins): befördern erst ab der Schwelle des Ziels;
         degradieren immer, auch über der Schwelle. Dienstgrade ohne Schwelle frei. Schreibt den Verlauf.
         Wer kein Mitglied mehr ist (z. B. Gast), kann den Dienstgrad nur verlieren (`rank_id: null`, ohne Punkteregeln).
+        `date` legt den Tag des Wechsels fest (leer = heute): nicht in der Zukunft und nicht vor dem letzten Wechsel der
+        Person. Bei einem früheren Tag zählen für Schwelle und `points_at_change` nur Punkte bis zu diesem Tag; der
+        Verlauf speichert dann 12:00 Uhr Ortszeit dieses Tages als `changed_at`.
       x-capability: manage_ranks
       requestBody:
         required: true
@@ -1957,12 +2305,107 @@ paths:
               properties:
                 rank_id: { type: [integer, 'null'], description: null = kein Dienstgrad }
                 reason: { type: string, maxLength: 255 }
+                date: { type: string, format: date, description: Tag des Wechsels (JJJJ-MM-TT); leer = heute }
       responses:
         '200':
           description: Neuer Stand
           content:
             application/json:
               schema: { $ref: '#/components/schemas/RankStatus' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /members/{id}/rank-history/{entry}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - { name: entry, in: path, required: true, schema: { type: integer }, description: ID des Eintrags im Verlauf }
+    patch:
+      tags: [Verwaltung]
+      summary: Datum eines Eintrags im Dienstgrad-Verlauf nachträglich ändern
+      description: |
+        Nicht in der Zukunft, nicht vor dem vorigen und nicht nach dem nächsten Eintrag der Person (die Reihenfolge
+        bleibt). Gespeichert wird 12:00 Uhr Ortszeit des Tages (heute höchstens jetzt), zwischen den Nachbarn. Mit Punkten
+        wird `points_at_change` auf die Punkte bis zu diesem Tag gesetzt; bei einer Beförderung muss dieser Stand die
+        heutige Schwelle des neuen Dienstgrads erreichen. Die Ersteinstufung behält ihren Stand. Der Dienstgrad selbst
+        ändert sich nicht.
+      x-capability: manage_ranks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [date]
+              properties:
+                date: { type: string, format: date }
+      responses:
+        '200':
+          description: Neuer Verlauf, neueste zuerst
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/RankHistoryEntry' } }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Verwaltung]
+      summary: Eintrag im Dienstgrad-Verlauf löschen
+      description: |
+        Für falsch gebuchte Wechsel. Beim neuesten Eintrag (wenn er den heutigen Dienstgrad ergeben hat) gilt wieder der
+        Dienstgrad davor (`from`, ohne Punkteprüfung, auch wenn er deaktiviert ist); „Dienstgrad seit“ ist dann der Zeitpunkt
+        des Eintrags davor. Gibt es den Dienstgrad davor nicht mehr oder ist die Person kein Mitglied mehr, wird nichts
+        geändert (400). Ältere Einträge werden nur aus dem Verlauf entfernt, der Dienstgrad bleibt. Steht im
+        Änderungsprotokoll als Änderung am Mitglied.
+      x-capability: manage_ranks
+      responses:
+        '200':
+          description: Neuer Stand und Verlauf
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rank: { $ref: '#/components/schemas/RankStatus' }
+                  history: { type: array, items: { $ref: '#/components/schemas/RankHistoryEntry' } }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /members/{id}/rank-history/{entry}/rank:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - { name: entry, in: path, required: true, schema: { type: integer }, description: ID des Eintrags im Verlauf }
+    put:
+      tags: [Verwaltung]
+      summary: Neuen Dienstgrad eines Eintrags im Dienstgrad-Verlauf nachträglich ändern
+      description: |
+        `kind` ergibt sich neu aus dem Dienstgrad davor (`from`); die Ersteinstufung bleibt eine und braucht einen
+        Dienstgrad. Nicht der Dienstgrad davor und nicht derselbe wie bisher. Mit Punkten muss eine Beförderung mit
+        `points_at_change` die heutige Schwelle des neuen Dienstgrads erreichen. Der Eintrag danach beginnt beim neuen
+        Dienstgrad (`from`, `kind` neu); ginge er auf denselben, 400. Beim neuesten Eintrag (wenn er den heutigen Dienstgrad
+        ergeben hat) ändert sich auch der aktuelle Dienstgrad, „seit“ bleibt; für Nicht-Mitglieder nur auf `null`.
+        Deaktivierte Dienstgrade sind erlaubt.
+      x-capability: manage_ranks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rank_id]
+              properties:
+                rank_id: { type: [integer, 'null'], description: null = kein Dienstgrad }
+      responses:
+        '200':
+          description: Neuer Stand und Verlauf
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rank: { $ref: '#/components/schemas/RankStatus' }
+                  history: { type: array, items: { $ref: '#/components/schemas/RankHistoryEntry' } }
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
@@ -1974,8 +2417,8 @@ paths:
       description: |
         Nur Mitglieder (ohne Gäste und Anwärter). Erreichte Schwellen zuerst (älteste oben), dann nach fehlenden Punkten;
         ohne nächsten Dienstgrad mit Schwelle am Ende. Enthält die Punktestände, auch wenn der Abrufende selbst kein
-        manage_points hat (die Übersicht braucht sie).
-      x-capability: manage_ranks
+        view_points hat (die Übersicht braucht sie).
+      x-capability: view_promotions
       responses:
         '200':
           description: OK
@@ -1996,8 +2439,8 @@ paths:
     get:
       tags: [Listen]
       summary: Alle gespeicherten Listen (Issue #121), zuletzt geänderte zuerst
-      description: Nur mit `manage_lists` (Standardrolle „Listen verwalten“, Admins). Bereich aus → 403 `feature_disabled`.
-      x-capability: manage_lists
+      description: Ansehen mit `view_lists`, ändern mit `manage_lists` (Standardrolle „Listen verwalten“, Admins). Bereich aus → 403 `feature_disabled`.
+      x-capability: view_lists
       responses:
         '200':
           description: OK
@@ -2038,9 +2481,9 @@ paths:
         Die Werte der Datenspalten werden beim Lesen ermittelt und nur geliefert, soweit die anfragende Person sie in der
         App ohnehin sehen darf (`available`): Rolle nur mit Zugang zur Mitgliederliste der Verwaltung, Dienstgrad und
         Titel mit öffentlicher Mitgliederliste (Bereich directory) oder dem Recht, sie zu pflegen, Geburtstag (Tag und
-        Monat) nur für Mitglieder und nur, wenn die Person ihn freigegeben hat, Punkte nur mit `manage_points`, offene
-        Strafen nur mit `manage_penalties`; jeweils nur bei eingeschaltetem Bereich.
-      x-capability: manage_lists
+        Monat) nur für Mitglieder und nur, wenn die Person ihn freigegeben hat, Punkte nur mit `view_points`, offene
+        Strafen nur mit `view_penalties`; jeweils nur bei eingeschaltetem Bereich.
+      x-capability: view_lists
       responses:
         '200':
           description: OK
@@ -2160,8 +2603,16 @@ paths:
     get:
       tags: [Verwaltung]
       summary: Sichtbare Dokumente (nach Titel) und alle Kategorien (Issue #2)
-      description: Dokumente mit Sichtbarkeit `managers` nur für wer `manage_documents` hat; für sie auch `max_bytes`.
-      x-capability: 'view_documents oder manage_documents'
+      description: |
+        Dokumente mit Sichtbarkeit `managers` nur für alle mit `view_restricted_documents` (`manage_documents` setzt es voraus); mit `manage_documents` auch `max_bytes`.
+        In einer weiteren Sprache (X-Kompanie-Lang) Titel und Namen der Kategorien dieser Fassung, ohne Eintrag die deutschen.
+      x-capability: 'view_documents oder view_restricted_documents'
+      parameters:
+        - name: source
+          in: query
+          required: false
+          schema: { type: string, enum: ['1'] }
+          description: 'Nur mit manage_documents, zum Bearbeiten: deutsche Namen und dazu translations.'
       responses:
         '200':
           description: OK
@@ -2191,6 +2642,7 @@ paths:
                 date: { type: string, format: date }
                 visibility: { type: string, enum: [members, managers], default: members }
                 file: { $ref: '#/components/schemas/DocumentFile' }
+                translations: { $ref: '#/components/schemas/TitleTranslationsInput' }
       responses:
         '201':
           description: Angelegt
@@ -2218,6 +2670,7 @@ paths:
                 category_id: { type: [integer, 'null'] }
                 date: { type: string, format: date }
                 visibility: { type: string, enum: [members, managers] }
+                translations: { $ref: '#/components/schemas/TitleTranslationsInput' }
       responses:
         '200':
           description: OK
@@ -2276,6 +2729,7 @@ paths:
               required: [title]
               properties:
                 title: { type: string, maxLength: 191 }
+                translations: { $ref: '#/components/schemas/TitleTranslationsInput' }
       responses:
         '201':
           description: Angelegt
@@ -2315,7 +2769,7 @@ paths:
       - $ref: '#/components/parameters/Id'
     patch:
       tags: [Verwaltung]
-      summary: Kategorie umbenennen
+      summary: Kategorie umbenennen und/oder Namen je Sprache ändern
       x-capability: manage_documents
       requestBody:
         required: true
@@ -2323,9 +2777,10 @@ paths:
           application/json:
             schema:
               type: object
-              required: [title]
+              description: 'title oder translations; ohne title bleibt der deutsche Name'
               properties:
                 title: { type: string, maxLength: 191 }
+                translations: { $ref: '#/components/schemas/TitleTranslationsInput' }
       responses:
         '200':
           description: OK
@@ -2350,17 +2805,17 @@ paths:
       summary: Gültige Einträge am Schwarzen Brett, neueste zuerst (Issue #5, #172)
       description: |
         Öffentlich: Nachrichten mit `audience: public` sehen alle, auch ohne Anmeldung; interne (`audience: members`) nur
-        Konten mit `view_board` (Mitglieder und Anwärter) sowie alle mit `post_board`. Nachrichten mit `audience: company`
+        Konten mit `view_board` (Mitglieder und Anwärter) sowie alle mit `view_board_history`. Nachrichten mit `audience: company`
         sehen nur Konten mit `view_board`, die einer der Kompanien aus `audience_ids` zugeordnet sind, mit `audience:
-        person` nur die ausgewählten Konten (sofern `view_board`); alle mit `post_board` sehen jede. Ohne `view_board` enthält die Liste
+        person` nur die ausgewählten Konten (sofern `view_board`); alle mit `view_board_history` (`post_board` setzt es voraus) sehen jede. Ohne `view_board` enthält die Liste
         daher nur öffentliche Nachrichten (vor dieser Version: 401 ohne Anmeldung, 403 ohne Recht). Nur Einträge, deren
         `expires_at` noch nicht erreicht ist und die nicht gelöscht wurden. Abgelaufene und gelöschte Nachrichten bleiben
-        30 Tage im Verlauf (`GET /board/history`, nur `post_board`); danach löscht die Hintergrundaufgabe `board_cleanup`
+        30 Tage im Verlauf (`GET /board/history`, nur `view_board_history`); danach löscht die Hintergrundaufgabe `board_cleanup`
         sie endgültig. Die App blendet Einträge anhand von `expires_at` auch selbst aus (offline aus dem Speicher).
         Erst die Nachrichten (`kind: message`), neueste zuerst; danach für Mitglieder (Recht `member`) mit eingeschaltetem
         Bereich Umfragen jede laufende Umfrage (`kind: poll`, Issue #4) mit `has_voted`. Später können weitere Arten
-        dazukommen – Clients überspringen unbekannte. Mit `post_board` zusätzlich `last_edit` und `mail`.
-      x-capability: 'öffentlich (interne Nachrichten: view_board oder post_board)'
+        dazukommen – Clients überspringen unbekannte. Mit `view_board_history` zusätzlich `last_edit` und `mail`.
+      x-capability: 'öffentlich (interne Nachrichten: view_board oder view_board_history)'
       security: []
       responses:
         '200':
@@ -2483,7 +2938,7 @@ paths:
     get:
       tags: [Schwarzes Brett]
       summary: Abgelaufene und gelöschte Nachrichten der letzten 30 Tage (Verlauf, Issue #172)
-      x-capability: post_board
+      x-capability: view_board_history
       responses:
         '200':
           description: OK, zuletzt beendete zuerst
@@ -2506,7 +2961,7 @@ paths:
       description: |
         Jede Erstellung, Titel-, Inhalts- und Enddatumsänderung, jeder Mailversand und das vorzeitige Löschen mit Konto
         und Zeitpunkt, mit vorherigem und neuem Stand; dazu das Protokoll des Mailversands je Empfänger.
-      x-capability: post_board
+      x-capability: view_board_history
       responses:
         '200':
           description: OK
@@ -2572,6 +3027,10 @@ paths:
                   type: array
                   items: { type: string }
                   description: 'Alle Anhänge danach (Kennungen): bisherige behalten, neue Entwürfe kommen dazu, fehlende werden gelöscht; steht im Verlauf'
+                translations:
+                  type: object
+                  description: 'Wie bei POST; nur die genannten Sprachen und Felder. Ändert updated_at wie Titel und Inhalt.'
+                  additionalProperties: { $ref: '#/components/schemas/ContentTranslation' }
       responses:
         '200':
           description: Geändert
@@ -2603,7 +3062,7 @@ paths:
       tags: [E-Mails]
       summary: Formular „E-Mail schreiben“ – eingerichtet, Absender, wählbare Rollen und Mitglieder
       description: |
-        Nur mit `send_mail` (Standardrolle „E-Mails verwalten“, Admins). Bereich `mail` aus → 403 `feature_disabled`.
+        Verlauf mit `view_mail`, schreiben mit `send_mail` (Standardrolle „E-Mails verwalten“, Admins). Bereich `mail` aus → 403 `feature_disabled`.
         Rollen ohne Gäste mit der Zahl der Personen und davon mit Mailadresse; Konten ohne Gäste mit ihren Rollen (Grund-
         und Zusatzrollen) und ob eine Adresse hinterlegt ist. Die Adressen selbst werden nicht ausgeliefert.
       x-capability: send_mail
@@ -2680,7 +3139,7 @@ paths:
       tags: [E-Mails]
       summary: Verlauf der versendeten E-Mails, neueste zuerst
       description: Aufbewahrt werden die Mails ein Jahr (`keep_days`); danach löscht die Aufgabe `mailing_cleanup` sie samt Protokoll und Bildern.
-      x-capability: send_mail
+      x-capability: view_mail
       responses:
         '200':
           description: OK
@@ -2816,7 +3275,7 @@ paths:
     get:
       tags: [E-Mails]
       summary: Eine versendete E-Mail mit Inhalt, Auswahl der Empfänger und Protokoll je Empfänger
-      x-capability: send_mail
+      x-capability: view_mail
       responses:
         '200':
           description: OK
@@ -2974,12 +3433,12 @@ paths:
       tags: [Umfragen]
       summary: Alle Umfragen (laufende und beendete), neueste zuerst (Issue #4)
       description: |
-        Für Mitglieder (Recht `member`; Anwärter nicht) und alle mit `manage_polls`. Je Umfrage `has_voted`, die eigene
+        Für Mitglieder (Recht `member`; Anwärter nicht) und alle mit `view_poll_results`. Je Umfrage `has_voted`, die eigene
         Antwort (`my_answer`) und die Ergebnisse (`results_data`), soweit sie für dieses Konto sichtbar sind:
         `after_vote` – wer geantwortet hat, nach dem Ende alle Mitglieder; `after_end` – alle Mitglieder nach dem Ende;
-        `managers` – nur `manage_polls`. Wer `manage_polls` hat, sieht die Ergebnisse immer. Namen je Möglichkeit bzw. je
+        `managers` – nur `view_poll_results`. Wer `view_poll_results` hat (`manage_polls` setzt es voraus), sieht die Ergebnisse immer. Namen je Möglichkeit bzw. je
         Freitext nur bei namentlichen Umfragen; bei anonymen nie Namen oder Benutzer-IDs (Freitexte alphabetisch).
-      x-capability: 'vote_polls oder manage_polls'
+      x-capability: 'vote_polls oder view_poll_results'
       responses:
         '200':
           description: OK
@@ -3018,7 +3477,7 @@ paths:
     get:
       tags: [Umfragen]
       summary: Eine Umfrage (wie in der Liste)
-      x-capability: 'vote_polls oder manage_polls'
+      x-capability: 'vote_polls oder view_poll_results'
       responses:
         '200':
           description: OK
@@ -3133,10 +3592,10 @@ paths:
       tags: [Inventar]
       summary: Alle Einträge des Inventars, nach Bezeichnung und Ort (Issue #6)
       description: |
-        Nur mit `manage_inventory` (Standardrolle „Inventar verwalten“, Admins); Mitglieder ohne das Recht → 403. Ein Ort je
+        Ansehen mit `view_inventory`, ändern mit `manage_inventory` (Standardrolle „Inventar verwalten“, Admins); Mitglieder ohne das Recht → 403. Ein Ort je
         Eintrag; dasselbe Material an zwei Orten sind zwei Einträge. Gelöschte Einträge fehlen. Die App gruppiert nach
         Bezeichnung (ohne Unterschied in Groß- und Kleinschreibung) und summiert je Einheit.
-      x-capability: manage_inventory
+      x-capability: view_inventory
       responses:
         '200':
           description: OK
@@ -3175,7 +3634,7 @@ paths:
       tags: [Inventar]
       summary: Bekannte Orte als Vorschläge
       description: Die Orte der vorhandenen Einträge, alphabetisch, ohne Dubletten in anderer Groß- und Kleinschreibung.
-      x-capability: manage_inventory
+      x-capability: view_inventory
       responses:
         '200':
           description: OK
@@ -3192,7 +3651,7 @@ paths:
       tags: [Inventar]
       summary: Verlauf aller Einträge, neueste zuerst
       description: Auch von gelöschten Einträgen. Mit `before` (ID eines Verlaufseintrags) die nächste Seite.
-      x-capability: manage_inventory
+      x-capability: view_inventory
       parameters:
         - $ref: '#/components/parameters/InventoryLogLimit'
         - $ref: '#/components/parameters/InventoryLogBefore'
@@ -3267,7 +3726,7 @@ paths:
     get:
       tags: [Inventar]
       summary: Verlauf eines Eintrags, neueste zuerst (auch nach dem Löschen)
-      x-capability: manage_inventory
+      x-capability: view_inventory
       parameters:
         - $ref: '#/components/parameters/InventoryLogLimit'
         - $ref: '#/components/parameters/InventoryLogBefore'
@@ -3332,11 +3791,81 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
+  /calendar/{key}/kind:
+    parameters:
+      - { name: key, in: path, required: true, schema: { type: string }, description: 'Kennung des Termins wie in `GET /calendar` (`id`)' }
+    put:
+      tags: [Termine]
+      summary: Terminarten eines Termins setzen (z. B. Versammlung und Arbeitsdienst)
+      description: |
+        Bei jeder Quelle des Kalenders (App, Google, iCal); die App speichert die Arten selbst, nichts geht an Google.
+        `kinds` ist die ganze Liste (leer entfernt alle; doppelte fallen weg, sortiert wie in den Einstellungen). Erlaubt
+        sind die Terminarten aus den Einstellungen und die bisherigen Arten des Termins. Ältere Oberflächen schicken statt
+        `kinds` eine einzelne Art als `kind` (`null` oder leer = keine). Eine Anwesenheitsliste zu dem Termin übernimmt
+        die neuen Arten. Geht auch bei vergangenen Terminen, solange der Kalender sie liefert (sonst 404).
+      x-capability: manage_calendar
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                kinds: { type: array, maxItems: 30, items: { type: string, maxLength: 40 } }
+                kind: { type: [string, 'null'], maxLength: 40, description: 'Ältere Oberflächen: eine Art statt `kinds`' }
+      responses:
+        '200':
+          description: Die gespeicherten Arten
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  kind: { type: [string, 'null'], description: Die erste Art }
+                  kinds: { type: array, items: { type: string } }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /admin/event-kinds:
+    put:
+      tags: [Einstellungen]
+      summary: Terminarten festlegen (Einstellungen → Kalender)
+      description: |
+        Liste von Bezeichnungen (höchstens 30, je höchstens 40 Zeichen, keine doppelten), leer erlaubt. Gespeichert wird
+        an Terminen und Listen die Bezeichnung: Entfernte Arten bleiben dort stehen. Die Liste steht in `GET /config`
+        (`eventKinds`). `hidden`: Arten, die nicht als Schild neben dem Titel des Termins stehen (nur Anzeige; die Art bleibt
+        gespeichert und zählt). Namen, die nicht in `kinds` stehen, werden ignoriert; ohne `hidden` bleibt die bisherige
+        Auswahl (ohne entfernte Arten). Steht in `GET /config` (`eventKindsHidden`).
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kinds]
+              properties:
+                kinds: { type: array, items: { type: string, maxLength: 40 } }
+                hidden: { type: array, items: { type: string }, description: 'Arten ohne Schild am Termin (Vorgabe: keine)' }
+      responses:
+        '200':
+          description: Die gespeicherte Liste
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [kinds, hidden]
+                properties:
+                  kinds: { type: array, items: { type: string } }
+                  hidden: { type: array, items: { type: string } }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
   /attendance:
     get:
       tags: [Verwaltung]
       summary: Die letzten 50 Anwesenheitslisten (Issue #21)
-      x-capability: manage_attendance
+      x-capability: view_attendance
       responses:
         '200':
           description: OK
@@ -3353,7 +3882,11 @@ paths:
         Mit `id` eine vorhandene Liste (bei freien Listen auch Titel und Datum). Ohne `id` neu: `source: calendar` mit
         `event_key` (gibt es schon eine Liste zu diesem Termin, wird sie genommen, 200) oder `source: free` mit `title` und
         `date`. Titel und Datum sind eine Momentaufnahme. `entries` setzt den Status je Person (null entfernt ihn);
-        nur Personen mit einer Rolle (keine Gäste).
+        nur Personen mit einer Rolle (keine Gäste). Liegt das Datum nach heute (Zeitzone der Kompanie), ist nur
+        `excused` erlaubt; das gilt auch für schon gespeicherte Einträge, wenn das Datum einer freien Liste in die Zukunft
+        rückt (sonst 400, ohne dass eine Liste entsteht). `kinds` setzt die Terminarten der Liste (eingerichtete oder
+        bisherige, leer für keine; ältere Oberflächen schicken eine als `kind`); ohne Angabe übernimmt eine neue Liste die
+        Arten des Termins im Kalender, sonst die Vorschläge aus dem Titel (Namen von Terminarten als eigenes Wort).
       x-capability: manage_attendance
       requestBody:
         required: true
@@ -3367,6 +3900,8 @@ paths:
                 event_key: { type: string }
                 title: { type: string, maxLength: 191 }
                 date: { type: string, format: date }
+                kinds: { type: array, maxItems: 30, items: { type: string, maxLength: 40 }, description: Terminarten (leer = keine) }
+                kind: { type: [string, 'null'], maxLength: 40, description: 'Ältere Oberflächen: eine Terminart statt `kinds` (leer = keine)' }
                 entries:
                   type: object
                   description: Benutzer-ID → Status
@@ -3392,9 +3927,9 @@ paths:
   /attendance/events:
     get:
       tags: [Verwaltung]
-      summary: Termine aus dem internen Kalender der letzten 90 Tage bis heute (jüngste zuerst)
+      summary: Termine aus dem internen Kalender der letzten 90 Tage und alle kommenden (späteste zuerst)
       description: Ohne Bereich Kalender bzw. ohne eingerichteten Kalender eine leere Liste.
-      x-capability: manage_attendance
+      x-capability: view_attendance
       responses:
         '200':
           description: OK
@@ -3411,6 +3946,10 @@ paths:
                     start: { type: string }
                     end: { type: string }
                     all_day: { type: boolean }
+                    kind: { type: [string, 'null'], description: Erste Terminart des Termins }
+                    kinds: { type: array, items: { type: string }, description: Alle Terminarten des Termins }
+                    upcoming: { type: boolean, description: Datum nach heute (Zeitzone der Kompanie) }
+                    today: { type: boolean, description: Datum ist heute (Zeitzone der Kompanie) }
                     list_id: { type: [integer, 'null'], description: Schon angelegte Liste }
         '403': { $ref: '#/components/responses/Error' }
         '502': { $ref: '#/components/responses/Error' }
@@ -3453,7 +3992,7 @@ paths:
     get:
       tags: [Verwaltung]
       summary: Liste mit allen Personen, Status, gebuchten Punkten und Zählern
-      x-capability: manage_attendance
+      x-capability: view_attendance
       responses:
         '200':
           description: OK
@@ -3477,8 +4016,8 @@ paths:
       summary: Kompanien in ihrer Reihenfolge (Issue #280)
       description: |
         Bereich `companies` aus → 403 `feature_disabled`. Ohne Anmeldung die Rechte der Rolle guest. `members` und
-        `member_count` nur mit Bereich Mitgliederliste und Recht view_directory, `member_ids` nur mit manage_companies.
-      x-capability: 'view_companies oder manage_companies'
+        `member_count` nur mit Bereich Mitgliederliste und Recht view_directory, `member_ids` nur mit view_company_members (`manage_companies` setzt es voraus).
+      x-capability: 'view_companies oder view_company_members'
       responses:
         '200':
           description: OK
@@ -3755,7 +4294,15 @@ paths:
     get:
       tags: [Seiten]
       summary: Eine Seite mit Text
-      description: 'Wer die Seite nicht lesen darf, bekommt 404 (verrät nicht, dass es sie gibt).'
+      description: |
+        Wer die Seite nicht lesen darf, bekommt 404 (verrät nicht, dass es sie gibt). In einer weiteren Sprache (Header
+        X-Kompanie-Lang) mit Titel und Texten der Blöcke dieser Fassung, was fehlt, auf Deutsch (untranslated).
+      parameters:
+        - name: source
+          in: query
+          required: false
+          schema: { type: string, enum: ['1'] }
+          description: 'Nur mit manage_pages, zum Bearbeiten: die deutsche Fassung und dazu translations (alle Fassungen der weiteren Sprachen).'
       responses:
         '200':
           description: OK
@@ -3781,6 +4328,10 @@ paths:
                 blocks: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/Block' }, description: 'wie bei POST' }
                 body: { type: string, description: 'Für ältere Apps, wie bei POST' }
                 updated_at: { type: string, format: date-time }
+                translations:
+                  type: object
+                  description: 'Fassungen je weiterer eingeschalteter Sprache (Plan „Mehrsprachigkeit“). Felder jeweils optional, leer löscht. Mit Fassungen antwortet der Server wie mit source.'
+                  additionalProperties: { $ref: '#/components/schemas/ContentTranslation' }
       responses:
         '200':
           description: OK
@@ -3800,6 +4351,63 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
+  /admin/website:
+    get:
+      tags: [Webseite]
+      summary: Startseite und Einstiegsdatei der Webseite
+      description: |
+        Issue #273. Die Webseite liegt im Ordner über der App (eigenständige Version, Einstiegsdatei index.php) und zeigt
+        als Startseite eine eigene Seite mit audience public, so wie Gäste sie sehen. Unter WordPress und mit Bereich
+        `website` aus → 403 `feature_disabled`.
+      x-capability: manage_website
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WebsiteSettings' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [Webseite]
+      summary: Startseite wählen
+      x-capability: manage_website
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                home_page_id:
+                  type: [integer, 'null']
+                  description: 'Eigene Seite mit audience public; null = keine Startseite (die Webseite zeigt einen Hinweis mit dem Weg zur App)'
+      responses:
+        '200':
+          description: Neuer Stand
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WebsiteSettings' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+  /admin/website/entry:
+    post:
+      tags: [Webseite]
+      summary: Einstiegsdatei der Webseite anlegen
+      description: |
+        Legt index.php im Ordner über der App an (nur bei entry.state missing oder outdated). Eine andere Startseite im
+        Ordner (index.php, index.html …) ersetzt die App nie → 409 `conflict`.
+      x-capability: manage_website
+      responses:
+        '200':
+          description: Neuer Stand
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WebsiteSettings' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
   /sponsors:
     get:
       tags: [Sponsoren]
@@ -3956,7 +4564,7 @@ paths:
     get:
       tags: [Verwaltung]
       summary: Titelliste (Ehrentitel und Ämter, Issue #22)
-      x-capability: manage_titles
+      x-capability: view_titles
       responses:
         '200':
           description: OK
@@ -4706,8 +5314,8 @@ paths:
     get:
       tags: [Verwaltung]
       summary: Mitglieder mit Summen
-      description: Wer Dienstgrade bzw. Titel verwaltet, sieht zusätzlich frühere Mitglieder, die noch einen Dienstgrad bzw. Titel haben.
-      x-capability: 'manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, create_users oder promote_users (Punkte bzw. offene Beträge nur mit dem jeweiligen Recht, sonst null)'
+      description: Wer Dienstgrade bzw. Titel sieht (view_promotions bzw. view_titles), sieht zusätzlich frühere Mitglieder, die noch einen Dienstgrad bzw. Titel haben.
+      x-capability: 'view_points, view_penalties, view_promotions, view_titles, view_attendance, view_company_members, view_personal, view_accounts, manage_former (Punkte bzw. offene Beträge nur mit view_points bzw. view_penalties, sonst null)'
       parameters:
         - name: all
           in: query
@@ -4758,7 +5366,7 @@ paths:
       tags: [Verwaltung]
       summary: Mitglied mit Punkten und Strafen
       description: Mit Bereich Geburtstage und Recht `create_users` auch `birthday` (mit Jahr und den Schaltern der Person, null ohne Eintrag).
-      x-capability: 'manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, create_users oder promote_users (Punkte bzw. Strafen nur mit dem jeweiligen Recht)'
+      x-capability: 'view_points, view_penalties, view_promotions, view_titles, view_attendance, view_company_members, view_personal, view_accounts, manage_former (Punkte bzw. Strafen nur mit view_points bzw. view_penalties)'
       responses:
         '200':
           description: OK
@@ -4838,7 +5446,7 @@ paths:
         setzen die Person auf die Rechte ihrer Rolle zurück. Nicht für Admins (haben alle Rechte), Gäste und sich selbst;
         `manage_settings` bleibt den Admins vorbehalten. Rechte zum Verwalten brauchen den Mitgliederbereich, der interne
         Kalender lässt sich nur mit ihm entziehen. Wer Rollen vergeben darf, ohne Admin zu sein, ändert nur Rechte, die er
-        selbst hat, ohne `create_users` und `promote_users`, und nur bei Personen, die er verwalten darf.
+        selbst hat, ohne `create_users`, `manage_former` und `promote_users`, und nur bei Personen, die er verwalten darf.
       x-capability: promote_users
       requestBody:
         required: true
@@ -4887,6 +5495,77 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
+  /members/{id}/admit:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Verwaltung]
+      summary: Anwärter als Mitglied aufnehmen
+      description: |
+        Grundrolle mit `promotable` oder `admission_extra` → `member` (wie `/members/{id}/promote`), sonst die Zusatzrolle mit
+        `admission_extra` entfernen. Die Voraussetzung sperrt nicht. Ohne Eintritt wird er auf heute gesetzt (`join_date`, sonst null);
+        „Anwärter seit“ fällt weg. Nicht für sich selbst und nicht für Ehemalige (400).
+      x-capability: create_users
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: integer }
+                  level: { $ref: '#/components/schemas/Level' }
+                  extra_roles: { $ref: '#/components/schemas/ExtraRoles' }
+                  join_date: { type: [string, 'null'] }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /members/{id}/candidate-since:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [Verwaltung]
+      summary: „Anwärter seit“ ändern
+      description: TT.MM.JJJJ oder JJJJ-MM-TT, nicht in der Zukunft; leer = unbekannt. Nur bei Anwärtern (sonst 400).
+      x-capability: create_users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                since: { type: string }
+      responses:
+        '200':
+          description: Neuer Stand
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Admission' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /admissions:
+    get:
+      tags: [Verwaltung]
+      summary: Aufnahmen – Anwärter mit Stand der Voraussetzung (nur zusammen mit dem Bereich Anwesenheit)
+      description: |
+        Alle Anwärter (Grundrolle mit `promotable` oder `admission_extra`, Zusatzrolle mit `admission_extra`, ohne Ehemalige): zuerst wer die
+        Voraussetzung erfüllt (nach `fulfilled_on`), dann `open`, dann `none`. Es zählen alle Teilnahmen der Terminart bis heute.
+        `result` ist die ausgewertete Voraussetzung (`AdmissionRuleResult`).
+        Aufnehmen (`POST /members/{id}/admit`) nur mit `create_users`.
+      x-capability: view_accounts
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Admission' } }
+        '403': { $ref: '#/components/responses/Error' }
+
   /members/{id}/data:
     get:
       tags: [Verwaltung]
@@ -4899,10 +5578,10 @@ paths:
         eigene Bilder (Signatur, Entwürfe) mit Inhalt). Ohne Pseudonyme. Nicht in der Vorschau (403).
         Wie `GET /me/data`, aber ohne Antworten in anonymen Umfragen und die Nutzungsauswertung nur mit `view_activity`.
         Grenzen wie beim Löschen (Konten von Admins nur für Admins); zusätzlich alle Rechte der enthaltenen Bereiche
-        (sonst 403), damit niemand über die Auskunft sieht, was ihm in der App verborgen ist: `view_personal`,
-        `manage_points`, `manage_penalties`, `manage_ranks`, `manage_titles`, `manage_attendance`, `manage_polls`,
-        `send_mail`, `manage_lists`, `post_board`, `view_offices`.
-      x-capability: create_users und die Rechte aller enthaltenen Bereiche (in der Regel Admins)
+        (sonst 403), damit niemand über die Auskunft sieht, was ihm in der App verborgen ist: `manage_former`, `view_personal`,
+        `view_points`, `view_penalties`, `view_promotions`, `view_titles`, `view_attendance`, `view_poll_results`,
+        `view_mail`, `view_lists`, `view_board_history`, `view_offices`, `view_responses`.
+      x-capability: view_accounts und die Rechte aller enthaltenen Bereiche (in der Regel Admins)
       parameters:
         - { name: id, in: path, required: true, schema: { type: integer } }
       responses:
@@ -4915,12 +5594,294 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
+  /passive-members:
+    get:
+      tags: [Verwaltung]
+      summary: Passive (eigene Einträge ohne Konto)
+      description: |
+        Nach Nachname, dazu die Mitglieder, die Betreuer sein können. Adresse, Telefon, E-Mail und Geburtsdatum nur mit
+        `view_personal` (sonst fehlen sie). Bereich `passive` aus → 403 `feature_disabled`.
+      x-capability: view_passive
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [passives, caretakers, personal, manage_personal]
+                properties:
+                  passives: { type: array, items: { $ref: '#/components/schemas/PassiveMember' } }
+                  caretakers:
+                    type: array
+                    description: Mitglieder (Recht member), nach Namen
+                    items:
+                      type: object
+                      required: [id, name]
+                      properties:
+                        id: { type: integer }
+                        name: { type: string }
+                  personal: { type: boolean, description: 'Sieht die Person Adresse, Telefon, E-Mail und Geburtsdatum (view_personal)?' }
+                  manage_personal: { type: boolean, description: 'Darf die Person sie ändern (manage_personal)?' }
+                  fee_cents: { type: integer, description: 'Jahresbeitrag als Vorschlag beim Eintragen in Cent, 0 = keiner' }
+                  methods: { type: array, items: { type: string }, description: 'Zahlungsarten zur Auswahl' }
+                  year: { type: integer, description: 'Laufendes Jahr (Zeitzone der App)' }
+                  birthday_ages:
+                    { type: array, items: { type: integer }, description: 'Alter, an deren Geburtstag erinnert wird (leer = aus)' }
+                  birthday_days: { type: integer, description: 'So viele Tage vorher kommt die Erinnerung (0 = am Tag selbst)' }
+                  birthdays:
+                    type: array
+                    description: |
+                      Anstehende Geburtstage der eingestellten Alter, heute bis in `birthday_days` Tagen, nach Datum. Nur mit
+                      `view_personal`, sonst leer. Der 29.02. gilt in Jahren ohne Schalttag am 28.02.
+                    items:
+                      type: object
+                      required: [id, name, date, age, days]
+                      properties:
+                        id: { type: integer }
+                        name: { type: string }
+                        date: { type: string, format: date, description: 'Tag des Geburtstags' }
+                        age: { type: integer, description: 'Alter, das die Person an diesem Tag erreicht' }
+                        days: { type: integer, description: 'Tage bis dahin, 0 = heute' }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Verwaltung]
+      summary: Einen Passiven anlegen
+      description: |
+        Vor- und Nachname sind Pflicht. Adresse, Telefon, E-Mail und Geburtsdatum nur mit `manage_personal` (sonst 403).
+        Betreuer nur ein Mitglied (sonst 400). Es entsteht kein Konto.
+      x-capability: manage_passive
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/PassiveInput'
+                - required: [first_name, last_name]
+      responses:
+        '201':
+          description: Angelegt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PassiveMember' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /passive-members/import:
+    post:
+      tags: [Verwaltung]
+      summary: Passive aus einer Tabelle übernehmen, mit dem Beitrag eines Jahres; ohne apply nur die Vorschau
+      description: |
+        CSV mit Semikolon, Tabulator (die App liest Excel-Dateien selbst und schickt sie so) oder Komma, UTF-8 oder
+        Windows-1252, höchstens 500 KB und 1.000 Zeilen. Kopfzeile ist die erste der ersten 20 Zeilen mit „Vorname“ oder
+        „Nachname“ (sonst die erste). Ohne `columns` werden die Spalten an ihren Namen erkannt (vorname, nachname,
+        straße/strasse (auch mit Hausnummer), hausnummer, adresszusatz, plz, ort/wohnort, land, telefon/telefon-nr./handy,
+        e-mail, geburtsdatum/geb-datum, eintritt, bemerkung, betreuer, betrag, zahlungsart, bezahlt am); die Antwort nennt
+        die Zuordnung (`columns`), die die App ändern und mitschicken kann. Adresse, Telefon, E-Mail und Geburtsdatum nur mit
+        `manage_personal` (sonst übergangen, `ignored`); ungültige Angaben bleiben leer, mit Hinweis (`warnings`).
+        Betreuer als „Vorname Nachname“, „Nachname, Vorname“ oder „V. Nachname“; passt keins oder mehr als ein Mitglied,
+        bleibt er leer (Hinweis). Beitrag für `year` (Vorgabe das laufende Jahr): Spalten betrag + zahlungsart oder, ohne
+        betrag, Spalten, die wie eine eingerichtete Zahlungsart heißen (auch abgekürzt) und den Betrag enthalten
+        (`method_columns`); ohne Betrag gilt der Jahresbeitrag. Datum aus „bezahlt am“ (TT.MM.JJJJ, TT.MM. oder JJJJ-MM-TT
+        am Anfang der Zelle), sonst `paid_on` (Vorgabe heute). Zellen ohne Buchstaben und Ziffern gelten als leer. Gleicher
+        Vor- und Nachname wie ein vorhandener Passiver → übersprungen (`existing`); doppelt in der Tabelle → Fehler.
+        Mit `apply` alles in einer Transaktion; hat eine Zeile einen Fehler → 400 (nichts angelegt), außer mit
+        `skip_errors` (dann ohne diese Zeilen).
+      x-capability: manage_passive
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [csv]
+              properties:
+                csv: { type: string }
+                apply: { type: boolean, default: false }
+                columns:
+                  type: [object, 'null']
+                  description: 'Feld => Nummer der Spalte ab 0 (null = keine); ohne: erkannt'
+                  additionalProperties: { type: [integer, 'null'] }
+                year: { type: integer, description: 'Jahr des Beitrags; Vorgabe das laufende' }
+                paid_on: { type: string, format: date, description: 'Datum für Zahlungen ohne Datum; Vorgabe heute' }
+                skip_errors: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Vorschau bzw. Ergebnis
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PassiveImportResult' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /passive-members/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Verwaltung]
+      summary: Ein Passiver
+      x-capability: view_passive
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PassiveMember' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [Verwaltung]
+      summary: Angaben eines Passiven ändern
+      description: Was fehlt, bleibt. Adresse, Telefon, E-Mail und Geburtsdatum nur mit `manage_personal` (sonst 403).
+      x-capability: manage_passive
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PassiveInput' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PassiveMember' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Verwaltung]
+      summary: Einen Passiven löschen
+      x-capability: manage_passive
+      responses:
+        '200':
+          description: Gelöscht
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deleted]
+                properties:
+                  deleted: { type: boolean }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /passive-members/settings:
+    get:
+      tags: [Verwaltung]
+      summary: Einstellungen der Passiven (Jahresbeitrag als Vorschlag, Zahlungsarten, Erinnerung an Geburtstage)
+      x-capability: view_passive
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PassiveSettings' }
+        '403': { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [Verwaltung]
+      summary: Einstellungen der Passiven ändern
+      description: |
+        Was fehlt, bleibt. `fee_cents`: 0, leer oder null heißt kein Vorschlag, sonst über 0 und höchstens 100000.
+        `methods`: Liste von Bezeichnungen (getrimmt, leere fallen weg), mindestens eine, höchstens 20, je höchstens 40
+        Zeichen, keine doppelt (sonst 400). Frühere Zahlungen behalten ihre Zahlungsart.
+        `birthday_ages`: Liste von Altern 1–120 (leere fallen weg, doppelte zählen einmal), höchstens 30; leer schaltet die
+        Erinnerung an Geburtstage aus. `birthday_days`: 0–30 Tage vorher. Erinnert werden per Push (Art
+        `passive_birthdays`) alle mit `manage_passive` und `view_personal`, je Geburtstag einmal.
+      x-capability: manage_passive
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fee_cents: { type: [integer, string, 'null'] }
+                methods: { type: array, items: { type: string } }
+                birthday_ages: { type: array, items: { type: [integer, string] } }
+                birthday_days: { type: [integer, string] }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PassiveSettings' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /passive-members/{id}/payments:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Verwaltung]
+      summary: Zahlung des Beitrags eines Passiven für ein Jahr eintragen
+      description: |
+        Je Passivem und Jahr höchstens eine Zahlung (sonst 400). Jahr ab 1900, höchstens das nächste; Betrag über 0 und
+        höchstens 100000 Cent; Datum JJJJ-MM-TT, ab 1900, nicht in der Zukunft; Zahlungsart Pflicht (eine der eingerichteten).
+      x-capability: manage_passive
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/PassivePaymentInput'
+                - required: [year, amount_cents, paid_on, method]
+      responses:
+        '201':
+          description: Eingetragen
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PassivePayment' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /passive-payments/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    patch:
+      tags: [Verwaltung]
+      summary: Zahlung eines Passiven ändern
+      description: Was fehlt, bleibt. Prüfungen wie beim Eintragen.
+      x-capability: manage_passive
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PassivePaymentInput' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PassivePayment' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Verwaltung]
+      summary: Zahlung eines Passiven löschen
+      x-capability: manage_passive
+      responses:
+        '200':
+          description: Gelöscht
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deleted]
+                properties:
+                  deleted: { type: boolean }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
   /members/former:
     get:
       tags: [Verwaltung]
       summary: Ehemalige Mitglieder (ausgetreten, verstorben, sonst ausgeschieden)
-      description: Nach Namen. `points` bzw. `open_cents` nur mit manage_points bzw. manage_penalties (sonst null).
-      x-capability: create_users
+      description: Nach Namen. `points` bzw. `open_cents` nur mit view_points bzw. view_penalties (sonst null).
+      x-capability: manage_former
       responses:
         '200':
           description: OK
@@ -4936,10 +5897,10 @@ paths:
       description: |
         Wie eine Zeile von `/members/former/import`, mit den Feldern von `PUT /members/{id}/former` (Daten als TT.MM.JJJJ,
         JJJJ-MM-TT, nur das Jahr oder leer). Erst wird alles geprüft, dann angelegt. Wer genau so heißt wie ein vorhandenes
-        Konto (Groß- und Kleinschreibung egal), wird nicht angelegt → 400. Geburtstag (nur mit dem Bereich Geburtstage) und
-        Foto wie bei `POST /users`; klappt das Speichern nicht, ist die Person trotzdem angelegt und `warning` sagt es. Freie
+        Konto (Groß- und Kleinschreibung egal), wird nicht angelegt → 400. Geburtstag (nur mit dem Bereich Geburtstage und nur, wer auch
+        `create_users` oder `manage_personal` hat, sonst 403) und Foto wie bei `POST /users`; klappt das Speichern nicht, ist die Person trotzdem angelegt und `warning` sagt es. Freie
         Namen in Amtszeiten, die genau passen, werden mit dem Konto verknüpft (`offices_linked`).
-      x-capability: create_users
+      x-capability: manage_former
       requestBody:
         required: true
         content:
@@ -4990,7 +5951,7 @@ paths:
         `apply` entsteht je Person ein Konto (zufälliges Passwort, das niemand erfährt), das gleich als ehemalig eingetragen
         wird; enthält eine Zeile einen Fehler → 400 (nichts angelegt). Freie Namen in Amtszeiten, die genau zu einer neu
         angelegten (oder schon früher als ehemalig importierten) Person passen, werden mit ihrem Konto verknüpft.
-      x-capability: create_users
+      x-capability: manage_former
       requestBody:
         required: true
         content:
@@ -5063,7 +6024,7 @@ paths:
         Laufende Amtszeiten (Zeitraum ohne Ende, auch mit Haken „Ehrung“) der Person mit dem Jahr, mit dem sie enden würden:
         Jahr aus `left_on`, leer dieses Jahr, nie vor dem Beginn (`clamped`). Prüfung und Grenzen wie bei
         `PUT /members/{id}/former`; ungültiges Datum → 400. Ändert nichts.
-      x-capability: create_users
+      x-capability: manage_former
       parameters:
         - name: left_on
           in: query
@@ -5107,7 +6068,7 @@ paths:
         nicht den letzten Admin, keine Gäste. Im selben Vorgang enden die laufenden Ämter der Person (siehe
         `GET /members/{id}/former/offices`); gemeinsame Amtszeiten werden geteilt, die anderen laufen weiter. Verknüpfte
         Titel entfallen damit, andere Titel bleiben.
-      x-capability: create_users
+      x-capability: manage_former
       requestBody:
         required: true
         content:
@@ -5134,7 +6095,7 @@ paths:
       description: |
         Ändert sich das Austrittsdatum, enden die beim Eintragen automatisch beendeten Amtszeiten mit dem neuen Jahr (nie vor
         ihrem Beginn), solange niemand sie seither von Hand geändert hat.
-      x-capability: create_users
+      x-capability: manage_former
       requestBody:
         required: true
         content:
@@ -5156,7 +6117,7 @@ paths:
         Grundrolle von vorher (Mitglied, wenn es sie nicht mehr gibt), Zusatzrollen, soweit es sie gibt und der Handelnde
         sie vergeben darf; Ausnahmen bei den Rechten nur durch Admins. Ein Startpasswort danach über
         `POST /members/{id}/password`. Beendete Ämter bleiben beendet.
-      x-capability: create_users
+      x-capability: manage_former
       responses:
         '200':
           description: OK
@@ -5181,8 +6142,9 @@ paths:
       summary: Angaben eines Kontos zum Bearbeiten (Issue #24)
       description: |
         Mit denselben Grenzen wie beim Passwort-Zurücksetzen (Admins nur für Admins usw.). `phone` nur für das eigene
-        Konto und mit `view_personal`, sonst leer; Adresse und Geburtsdatum stehen in `GET /members/{id}`.
-      x-capability: create_users
+        Konto und mit `view_personal`, sonst leer; Adresse und Geburtsdatum stehen in `GET /members/{id}`. Ändern
+        (`PATCH`) nur mit `create_users`.
+      x-capability: view_accounts
       responses:
         '200': { $ref: '#/components/responses/AccountProfile' }
         '403': { $ref: '#/components/responses/Error' }
@@ -5262,7 +6224,7 @@ paths:
         Neu gegenüber der ersten Umsetzung. Ersetzt „Passwort vergessen“ per E-Mail: Ein Admin erzeugt ein
         neues Startpasswort, das nur in dieser Antwort steht. Alle Geräte des Mitglieds
         werden abgemeldet. Wer kein Admin ist, darf das nur bei Anwärtern (auch eigenen Rollen nur mit dem Kalender)
-        und Mitgliedern, deren Rechte er selbst hat (ohne create_users und promote_users), nicht bei Gästen und Admins.
+        und Mitgliedern, deren Rechte er selbst hat (ohne create_users, manage_former und promote_users), nicht bei Gästen und Admins.
         Bei einem Mitglied ohne Zugang („Zugang einrichten“) hat es danach einen (`no_access` fällt weg).
       x-capability: create_users
       responses:
@@ -5293,7 +6255,7 @@ paths:
         Metadaten) in der Datenbank. Ein vorhandenes Foto wird ersetzt; die Fassung (und damit
         `photo_url`) ändert sich. Wer kein Admin ist, nur bei Konten, die er verwalten darf (wie `PATCH
         /members/{id}/account`).
-      x-capability: create_users
+      x-capability: create_users (bei Ehemaligen auch manage_former)
       requestBody:
         required: true
         content:
@@ -5319,7 +6281,7 @@ paths:
     delete:
       tags: [Verwaltung]
       summary: Foto eines Mitglieds entfernen
-      x-capability: create_users
+      x-capability: create_users (bei Ehemaligen auch manage_former)
       responses:
         '200':
           description: Entfernt (`photo_url` ist null)
@@ -5493,7 +6455,7 @@ paths:
   /registrations:
     get:
       tags: [Zugang beantragen]
-      summary: Anfragen, die auf Freigabe warten (create_users)
+      summary: Anfragen, die auf Freigabe warten (view_accounts; freigeben und ablehnen mit create_users)
       responses:
         '200':
           description: Älteste zuerst
@@ -5528,6 +6490,18 @@ paths:
                         created_at: { type: string, format: date-time }
                         email_confirmed: { type: boolean, description: Adresse per Link bestätigt (nur mit Mailversand) }
                         expires_at: { type: string, format: date-time, description: Danach wird die Anfrage gelöscht }
+                        company_choice:
+                          type: [string, 'null']
+                          enum: [company, none, passive, null]
+                          description: Wahl im Formular; null bei Anfragen ohne Angabe; nur mit dem Bereich Kompanien
+                        companies:
+                          description: Kompanien, die die Person gewählt hat (die es noch gibt); nur mit dem Bereich Kompanien
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              id: { type: integer }
+                              name: { type: string }
                         matches:
                           description: >-
                             Mitglieder ohne Zugang, die passen könnten, beste zuerst: gleiche E-Mail-Adresse (email), gleicher
@@ -5550,6 +6524,15 @@ paths:
                       properties:
                         id: { type: integer }
                         name: { type: string }
+                  companies:
+                    description: Alle Kompanien (auch ehemalige) zum Ändern beim Freigeben; nur mit dem Bereich Kompanien
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        name: { type: string }
+                        active: { type: boolean }
         '403': { $ref: '#/components/responses/Error' }
 
   /registrations/{id}/approve:
@@ -5561,6 +6544,9 @@ paths:
         vergeben darf; Benutzername und E-Mail-Adresse frei). Mit Mailversand bekommt die Person eine Mail (`mailed`).
         Mit `user_id` entsteht kein Konto: Das Mitglied ohne Zugang bekommt Benutzername, E-Mail-Adresse und Passwort
         aus der Anfrage und behält Name, Rolle und alle Einträge (`linked`). Nur bei Mitgliedern ohne Zugang (sonst 400).
+        Mit dem Bereich Kompanien ordnet die Freigabe die Person den Kompanien aus der Anfrage zu (bei `user_id` zusätzlich
+        zu seinen), aber nur, wenn sie danach das Recht `member` hat. `company_ids` ändert die Wahl; eine andere als die
+        aus der Anfrage nur mit `manage_companies` (sonst 403).
       parameters:
         - { name: id, in: path, required: true, schema: { type: integer } }
       requestBody:
@@ -5573,6 +6559,10 @@ paths:
                 username: { type: string, description: Anderer Benutzername, wenn der gewünschte vergeben ist }
                 user_id:
                   { type: integer, description: Mit diesem Mitglied ohne Zugang verbinden statt ein Konto anzulegen; level gilt dann nicht }
+                company_ids:
+                  description: Kompanien statt der aus der Anfrage (alle der Liste, auch ehemalige); anders als in der Anfrage nur mit manage_companies
+                  type: array
+                  items: { type: integer }
       responses:
         '200':
           description: Freigegeben
@@ -5593,6 +6583,16 @@ paths:
                       level: { type: string }
                   mailed: { type: boolean }
                   linked: { type: boolean, description: Mit einem Mitglied ohne Zugang verbunden (user_id) }
+                  companies:
+                    description: Kompanien der Person nach der Freigabe; nur mit dem Bereich Kompanien
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        name: { type: string }
+                        short_name: { type: string }
+                        active: { type: boolean }
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
@@ -5723,6 +6723,10 @@ paths:
                   type: boolean
                   default: true
                   description: Punktefaktor der Rolle anwenden (z. B. 0,5). false bucht für alle mit Faktor 1.
+                request_id:
+                  type: string
+                  pattern: '^[A-Za-z0-9-]{8,36}$'
+                  description: 'Kennung der Buchung aus der App (Warteschlange offline). Kam sie schon einmal an, liefert der Server die Einträge von damals, statt erneut zu buchen.'
       responses:
         '201':
           description: Angelegt (ein Eintrag pro Mitglied)
@@ -5766,6 +6770,10 @@ paths:
                 amount_cents: { type: integer, minimum: 1, maximum: 100000 }
                 reason: { type: string }
                 date: { type: string, format: date }
+                request_id:
+                  type: string
+                  pattern: '^[A-Za-z0-9-]{8,36}$'
+                  description: 'Kennung der Buchung aus der App (Warteschlange offline). Kam sie schon einmal an, liefert der Server die Einträge von damals, statt erneut zu buchen.'
       responses:
         '201':
           description: Angelegt (eine Strafe pro Mitglied)
@@ -5781,7 +6789,7 @@ paths:
     get:
       tags: [Verwaltung]
       summary: Alle offenen Strafen, neueste zuerst, mit dem Namen der Person
-      x-capability: manage_penalties
+      x-capability: view_penalties
       responses:
         '200':
           description: OK
@@ -5842,7 +6850,7 @@ paths:
         Anwärter (Issue #23) sind eine eigene Rolle; die frühere feste Rolle `candidate` bleibt in Installationen, die
         sie hatten, als eigene Rolle mit `new_accounts` und `promotable` erhalten. Schaltet der Admin einen Bereich mit eigenen Rechten ein
         (Termine, Punkte, Strafen), kommt dessen Standardrolle dazu; schaltet er ihn aus, verschwindet sie, wenn niemand sie hat.
-        Wer Rollen vergeben darf, ohne Admin zu sein, vergibt nur Rollen mit eigenen Rechten, ohne `create_users` und `promote_users`.
+        Wer Rollen vergeben darf, ohne Admin zu sein, vergibt nur Rollen mit eigenen Rechten, ohne `create_users`, `manage_former` und `promote_users`.
       x-capability: manage_settings
       responses:
         '200':
@@ -6073,6 +7081,105 @@ paths:
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
+  /admin/report/sections:
+    get:
+      tags: [Einstellungen]
+      summary: Bereiche, die die Person in den Bericht als PDF nehmen kann
+      description: |
+        Bericht als PDF (Verwaltung → Bericht). Je Bereich nur, wenn er an ist und die Person sein Recht hat: Mitglieder mit
+        einem Recht der Mitgliederliste, Punkte mit `view_points`, Strafen mit `view_penalties`, Anwesenheit mit
+        `view_attendance`, Inventar mit `view_inventory`. `dated` false: ohne Zeitbezug (Stand heute). Reihenfolge wie im Bericht.
+      x-capability: 'eines der Rechte der Bereiche (siehe Beschreibung)'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [key, title, dated]
+                  properties:
+                    key:
+                      {
+                        type: string,
+                        enum: [members, passive, points, penalties, attendance, events, calendar, ranks, titles, offices, inventory],
+                      }
+                    title: { type: string, description: Name des Bereichs, wie die Kompanie ihn nennt }
+                    dated: { type: boolean }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+  /admin/report:
+    get:
+      tags: [Einstellungen]
+      summary: Daten des Berichts als PDF für einen Zeitraum
+      description: |
+        Fertige Tabellen (Texte, wie sie im PDF stehen) je gewähltem Bereich; das PDF baut die App. Jeder Bereich verlangt
+        sein Recht wie in `/admin/report/sections`; einer ohne Recht oder ausgeschaltet ergibt 403 (nichts wird still
+        weggelassen). Persönliche Angaben der Mitglieder (E-Mail, Telefon, Adresse, Geburtsdatum) nur mit `view_personal`.
+        Stornierte Punkte und Strafen fehlen. Der Abruf steht im Änderungsprotokoll (Art „Bericht“, Aktion `event`, Zeitraum
+        und Bereiche, ohne Inhalt). In der Vorschau 403.
+      x-capability: 'eines der Rechte der Bereiche (siehe /admin/report/sections)'
+      parameters:
+        - { name: from, in: query, required: true, schema: { type: string, format: date }, description: Beginn (JJJJ-MM-TT) }
+        - {
+            name: to,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+            description: 'Ende einschließlich (JJJJ-MM-TT); höchstens rund zehn Jahre nach dem Beginn',
+          }
+        - {
+            name: sections,
+            in: query,
+            required: true,
+            schema: { type: string },
+            description: 'Bereiche mit Kommas, z. B. members,points; Reihenfolge im Bericht ist fest',
+          }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [from, to, created, sections]
+                properties:
+                  from: { type: string, format: date }
+                  to: { type: string, format: date }
+                  created: { type: string, description: 'Zeitpunkt des Abrufs in der Zeit der Kompanie (TT.MM.JJJJ, HH:MM)' }
+                  sections:
+                    type: array
+                    items:
+                      type: object
+                      required: [key, title, dated, landscape, tables]
+                      properties:
+                        key: { type: string }
+                        title: { type: string }
+                        dated: { type: boolean }
+                        landscape: { type: boolean, description: Breite Tabelle, im PDF quer }
+                        tables:
+                          type: array
+                          items:
+                            type: object
+                            required: [title, columns, rows, empty]
+                            properties:
+                              title: { type: string }
+                              columns:
+                                type: array
+                                items:
+                                  type: object
+                                  required: [label, num, wrap]
+                                  properties:
+                                    label: { type: string }
+                                    num: { type: boolean, description: Zahl (rechtsbündig) }
+                                    wrap: { type: boolean, description: Langer Text, bricht um }
+                              rows: { type: array, items: { type: array, items: { type: string } } }
+                              empty: { type: string, description: Hinweis, wenn die Tabelle leer ist }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
   /admin/changes:
     get:
       tags: [Einstellungen]
@@ -6134,6 +7241,173 @@ paths:
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
+  /admin/tiles:
+    get:
+      tags: [Einstellungen]
+      summary: Vorgabe für die Anordnung der Kacheln (für alle ohne eigene Anordnung)
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: Seite => TileLayouts (leer als {})
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [defaults]
+                properties:
+                  defaults: { type: object, additionalProperties: { $ref: '#/components/schemas/TileLayouts' } }
+        '403': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Einstellungen]
+      summary: Vorgabe einer Seite für eine Spaltenzahl festlegen
+      x-capability: manage_settings
+      description: |
+        Gleiche Form und Prüfung wie `PUT /me/tiles`. Gilt für jede Person ohne eigene Anordnung der Seite, auch ohne
+        Anmeldung und in der Vorschau; wer eine Kachel nicht sieht, bei dem wird die schmalste Kachel derselben Zeile breiter.
+        Die anderen Spaltenzahlen der Seite bleiben. Kommt ins Änderungsprotokoll.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [page, cols, tiles]
+              properties:
+                page: { type: string, examples: [verwaltung, intern] }
+                cols: { type: integer, enum: [2, 3, 4, 5] }
+                tiles: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/TilePlace' } }
+      responses:
+        '200':
+          description: Gespeichert; alle Spaltenzahlen der Seite
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TileLayoutResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Einstellungen]
+      summary: Vorgabe einer Seite löschen (alle Spaltenzahlen); danach gilt die Reihenfolge aus der Navigation
+      x-capability: manage_settings
+      parameters:
+        - { name: page, in: query, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Gelöscht; `layouts` leer
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TileLayoutResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+  /admin/translations:
+    get:
+      tags: [Einstellungen]
+      summary: Alle übersetzbaren Namen einer weiteren Sprache an einer Stelle
+      x-capability: manage_settings
+      description: |
+        Einstellungen → Sprachen → Übersetzungen: je Art (`nav`, `role`, `rank`, `office`, `office_group`, `event_kind`,
+        `menu`) die Einträge mit dem Text der Basissprache (`source`, heute immer Deutsch), dem eingetragenen Text der Sprache
+        (`text`, leer ohne) und dem, was Leser ohne Eintrag sehen (`fallback`, z. B. die übersetzte Vorgabe „Guest“ zu „Gast“,
+        sonst wie `source`). Eine Art fehlt ohne das Recht, das sie zum Pflegen verlangt (siehe PUT), oder wenn ihr Bereich
+        aus ist (`rank` ohne Dienstgrade, `office` und `office_group` ohne Ämter). `nav` enthält nur Bereiche, die an sind,
+        eigene Seiten (`seiten/<id>`) und `intern`. Dazu einfache Inhalte (gespeichert über ihre eigene Route mit
+        `translations`): `event` (kommende öffentliche Termine, mit `manage_events`) und `calendar_entry` (kommende Termine
+        des internen Kalenders in der App, mit `manage_calendar`) mit `title`, `location`, `description`; `poll` (laufende
+        Umfragen, `manage_polls`) mit `title`, `description` und `option:<n>` je Antwortmöglichkeit (ab 0); `document` und
+        `document_category` (`manage_documents`) sowie `album` (Alben der App, `manage_gallery`) mit `title`. Felder, die in
+        der Basissprache leer sind, fehlen. Inhalte haben zusätzlich `context` (Titel der Basissprache, bei Terminen mit
+        Datum), `label` (Name des Felds in der Sprache der Anfrage) und `multiline`. Inhalte aus Blöcken: `page` (eigene
+        Seiten, `manage_pages`) und `board` (laufende Nachrichten, `post_board` und `view_board_history`) mit je einem
+        Eintrag (`field` content, `text` = übersetzter Titel) und dem Stand `total` (übersetzbare Felder samt Titel) und
+        `done`; übersetzt wird über PATCH der Seite bzw. Nachricht mit `translations`. News fehlen.
+        400, wenn keine weitere Sprache eingeschaltet ist oder `locale` keine ist.
+      parameters:
+        - name: locale
+          in: query
+          required: false
+          description: Weitere eingeschaltete Sprache; ohne die erste.
+          schema: { type: string, enum: [en] }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [locale, source_locale, groups]
+                properties:
+                  locale: { type: string, enum: [en] }
+                  source_locale: { type: string, enum: [de] }
+                  groups:
+                    type: array
+                    items:
+                      type: object
+                      required: [kind, items]
+                      properties:
+                        kind: { type: string, enum: [nav, role, rank, office, office_group, event_kind, menu, event, calendar_entry, poll, document, document_category, album, page, board] }
+                        items:
+                          type: array
+                          items:
+                            type: object
+                            required: [kind, ref, field, source, text, fallback, max]
+                            properties:
+                              kind: { type: string, enum: [nav, role, rank, office, office_group, event_kind, menu, event, calendar_entry, poll, document, document_category, album, page, board] }
+                              ref: { type: string }
+                              field: { type: string, description: '`label` bei Namen; bei Inhalten title, location, description oder option:<n>' }
+                              source: { type: string }
+                              text: { type: string }
+                              fallback: { type: string }
+                              max: { type: integer }
+                              context: { type: string }
+                              label: { type: string }
+                              multiline: { type: boolean }
+                              total: { type: integer }
+                              done: { type: integer }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Einstellungen]
+      summary: Eigene Namen in einer weiteren Sprache speichern
+      description: |
+        Einrichten je Sprache (Plan „Mehrsprachigkeit“): Der deutsche Name bleibt, wo er ist; hier steht der Name für eine
+        weitere eingeschaltete Sprache (nicht Deutsch). Arten: `nav` (Name eines Bereichs, einer eigenen Seite oder von
+        „Intern“ in der Navigation, Kennung wie in `navigation_names`; höchstens 24 Zeichen), `role` (Name einer Rolle,
+        Kennung der Rolle; höchstens 30 Zeichen), `event_kind` (Terminart, Kennung ist ihr deutscher Name; 40 Zeichen) und
+        `menu` (Untermenü, Kennung ist sein deutscher Name; 24 Zeichen), alle mit `manage_settings`; `rank` (Dienstgrad, ID;
+        60 Zeichen) mit `manage_ranks`; `office` und `office_group` (Amt bzw. Gruppe, ID; 60 Zeichen) mit `manage_offices`. Ein leerer `text` löscht die Übersetzung
+        (dann gilt der deutsche Name). Die Antwort enthält alle Übersetzungen wie `name_translations` in `/config`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [locale, items]
+              properties:
+                locale: { type: string, enum: [en] }
+                items:
+                  type: array
+                  items:
+                    type: object
+                    required: [kind, ref, text]
+                    properties:
+                      kind: { type: string, enum: [nav, role, rank, office, office_group, event_kind, menu] }
+                      ref: { type: string, maxLength: 100 }
+                      field: { type: string, enum: [label], default: label }
+                      text: { type: string }
+      responses:
+        '200':
+          description: Gespeichert
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [translations]
+                properties:
+                  translations: { $ref: '#/components/schemas/NameTranslations' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
   /admin/navigation:
     get:
       tags: [Einstellungen]
@@ -6157,7 +7431,9 @@ paths:
         Die Zahl der Hauptpunkte ist frei (Issue #362). names, start und show_labels sind optional; fehlen sie, bleiben sie,
         wie sie sind. Die App setzt mit „Standardnavigation wiederherstellen“ alles zurück (navigation null, names {}, start {}, show_labels true,
         intern_order null). Ebenso optional: intern_order (Reihenfolge in „Intern“ der Standardnavigation) und admin_order
-        (Reihenfolge der Kacheln der Verwaltung); null bzw. leer = Standardreihenfolge.
+        (Reihenfolge der Kacheln der Verwaltung); null bzw. leer = Standardreihenfolge. guest_navigation (optional) ist die
+        eigene Leiste für Gäste; null = dieselbe wie für Angemeldete, fehlt = unverändert. Die Startseite der Gäste muss in
+        deren Leiste stehen (ohne eigene: in der für Angemeldete). Ist etwas ungültig, bleibt alles, wie es war.
       x-capability: manage_settings
       requestBody:
         required: true
@@ -6169,6 +7445,11 @@ paths:
               properties:
                 navigation:
                   description: null stellt die Standardnavigation wieder her
+                  oneOf:
+                    - $ref: '#/components/schemas/Navigation'
+                    - type: 'null'
+                guest_navigation:
+                  description: Eigene Leiste für Gäste; null = dieselbe wie für Angemeldete
                   oneOf:
                     - $ref: '#/components/schemas/Navigation'
                     - type: 'null'
@@ -6404,6 +7685,18 @@ paths:
                     description: 'Kommagetrennte Kalender-IDs; gelesen mit API-Schlüssel (öffentliche Kalender) oder über den Google-Zugang',
                   }
                 calendar_cache_minutes: { type: integer, minimum: 1, maximum: 1440 }
+                calendar_responses:
+                  { type: string, enum: ['0', '1'], description: 'Zu- und Absagen bei Terminen einschalten (Vorgabe aus)' }
+                languages:
+                  {
+                    type: string,
+                    description: 'Sprachen der App, durch Komma getrennt (de, en); die Basissprache ist immer dabei',
+                    examples: ['de,en'],
+                  }
+                calendar_response_reminder:
+                  { type: string, enum: ['0', '1'], description: An Zu- und Absage erinnern (Push an alle ohne Rückmeldung) }
+                calendar_response_reminder_days:
+                  { type: integer, minimum: 1, maximum: 30, description: Erinnerung so viele Tage vor Beginn }
                 drive_service_account: { type: string, description: JSON-Schlüssel des Dienstkontos }
                 drive_oauth:
                   {
@@ -6511,7 +7804,8 @@ paths:
       description: |
         Speichert den eigenen OAuth-Client der Installation (Client-ID und Client-Secret aus der Google Cloud Console,
         Typ „Webanwendung“) und liefert die Adresse der Anmeldung bei Google. Die App leitet den Browser dorthin.
-        Angefragt werden `drive.readonly` und `calendar.readonly` mit `access_type=offline`, `prompt=consent` und
+        Angefragt werden `drive` (voller Zugriff: die Galerie legt Einreichungen und hochgeladene Bilder in Drive ab;
+        ältere Verbindungen haben `drive.readonly` und `drive.file`) und `calendar.readonly` mit `access_type=offline`, `prompt=consent` und
         `include_granted_scopes=true`. Das `state` gilt 15 Minuten, einmal, nur für diesen Admin in dieser Sitzung.
 
         Google leitet danach an die Weiterleitungs-URI der Installation zurück (`google.redirect_uri` in
@@ -7585,7 +8879,8 @@ components:
       in: header
       required: false
       description: |
-        Vorschau „App als Rolle ansehen“ (Issue #63): Schlüssel einer Rolle (nicht `admin`) oder `@public`. Gilt nur für
+        Vorschau „App als Rolle ansehen“ (Issue #63): Schlüssel einer Rolle (nicht `admin`), `@person:<ID>` (Rechte einer
+        Person, die nicht Admin ist) oder `@public`. Gilt nur für
         Admins und für jede Route; statt des Headers geht auch der Parameter `?vorschau=…` (so bei Dateien).
       schema: { type: string, maxLength: 32 }
     Id:
@@ -7633,10 +8928,11 @@ components:
               last_upload:
                 type: [object, 'null']
                 description: Messung des letzten erfolgreichen Hochladens (Sekunden); null, solange es keine gibt
-                required: [bytes, chunks, start_seconds, read_seconds, send_seconds, slowest_seconds, total_seconds]
+                required: [bytes, chunks, retries, start_seconds, read_seconds, send_seconds, slowest_seconds, total_seconds]
                 properties:
                   bytes: { type: integer }
                   chunks: { type: integer, description: Anzahl der Anfragen mit Daten (Stücke von 8 MB) }
+                  retries: { type: integer, description: Neue Versuche nach vorübergehenden Fehlern (HTTP 408, 429, 5xx) }
                   start_seconds:
                     { type: number, description: Sitzung bei Google beginnen (kleine Anfrage, Verbindungsaufbau und Antwortzeit) }
                   read_seconds: { type: number, description: Datei von der Platte des Servers lesen }
@@ -7857,6 +9153,16 @@ components:
               deleted: { type: boolean }
 
   schemas:
+    NameTranslations:
+      type: object
+      description: 'Eigene Namen je weiterer eingeschalteter Sprache: Sprache => Art (nav, role) => Kennung => Feld => Text. Ohne weitere Sprache leer.'
+      additionalProperties:
+        type: object
+        additionalProperties:
+          type: object
+          additionalProperties:
+            type: object
+            additionalProperties: { type: string }
     InventoryItem:
       type: object
       properties:
@@ -7971,6 +9277,13 @@ components:
           type: array
           items: { type: string, pattern: '^[a-f0-9]{32}$' }
           description: 'Kennungen von Anhängen (eigene Entwürfe aus `POST /attachments`); sonst → 400'
+        translations:
+          type: object
+          description: |
+            Fassungen je weiterer eingeschalteter Sprache (Sprache => title, blocks; nicht de, sonst → 400). Leeres Feld
+            löscht es. Wer die App in dieser Sprache nutzt, bekommt Nachricht, Benachrichtigung und Mail in dieser Fassung;
+            was fehlt, steht auf Deutsch. Jede Änderung steht im Verlauf (`translation`).
+          additionalProperties: { $ref: '#/components/schemas/ContentTranslation' }
     BoardAudience:
       type: string
       enum: [members, public, company, person]
@@ -7978,7 +9291,7 @@ components:
       description: |
         Sichtbarkeit: members (intern, wer das Brett liest: view_board), public (alle, auch ohne Anmeldung), company (wer
         das Brett liest und einer der Kompanien aus audience_ids angehört) oder person (nur die Konten aus audience_ids).
-        Alle mit post_board sehen jede Nachricht. Andere Werte → 400. Ältere Clients zeigen company und person wie intern
+        Alle mit view_board_history sehen jede Nachricht. Andere Werte → 400. Ältere Clients zeigen company und person wie intern
         an (der Server liefert sie trotzdem nur an die Berechtigten).
     BoardItem:
       type: object
@@ -7996,7 +9309,7 @@ components:
           {
             type: array,
             items: { $ref: '#/components/schemas/Block' },
-            description: 'Inhalt aus Blöcken, nur die für die Person sichtbaren (members-Blöcke nur mit view_board bzw. post_board). Ältere Nachrichten: ein Textblock aus text.',
+            description: 'Inhalt aus Blöcken, nur die für die Person sichtbaren (members-Blöcke nur mit view_board bzw. view_board_history). Ältere Nachrichten: ein Textblock aus text.',
           }
         excerpt: { type: string, description: 'Reiner Textauszug aller sichtbaren Blöcke' }
         author_name: { type: [string, 'null'], description: '„gelöschtes Konto“, wenn das Konto des Verfassers gelöscht wurde' }
@@ -8004,11 +9317,12 @@ components:
         updated_at: { type: string, format: date-time, description: 'Wechselt, wenn sich Titel, Inhalt oder Anhänge ändern' }
         expires_at: { type: string, format: date-time, description: 'Sichtbar bis (UTC); standardmäßig 24 Stunden nach created_at' }
         audience: { $ref: '#/components/schemas/BoardAudience' }
-        audience_ids: { type: array, items: { type: integer }, description: 'Nur mit post_board, bei company und person: die Auswahl' }
+        audience_ids:
+          { type: array, items: { type: integer }, description: 'Nur mit view_board_history, bei company und person: die Auswahl' }
         audience_names:
           type: array
           items: { type: string }
-          description: 'Bei company: Namen der Kompanien (für alle, die die Nachricht lesen); bei person: Namen der Personen (nur mit post_board)'
+          description: 'Bei company: Namen der Kompanien (für alle, die die Nachricht lesen); bei person: Namen der Personen (nur mit view_board_history)'
         attachments:
           {
             type: array,
@@ -8016,7 +9330,7 @@ components:
             description: 'Dateianhänge; sehen alle, die die Nachricht sehen (bei öffentlichen auch ohne Anmeldung)',
           }
         last_edit:
-          description: 'Nur mit post_board: wer zuletzt Titel, Inhalt, Enddatum oder Sichtbarkeit geändert hat (null: unverändert)'
+          description: 'Nur mit view_board_history: wer zuletzt Titel, Inhalt, Enddatum oder Sichtbarkeit geändert hat (null: unverändert)'
           oneOf:
             - type: 'null'
             - type: object
@@ -8024,8 +9338,24 @@ components:
                 name: { type: [string, 'null'] }
                 at: { type: string, format: date-time }
         mail:
-          description: 'Nur mit post_board: Stand des Mailversands (null: ohne Mail)'
+          description: 'Nur mit view_board_history: Stand des Mailversands (null: ohne Mail)'
           oneOf: [{ $ref: '#/components/schemas/BoardMailSummary' }, { type: 'null' }]
+        untranslated:
+          {
+            type: string,
+            enum: [all, some],
+            description: 'Nur in einer weiteren Sprache (X-Kompanie-Lang), wenn dort etwas fehlt; das Fehlende steht auf Deutsch',
+          }
+        source:
+          type: object
+          description: 'Nur mit view_board_history, wenn die Anfrage in einer weiteren Sprache läuft: die deutsche Fassung zum Bearbeiten'
+          properties:
+            title: { type: string }
+            blocks: { type: array, items: { $ref: '#/components/schemas/Block' } }
+        translations:
+          type: object
+          description: 'Nur mit view_board_history, wenn weitere Sprachen an sind: Fassungen je Sprache'
+          additionalProperties: { $ref: '#/components/schemas/ContentTranslation' }
     BoardMailSummary:
       type: object
       properties:
@@ -8152,7 +9482,7 @@ components:
       type: object
       properties:
         id: { type: integer }
-        action: { type: string, enum: [created, title, content, expires, audience, attachments, deleted, mailed] }
+        action: { type: string, enum: [created, title, content, expires, audience, attachments, deleted, mailed, translation] }
         user_name: { type: [string, 'null'], description: '„gelöschtes Konto“, wenn es das Konto nicht mehr gibt' }
         at: { type: string, format: date-time }
         before:
@@ -8230,6 +9560,17 @@ components:
         ends_at:
           type: [string, 'null']
           description: 'Optional: „JJJJ-MM-TTTHH:MM“ in der Zeitzone der Kompanie oder ISO 8601 mit Zeitzone; muss in der Zukunft liegen. Gespeichert in UTC.'
+        translations:
+          type: object
+          description: 'Fassungen je weiterer eingeschalteter Sprache (nicht de, sonst → 400); nur die genannten Felder ändern sich. options gleich viele wie auf Deutsch (sonst → 400), leere = deutsch; geht auch, wenn es schon Antworten gibt.'
+          additionalProperties: { $ref: '#/components/schemas/PollTranslation' }
+    PollTranslation:
+      type: object
+      description: 'Fassung einer Umfrage in einer weiteren Sprache; leer = deutsch. Abgestimmt wird über dieselben Möglichkeiten.'
+      properties:
+        title: { type: string, maxLength: 150 }
+        description: { type: string, maxLength: 1000 }
+        options: { type: array, items: { type: string, maxLength: 100 }, description: 'In der Reihenfolge der deutschen Möglichkeiten' }
     PollPatch:
       type: object
       properties:
@@ -8240,6 +9581,10 @@ components:
         anonymous: { type: boolean }
         results: { type: string, enum: [after_vote, after_end, managers] }
         ends_at: { type: [string, 'null'] }
+        translations:
+          type: object
+          description: 'Fassungen je weiterer eingeschalteter Sprache (nicht de, sonst → 400); nur die genannten Felder ändern sich. options gleich viele wie auf Deutsch (sonst → 400), leere = deutsch; geht auch, wenn es schon Antworten gibt.'
+          additionalProperties: { $ref: '#/components/schemas/PollTranslation' }
     PollVote:
       type: object
       properties:
@@ -8321,6 +9666,14 @@ components:
                 properties:
                   text: { type: string }
                   name: { type: string, description: Nur bei namentlichen Umfragen }
+        untranslated:
+          { type: string, enum: [all, some], description: 'In einer weiteren Sprache (X-Kompanie-Lang), wenn dort etwas fehlt (dann deutsch)' }
+        source:
+          { $ref: '#/components/schemas/PollTranslation', description: 'Nur mit manage_polls in einer weiteren Sprache: die deutsche Fassung zum Bearbeiten' }
+        translations:
+          type: object
+          description: 'Nur mit manage_polls, wenn eine weitere Sprache an ist: Fassungen je weiterer Sprache (leere Möglichkeit = deutsch)'
+          additionalProperties: { $ref: '#/components/schemas/PollTranslation' }
     PushType:
       type: string
       enum:
@@ -8329,6 +9682,7 @@ components:
           board_public,
           polls,
           birthdays,
+          passive_birthdays,
           gallery_review,
           gallery_submissions,
           registrations,
@@ -8340,9 +9694,10 @@ components:
           titles,
           events,
           reminder,
+          responses,
           news,
         ]
-      description: '`board` (Schwarzes Brett, Issue #5) nur für Mitglieder und Anwärter (view_board); dringend (Urgency high), TTL höchstens bis zum Ablauf der Nachricht. `board_public`: öffentliche Nachrichten am Brett für alle anderen (Gäste ohne Konto, Konten ohne view_board), sonst wie `board`. `polls` (Umfragen, Issue #4) nur für Mitglieder: neue Umfrage und Erinnerung 24 Stunden vor dem Ende an alle ohne Antwort. `birthdays` (Geburtstage, Issue #1) nur für Mitglieder: am Tag selbst ab 7 Uhr (Zeitzone der Kompanie), nicht an das Geburtstagskind, nur für sichtbare Geburtstage; TTL bis Mitternacht.'
+      description: '`board` (Schwarzes Brett, Issue #5) nur für Mitglieder und Anwärter (view_board); dringend (Urgency high), TTL höchstens bis zum Ablauf der Nachricht. `board_public`: öffentliche Nachrichten am Brett für alle anderen (Gäste ohne Konto, Konten ohne view_board), sonst wie `board`. `polls` (Umfragen, Issue #4) nur für Mitglieder: neue Umfrage und Erinnerung 24 Stunden vor dem Ende an alle ohne Antwort. `birthdays` (Geburtstage, Issue #1) nur für Mitglieder: am Tag selbst ab 7 Uhr (Zeitzone der Kompanie), nicht an das Geburtstagskind, nur für sichtbare Geburtstage; TTL bis Mitternacht. `passive_birthdays` (Geburtstage der Passiven) nur mit manage_passive und view_personal und nur mit eingestellten Altern: einmal je Geburtstag die eingestellten Tage vorher ab derselben Stunde. `responses` (Zu- und Absagen) nur mit respond_calendar: einmal am Tag zur Uhrzeit der Erinnerung an alle ohne Rückmeldung zu Terminen, die in den eingestellten Tagen beginnen bzw. deren Anmeldeschluss morgen ist. `reminder` (Erinnerung am Vortag) nennt keine Termine, bei denen die Person abgesagt hat.'
     PushSubscribe:
       type: object
       required: [endpoint, keys]
@@ -8630,6 +9985,25 @@ components:
       description: 'Reihenfolge der Kacheln in „Intern“ der Standardnavigation, ohne eigene Navigation. Bereiche, die fehlen, stehen hinter ihrem Vorgänger aus der Standardreihenfolge. Leer = Standard.'
       items: { $ref: '#/components/schemas/NavigationTarget' }
       uniqueItems: true
+    TilePlace:
+      type: object
+      description: Lage einer Kachel im Raster
+      required: [id, col, row, span]
+      properties:
+        id: { type: string, description: 'Bereich bzw. Ziel, z. B. mitglieder, seite/3, einstellungen' }
+        col: { type: integer, minimum: 1, maximum: 4 }
+        row: { type: integer, minimum: 1, maximum: 200 }
+        span: { type: integer, minimum: 1, maximum: 4 }
+    TileLayouts:
+      type: object
+      description: 'Spaltenzahl (2, 3, 4) => Kacheln, nach Zeile und Spalte geordnet'
+      additionalProperties: { type: array, items: { $ref: '#/components/schemas/TilePlace' } }
+    TileLayoutResponse:
+      type: object
+      required: [page, layouts]
+      properties:
+        page: { type: string }
+        layouts: { $ref: '#/components/schemas/TileLayouts' }
     AdminOrder:
       type: object
       description: 'Reihenfolge der Kacheln der Verwaltung, für alle gleich, je Gruppe: start (Startseite, mit dem Sammelknopf einrichtungen) und setup (unter „Einrichtungen“). Eine Kachel wechselt die Gruppe nicht. Kacheln, die fehlen, stehen hinter ihrem Vorgänger aus der Standardreihenfolge. Leer kommt als [] an.'
@@ -8663,13 +10037,19 @@ components:
         setup:
           type: array
           uniqueItems: true
-          items: { type: string, enum: [katalog, dienstgrade, titel, aemter, kompanien, sponsoren, seiten] }
+          items: { type: string, enum: [katalog, dienstgrade, titel, aemter, kompanien, sponsoren, seiten, webseite] }
     NavigationAdmin:
       type: object
-      required: [navigation, names, start, show_labels, intern_order, admin_order, targets, icons, max_menu_items, label_max]
+      required:
+        [navigation, guest_navigation, names, start, show_labels, intern_order, admin_order, targets, icons, max_menu_items, label_max]
       properties:
         navigation:
           description: Gespeicherte Navigation; null = Standardnavigation
+          oneOf:
+            - $ref: '#/components/schemas/Navigation'
+            - type: 'null'
+        guest_navigation:
+          description: Eigene Leiste für Gäste (ohne Anmeldung und Grundrolle Gast); null = dieselbe wie für Angemeldete
           oneOf:
             - $ref: '#/components/schemas/Navigation'
             - type: 'null'
@@ -8722,7 +10102,7 @@ components:
 
     ReviewReport:
       type: object
-      description: Fehlermeldung im Eingang der Admins (review_reports)
+      description: Fehlermeldung im Eingang der Admins (view_reports)
       required:
         [
           id,
@@ -8785,13 +10165,14 @@ components:
         video:
           {
             type: string,
-            description: 'Nur beim Prüfen offener Videos: Adresse zum Abspielen vor der Freigabe (<App>/foto/<id der Einreichung>/einreichung, Range, nur mit review_gallery)',
+            description: 'Nur beim Prüfen offener Videos: Adresse zum Abspielen vor der Freigabe (<App>/foto/<id der Einreichung>/einreichung, Range, nur mit view_submissions)',
           }
     GalleryAlbumInput:
       type: object
       properties:
         title: { type: string, maxLength: 120 }
         year: { type: integer, minimum: 1800, description: höchstens das nächste Jahr }
+        translations: { $ref: '#/components/schemas/TitleTranslationsInput' }
     GalleryAdminAlbum:
       type: object
       required: [id, title, year, source, uploads, drive_photos]
@@ -8800,8 +10181,13 @@ components:
         title: { type: string }
         year: { type: string }
         source: { type: string, enum: [app, drive], description: 'app: nur in der App; drive: aus Google Drive' }
+        editable: { type: boolean, description: 'In der App änderbar: Alben der App, mit Google Drive als Ablage auch aus Drive' }
         uploads: { type: integer, description: Anzahl hochgeladener Bilder }
         drive_photos: { type: integer, description: Anzahl Bilder aus Drive }
+        translations:
+          type: object
+          description: 'Mit weiteren Sprachen, zum Bearbeiten: Titel je Sprache (alle eingeschalteten, '''' = deutsch)'
+          additionalProperties: { type: object, properties: { title: { type: string } } }
     GalleryAdminAlbumDetail:
       type: object
       required: [id, title, year, source, uploads]
@@ -8810,6 +10196,10 @@ components:
         title: { type: string }
         year: { type: string }
         source: { type: string, enum: [app, drive] }
+        translations:
+          type: object
+          description: 'Mit weiteren Sprachen, zum Bearbeiten: Titel je Sprache (alle eingeschalteten, '''' = deutsch)'
+          additionalProperties: { type: object, properties: { title: { type: string } } }
         uploads:
           type: array
           items:
@@ -8839,6 +10229,8 @@ components:
             connected: { type: boolean, description: OAuth-Verbindung besteht (geht dem Dienstkonto vor) }
             email: { type: string, description: 'Google-Konto der Verbindung, leer wenn unbekannt' }
             calendar_access: { type: boolean, description: wie gallery.calendar_access }
+            write_access:
+              { type: boolean, description: 'Voller Drive-Zugriff (OAuth mit drive); ältere Verbindungen und das Dienstkonto nur lesen' }
             service_account_email: { type: string }
             last_result:
               type: [object, 'null']
@@ -8869,14 +10261,29 @@ components:
             google_api_key_set: { type: boolean }
             calendar_ids: { type: string }
             cache_minutes: { type: integer }
+            responses: { type: boolean, description: 'Zu- und Absagen bei Terminen eingeschaltet (calendar_responses, Vorgabe aus)' }
+            response_reminder: { type: boolean, description: An Zu- und Absage erinnern (Standard an) }
+            response_reminder_days: { type: integer, minimum: 1, maximum: 30, description: Vorlauf in Tagen vor Beginn (Standard 3) }
         gallery:
           type: object
           properties:
             configured: { type: boolean, description: 'Quelle server immer, Quelle drive mit Zugang und Ordner' }
             root: { type: string }
             source: { type: string, enum: [drive, server] }
-            store: { type: string, enum: [server] }
+            store:
+              type: string
+              enum: [server, drive]
+              description: 'Ablageort hochgeladener Bilder und Einreichungen: drive mit Drive als Quelle und write_access, sonst server'
             media_bytes: { type: integer, description: Belegter Platz der hochgeladenen Bilder in Bytes }
+            drive:
+              type: object
+              description: Ablage in Google Drive (GalleryDriveService)
+              required: [active, needs_reconnect, waiting, error]
+              properties:
+                active: { type: boolean, description: 'Neue Dateien landen in Drive' }
+                needs_reconnect: { type: boolean, description: 'Drive ist die Quelle, die Verbindung darf aber nur lesen' }
+                waiting: { type: integer, description: 'Dateien, die noch auf dem Server auf Drive warten' }
+                error: { type: string, description: 'Letzter Fehler beim Übertragen, leer ohne' }
             downloads: { type: boolean, description: 'Knöpfe zum Herunterladen in der Galerie (Einstellung gallery_downloads)' }
             submissions: { type: boolean, description: 'Einreichen durch Mitglieder erlaubt (Einstellung gallery_submissions)' }
             service_account_email: { type: string, description: wie google.service_account_email (für ältere Fassungen der App) }
@@ -8908,6 +10315,13 @@ components:
           properties:
             imprint_url: { type: string }
             privacy_url: { type: string }
+        languages:
+          type: object
+          description: 'Sprachen der App: eingeschaltete (die Basissprache immer, zuerst) und mögliche'
+          required: [enabled, available]
+          properties:
+            enabled: { type: array, items: { type: string, enum: [de, en] } }
+            available: { type: array, items: { type: string, enum: [de, en] } }
 
     Level:
       type: string
@@ -8963,6 +10377,7 @@ components:
                     [
                       member,
                       calendar,
+                      respond_calendar,
                       view_intern,
                       view_events,
                       view_news,
@@ -8983,31 +10398,51 @@ components:
                       view_board,
                       view_ranks,
                       view_catalog,
+                      view_points,
                       manage_points,
+                      view_penalties,
                       manage_penalties,
+                      view_promotions,
                       manage_ranks,
+                      view_titles,
                       manage_titles,
+                      view_attendance,
                       manage_attendance,
                       manage_events,
+                      view_responses,
                       manage_calendar,
+                      view_restricted_documents,
                       manage_documents,
+                      view_board_history,
                       post_board,
+                      view_poll_results,
                       manage_polls,
+                      view_inventory,
                       manage_inventory,
                       manage_offices,
+                      view_lists,
                       manage_lists,
+                      view_mail,
                       send_mail,
                       manage_sponsors,
+                      view_company_members,
                       manage_companies,
                       submit_gallery,
+                      view_submissions,
                       review_gallery,
                       manage_gallery,
                       manage_pages,
+                      manage_website,
                       manage_news,
                       view_personal,
                       manage_personal,
+                      view_accounts,
                       create_users,
+                      manage_former,
+                      view_passive,
+                      manage_passive,
                       promote_users,
+                      view_reports,
                       review_reports,
                       view_activity,
                       view_changes,
@@ -9023,6 +10458,11 @@ components:
                 description: 'guest, member und admin: nicht löschbar; bei guest und member nur die Rechte zum Sehen änderbar, bei admin keine',
               }
             deletable: { type: boolean, description: 'false für guest, member und admin' }
+            admission_extra: { type: boolean, description: 'Anwärter-Rolle (als Grund- oder Zusatzrolle, auch mit Mitgliederbereich)' }
+            admission_kind: { type: [string, 'null'], description: 'Frühere Form (Teilnahmen einer Art UND Dauer); null/0, wenn admission_rule mehr ausdrückt' }
+            admission_count: { type: integer }
+            admission_months: { type: integer }
+            admission_rule: { $ref: '#/components/schemas/AdmissionRule' }
 
     RoleInput:
       type: object
@@ -9037,6 +10477,7 @@ components:
                 [
                   member,
                   calendar,
+                  respond_calendar,
                   view_intern,
                   view_events,
                   view_news,
@@ -9057,31 +10498,51 @@ components:
                   view_board,
                   view_ranks,
                   view_catalog,
+                  view_points,
                   manage_points,
+                  view_penalties,
                   manage_penalties,
+                  view_promotions,
                   manage_ranks,
+                  view_titles,
                   manage_titles,
+                  view_attendance,
                   manage_attendance,
                   manage_events,
+                  view_responses,
                   manage_calendar,
+                  view_restricted_documents,
                   manage_documents,
+                  view_board_history,
                   post_board,
+                  view_poll_results,
                   manage_polls,
+                  view_inventory,
                   manage_inventory,
                   manage_offices,
+                  view_lists,
                   manage_lists,
+                  view_mail,
                   send_mail,
                   manage_sponsors,
+                  view_company_members,
                   manage_companies,
                   submit_gallery,
+                  view_submissions,
                   review_gallery,
                   manage_gallery,
                   manage_pages,
+                  manage_website,
                   manage_news,
                   view_personal,
                   manage_personal,
+                  view_accounts,
                   create_users,
+                  manage_former,
+                  view_passive,
+                  manage_passive,
                   promote_users,
+                  view_reports,
                   review_reports,
                 ],
             }
@@ -9089,6 +10550,92 @@ components:
         points_factor: { type: [number, string], description: 'Zwischen 0 und 10, z. B. 0.5 oder "0,5"' }
         new_accounts: { type: boolean, description: 'Nur eigene Rollen: beim Anlegen von Konten wählbar' }
         promotable: { type: boolean, description: 'Nur eigene Rollen ohne member: als Mitglied aufnehmen mit create_users' }
+        admission_extra:
+          {
+            type: boolean,
+            description: 'Nur eigene Rollen: Anwärter-Rolle als Grund- oder Zusatzrolle; bei der Aufnahme wird die Grundrolle zu member, die Zusatzrolle entfernt',
+          }
+        admission_kind:
+          {
+            type: [string, 'null'],
+            description: 'Voraussetzung für die Aufnahme: Terminart (eine aus /config eventKinds; leer oder null für keine)',
+          }
+        admission_count:
+          {
+            type: [integer, string],
+            description: 'Mindestens so viele Teilnahmen (present) an Listen dieser Art, 0–100; > 0 nur mit admission_kind',
+          }
+        admission_months: { type: [integer, string], description: 'Mindestens so viele Monate seit „Anwärter seit“, 0–120' }
+        admission_rule:
+          description: 'Voraussetzung als Baum; geht admission_kind/count/months vor. null oder leere Gruppe: keine Voraussetzung'
+          oneOf:
+            - $ref: '#/components/schemas/AdmissionRule'
+            - type: 'null'
+
+    AdmissionRule:
+      type: object
+      description: |
+        Voraussetzung für die Aufnahme (Domain\AdmissionRule): ein Knoten. Gruppe `{type: group, op: and|or, items}` (UND: alle,
+        ODER: eine reicht; beliebig tief, leere Gruppen fallen weg), Teilnahmen `{type: attendance, kind, count}` (1–100 Mal
+        present an Listen der Terminart), Dauer `{type: duration, months}` (1–120 Monate seit „Anwärter seit“). Höchstens 20
+        Bedingungen und 20 Gruppen unter der obersten. Die oberste Ebene ist immer eine Gruppe.
+      required: [type]
+      properties:
+        type: { type: string, enum: [group, attendance, duration] }
+        op: { type: string, enum: [and, or] }
+        items: { type: array, items: { $ref: '#/components/schemas/AdmissionRule' } }
+        kind: { type: string }
+        count: { type: [integer, string] }
+        months: { type: [integer, string] }
+
+    AdmissionRuleResult:
+      type: object
+      description: |
+        Ausgewertete Voraussetzung einer Person: jeder Knoten wie in `AdmissionRule` mit `status` (fulfilled, open, unknown =
+        Dauer ohne „Anwärter seit“) und `on` (Tag, an dem er erfüllt wurde: UND das späteste, ODER das früheste der erfüllten).
+        Teilnahmen zusätzlich mit `attended` und `missing`, Dauer mit `due` (Tag, ab dem sie erfüllt ist).
+      required: [type, status, 'on']
+      properties:
+        type: { type: string, enum: [group, attendance, duration] }
+        status: { type: string, enum: [fulfilled, open, unknown] }
+        'on': { type: [string, 'null'] }
+        op: { type: string, enum: [and, or] }
+        items: { type: array, items: { $ref: '#/components/schemas/AdmissionRuleResult' } }
+        kind: { type: string }
+        count: { type: integer }
+        attended: { type: integer }
+        missing: { type: integer }
+        months: { type: integer }
+        due: { type: [string, 'null'] }
+        soon:
+          type: boolean
+          description: 'Erfüllt oder bald erfüllt (Teilnahmen: höchstens 1 fehlt; Dauer: in höchstens 30 Tagen erreicht; UND: alle Teile, ODER: einer)'
+
+    Admission:
+      type: object
+      description: Stand eines Anwärters für die Aufnahme als Mitglied (Domain\AdmissionService)
+      required: [id, name, role, role_key, way, since, kind, count, months, attended, missing, months_on, fulfilled_on, status]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        role: { type: string, description: Bezeichnung der Anwärter-Rolle }
+        role_key: { $ref: '#/components/schemas/Level' }
+        way: { type: string, enum: [base, extra], description: 'base: Grundrolle wird member; extra: diese Zusatzrolle wird entfernt' }
+        since: { type: [string, 'null'], description: 'Anwärter seit (JJJJ-MM-TT); null, wenn unbekannt' }
+        kind: { type: [string, 'null'], description: Terminart der ersten Bedingung „Teilnahmen“ (für ältere Oberflächen) }
+        count: { type: integer, description: Nötige Teilnahmen der ersten Bedingung „Teilnahmen“ (0 keine) }
+        months: { type: integer, description: Mindestdauer der ersten Bedingung „Dauer“ in Monaten (0 keine) }
+        attended: { type: integer, description: 'Teilnahmen (present) an Listen der Art bis heute, auch vor since' }
+        missing: { type: integer }
+        months_on: { type: [string, 'null'], description: Tag, ab dem die erste Mindestdauer erfüllt ist }
+        fulfilled_on: { type: [string, 'null'], description: Tag, an dem alles erfüllt war }
+        status: { type: string, enum: [fulfilled, open, none], description: 'none: Rolle ohne Voraussetzung' }
+        soon: { type: boolean, description: 'Noch nicht erfüllt, aber kurz davor (status open, result.soon); unter „Bald erfüllt“ und im zweiten Kreis der Kachel' }
+        result:
+          description: Ausgewertete Voraussetzung; null ohne Voraussetzung
+          oneOf:
+            - $ref: '#/components/schemas/AdmissionRuleResult'
+            - type: 'null'
 
     AppUser:
       type: object
@@ -9100,6 +10647,8 @@ components:
         level: { $ref: '#/components/schemas/Level' }
         extra_roles: { $ref: '#/components/schemas/ExtraRoles' }
         photo_url: { $ref: '#/components/schemas/PhotoUrl' }
+        locale:
+          { type: [string, 'null'], enum: [de, en, null], description: 'Sprache am Konto (PUT /me/locale); null = nichts gewählt' }
         create_roles:
           type: array
           items: { $ref: '#/components/schemas/Level' }
@@ -9116,32 +10665,53 @@ components:
               [
                 member,
                 calendar,
+                respond_calendar,
                 view_intern,
+                view_points,
                 manage_points,
+                view_penalties,
                 manage_penalties,
+                view_promotions,
                 manage_ranks,
+                view_titles,
                 manage_titles,
+                view_attendance,
                 manage_attendance,
                 manage_events,
+                view_responses,
                 manage_calendar,
+                view_restricted_documents,
                 manage_documents,
+                view_board_history,
                 post_board,
+                view_poll_results,
                 manage_polls,
+                view_inventory,
                 manage_inventory,
                 manage_offices,
+                view_lists,
                 manage_lists,
+                view_mail,
                 send_mail,
                 manage_sponsors,
+                view_company_members,
                 manage_companies,
                 submit_gallery,
+                view_submissions,
                 review_gallery,
                 manage_gallery,
                 manage_pages,
+                manage_website,
                 manage_news,
                 view_personal,
                 manage_personal,
+                view_accounts,
                 create_users,
+                manage_former,
+                view_passive,
+                manage_passive,
                 promote_users,
+                view_reports,
                 review_reports,
                 view_activity,
                 view_changes,
@@ -9181,6 +10751,8 @@ components:
         majorVersion: { type: string }
         withdrawn: { type: boolean, description: Die installierte Version wurde zurückgezogen }
         fallback: { type: [string, 'null'], description: 'Bei withdrawn: Ziel des automatischen Wechsels; null = keins vorhanden' }
+        maintenance: { type: [string, 'null'], description: 'Wartungsabo laut Update-Liste: letzter Tag (JJJJ-MM-TT, UTC) oder „unbefristet“; null = keine Angabe' }
+        maintenanceEnded: { type: boolean, description: 'Das Wartungsabo ist abgelaufen; neue Versionen gibt es erst nach einer Verlängerung' }
         skipped: { type: boolean, description: 'latest wird nach dem Zurückrollen nicht automatisch eingespielt' }
         autoAllowed: { type: boolean, description: 'Automatische Updates sind hier erlaubt (WordPress kann sie sperren)' }
         problems: { type: array, items: { type: string }, description: Gründe, warum die neue Version hier nicht läuft }
@@ -9237,6 +10809,14 @@ components:
         version: { type: string, description: 'Version der Installation, z. B. 1.4.0.3' }
         variant: { type: string, enum: [wordpress, standalone], description: Art der Installation }
         siteUrl: { type: [string, 'null'], description: Startseite der Webseite, falls vorhanden }
+        languages:
+          type: array
+          items: { type: string, enum: [de, en] }
+          description: 'Sprachen, die die App anbietet (Einstellung des Admins), die Basissprache zuerst; nur sie = kein Umschalter'
+        base_language:
+          type: string
+          enum: [de, en]
+          description: 'Basissprache der Kompanie (kompanie.json „language“, beim Anlegen gewählt): Sprache der Inhalte und eigenen Namen, Vorgabe ohne eigene Wahl'
         handbookUrl:
           {
             type: [string, 'null'],
@@ -9250,12 +10830,40 @@ components:
             imprint: { type: [string, 'null'] }
             privacy: { type: [string, 'null'] }
         reports: { type: boolean, description: 'Fehler melden möglich (Knopf „Fehler melden“); Meldungen gehen zuerst an die Admins' }
-        openReports: { type: [integer, 'null'], description: 'Offene Fehlermeldungen; nur für Angemeldete mit review_reports, sonst null' }
+        openReports: { type: [integer, 'null'], description: 'Offene Fehlermeldungen; nur für Angemeldete mit view_reports, sonst null' }
         registration: { type: boolean, description: 'Zugang beantragen eingeschaltet (Issue #314): Link „Zugang beantragen“ für Gäste' }
         pendingRegistrations:
-          { type: [integer, 'null'], description: 'Offene Anfragen auf einen Zugang; nur für Angemeldete mit create_users, sonst null' }
+          { type: [integer, 'null'], description: 'Offene Anfragen auf einen Zugang; nur für Angemeldete mit view_accounts, sonst null' }
+        admissionsDue:
+          type: [integer, 'null']
+          description: 'Anwärter, die die Voraussetzung für die Aufnahme erfüllen (Kachel „Aufnahmen“); nur für view_accounts mit Bereich Anwesenheit (auch ohne Anwärter-Rolle, dann 0), sonst null'
+        admissionsSoon:
+          type: [integer, 'null']
+          description: 'Anwärter kurz vor der Aufnahme (noch nicht erfüllt, siehe Admission.soon; zweiter Kreis an der Kachel „Aufnahmen“); wie admissionsDue nur für view_accounts mit Bereich Anwesenheit, sonst null'
         gallerySubmissions:
-          { type: boolean, description: 'Galerie an und Einreichen erlaubt (Einstellung gallery_submissions): sonst kein Knopf zum Einreichen' }
+          {
+            type: boolean,
+            description: 'Galerie an und Einreichen erlaubt (Einstellung gallery_submissions): sonst kein Knopf zum Einreichen',
+          }
+        eventResponses:
+          {
+            type: boolean,
+            description: 'Interner Kalender an und Zu- und Absagen eingeschaltet (Einstellung calendar_responses): sonst keine Knöpfe und kein Anmeldeschluss',
+          }
+        eventKinds:
+          type: array
+          items: { type: string }
+          description: 'Terminarten (Einstellungen → Kalender, `PUT /admin/event-kinds`) zur Auswahl am Termin und an Anwesenheitslisten; leer ohne Kalender und Anwesenheit'
+        eventKindsHidden:
+          type: array
+          items: { type: string }
+          description: 'Terminarten ohne Schild neben dem Titel des Termins (Einstellungen → Kalender, `hidden` in `PUT /admin/event-kinds`); leer = alle mit Schild'
+        caredPassives:
+          {
+            type: integer,
+            minimum: 0,
+            description: 'Wie viele Passive die angemeldete Person betreut (Meins → Meine Passiven); 0 ohne Anmeldung oder ohne den Bereich passive',
+          }
         setupPending: { type: boolean, description: 'Nur für Admins true: Einrichtungsassistent noch nicht abgeschlossen' }
         backupUrl:
           {
@@ -9264,7 +10872,12 @@ components:
           }
         maintenance: { $ref: '#/components/schemas/MaintenanceInfo' }
         navigation:
-          description: 'Einrichtbare Navigation (Issue #277, Einstellungen → Navigation), für alle; null = Standardnavigation'
+          description: 'Einrichtbare Navigation (Issue #277, Einstellungen → Navigation), für Angemeldete und ohne eigene Leiste für Gäste auch für sie; null = Standardnavigation'
+          oneOf:
+            - $ref: '#/components/schemas/Navigation'
+            - type: 'null'
+        navigation_guest:
+          description: 'Eigene Leiste für Gäste: ohne Anmeldung und mit der Grundrolle Gast (auch in der Vorschau); null = dieselbe wie navigation'
           oneOf:
             - $ref: '#/components/schemas/Navigation'
             - type: 'null'
@@ -9273,13 +10886,33 @@ components:
         navigation_labels: { type: boolean, description: 'Namen unter den Symbolen der Leiste (Issue #362)' }
         navigation_intern_order: { $ref: '#/components/schemas/NavigationInternOrder' }
         admin_order: { $ref: '#/components/schemas/AdminOrder' }
+        tile_layouts:
+          description: 'Eigene Anordnung der Kacheln: Seite => TileLayouts (leer als {}); null ohne Anmeldung und in der Vorschau'
+          oneOf:
+            - { type: object, additionalProperties: { $ref: '#/components/schemas/TileLayouts' } }
+            - type: 'null'
+        tile_defaults:
+          description: 'Vorgabe des Admins für die Anordnung der Kacheln: Seite => TileLayouts (leer als {}); gilt ohne eigene Anordnung'
+          type: object
+          additionalProperties: { $ref: '#/components/schemas/TileLayouts' }
         section_labels:
           type: object
           description: 'Eigene Namen als Abschnitte der Bezeichnungen (z. B. gallery, catalog, intern), gehen vor kompanie.json (Issue #362). Leer kommt als [] an.'
           additionalProperties: { type: string }
+        section_labels_i18n:
+          type: object
+          description: 'Dieselben Namen je weiterer eingeschalteter Sprache (Sprache => Abschnitt => Name): der für diese Sprache eingetragene, sonst der deutsche. Ohne weitere Sprache leer.'
+          additionalProperties:
+            type: object
+            additionalProperties: { type: string }
+        name_translations:
+          $ref: '#/components/schemas/NameTranslations'
         newsInApp:
           type: boolean
           description: 'News werden in der App geschrieben (Quelle app, Bereich news an); wer manage_news hat, sieht die Knöpfe dazu'
+        newsEditorUrl:
+          type: [string, 'null']
+          description: 'WordPress, Quelle site, mit manage_news: Adresse des Editors von WordPress für einen neuen Beitrag (Knopf „Neuer Beitrag“); null ohne das Recht oder mit anderen Quellen. Das Recht gibt in WordPress die Rechte für alle Beiträge (keine Seiten).'
         calendarInApp:
           type: boolean
           description: 'Der interne Kalender wird in der App gepflegt (Quelle app, Bereich calendar an); wer manage_calendar hat, sieht den Knopf dazu'
@@ -9292,6 +10925,7 @@ components:
             properties:
               id: { type: integer }
               title: { type: string }
+              title_i18n: { type: object, additionalProperties: { type: string }, description: 'Titel je weiterer Sprache, soweit eingetragen' }
         birthdays:
           type: [object, 'null']
           description: 'Geburtstage (Issue #1): Vorlauf der Karte „Anstehende Geburtstage“ in Tagen (Einstellungen → Geburtstage); null ohne den Bereich'
@@ -9300,11 +10934,16 @@ components:
             upcomingDays: { type: integer, minimum: 0, maximum: 30 }
         preview:
           type: [object, 'null']
-          description: 'Vorschau „App als Rolle ansehen“ (Issue #63), vom Server bestätigt; null ohne (gültige) Vorschau. user, capabilities und features sind dann die der Rolle.'
+          description: 'Vorschau „App als Rolle ansehen“ (Issue #63), vom Server bestätigt; null ohne (gültige) Vorschau. user, capabilities und features sind dann die der Rolle bzw. der Person (user.id bleibt die des Admins).'
           required: [role, label]
           properties:
-            role: { type: string, description: 'Schlüssel der Rolle oder @public (ohne Anmeldung)' }
-            label: { type: string }
+            role: { type: string, description: 'Schlüssel der Rolle, @person:<ID> oder @public (ohne Anmeldung)' }
+            label: { type: string, description: 'Bezeichnung der Rolle bzw. Name der Person' }
+            person: { type: integer, description: 'Nur als Person: ihre ID' }
+            roles:
+              type: array
+              items: { type: string }
+              description: 'Nur als Person: Bezeichnungen ihrer Grundrolle und Zusatzrollen'
         csrf:
           type: object
           required: [header, token, refreshUrl]
@@ -9354,6 +10993,8 @@ components:
             companies: { type: boolean }
             sponsors: { type: boolean }
             pages: { type: boolean }
+            website: { type: boolean, description: 'Webseite (Issue #273); nur in der eigenständigen Version, sonst immer false' }
+            passive: { type: boolean, description: 'Passive: interne Liste passiver Mitglieder ohne Konto' }
         user:
           oneOf:
             - $ref: '#/components/schemas/AppUser'
@@ -9429,6 +11070,49 @@ components:
         location: { type: string }
         description: { type: string }
         url: { type: string, description: 'Nur bei Terminen, die in der App gepflegt werden (Quelle app)' }
+        respond_until:
+          {
+            type: [string, 'null'],
+            format: date,
+            description: 'Nur Quelle app: Anmeldeschluss (Zu- und Absagen bis zum Ende dieses Tages)',
+          }
+        responses:
+          type: object
+          description: Zu- und Absagen (nur in `GET /calendar` und den Antworten der Rückmeldung); fehlt, solange Zu- und Absagen ausgeschaltet sind
+          properties:
+            key:
+              {
+                type: string,
+                description: 'Stabile Kennung für Zu- und Absagen: bleibt bei iCal gleich, wenn der Termin verschoben wird (die `id` ändert sich dann); gilt überall, wo `{key}` steht',
+              }
+            mine: { type: [string, 'null'], enum: ['yes', 'no', null], description: Eigene Rückmeldung }
+            note: { type: string, description: Eigener Hinweis }
+            'yes': { type: integer, description: 'Zusagen (von allen, die zusagen dürfen)' }
+            'no': { type: integer, description: Absagen }
+            until: { type: string, description: 'ISO 8601: bis dahin änderbar (Beginn bzw. Ende des Anmeldeschlusses)' }
+            open: { type: boolean, description: Noch änderbar }
+            can_respond: { type: boolean, description: 'Hat respond_calendar' }
+            can_list: { type: boolean, description: 'Hat view_responses: sieht die Namen (`GET /calendar/{key}/responses`)' }
+        kind: { type: [string, 'null'], description: 'Erste Terminart (nur in `GET /calendar`), z. B. Versammlung' }
+        kinds:
+          type: array
+          items: { type: string }
+          description: 'Alle Terminarten (nur in `GET /calendar`), sortiert wie in den Einstellungen; leer ohne'
+        kind_suggestion:
+          type: [string, 'null']
+          description: 'Nur mit manage_calendar und ohne gesetzte Art: längster Vorschlag aus dem Titel (zählt erst gespeichert)'
+        kind_suggestions:
+          type: array
+          items: { type: string }
+          description: 'Nur mit manage_calendar und ohne gesetzte Art: alle Vorschläge aus dem Titel'
+
+    EventResponsePerson:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        note: { type: string }
+        late: { type: boolean, description: 'Vor dem Ende der Frist getippt, erst danach angekommen (nachträglich übertragen)' }
 
     PublicEvent:
       type: object
@@ -9445,6 +11129,22 @@ components:
         end_date: { type: [string, 'null'] }
         end_time: { type: [string, 'null'] }
         url: { type: string }
+        respond_until:
+          { type: [string, 'null'], format: date, description: 'Nur Termine des internen Kalenders (`/calendar/entries`): Anmeldeschluss' }
+        untranslated:
+          { type: string, enum: [all, some], description: 'In einer weiteren Sprache, wenn dort Titel, Ort oder Beschreibung fehlt (dann deutsch)' }
+        translations:
+          type: object
+          description: 'Nur zum Bearbeiten (`?source=1`, `/calendar/entries`, Antwort auf POST und PATCH, mit weiterer Sprache): deutsche Fassung oben, hier die Fassungen je weiterer Sprache'
+          additionalProperties: { $ref: '#/components/schemas/EventTranslation' }
+
+    EventTranslation:
+      type: object
+      description: 'Fassung eines Termins in einer weiteren Sprache; leer = deutsch. Datum, Zeit und Link gelten für alle Sprachen.'
+      properties:
+        title: { type: string, maxLength: 191 }
+        location: { type: string, maxLength: 191 }
+        description: { type: string }
 
     EventInput:
       type: object
@@ -9458,6 +11158,12 @@ components:
         location: { type: string }
         description: { type: string }
         url: { type: string }
+        respond_until:
+          { type: string, description: 'Nur `/calendar/entries`: Anmeldeschluss YYYY-MM-DD, höchstens der Tag des Beginns, oder leer' }
+        translations:
+          type: object
+          description: 'Fassungen je weiterer eingeschalteter Sprache (nicht de, sonst → 400); nur die genannten Felder ändern sich, leeres Feld = deutsch. Antwort von POST und PATCH: die deutsche Fassung mit translations.'
+          additionalProperties: { $ref: '#/components/schemas/EventTranslation' }
 
     NewsItem:
       type: object
@@ -9479,6 +11185,17 @@ components:
         cover_uid: { type: [string, 'null'], description: 'Nur Einzelansicht, Quelle app: Kennung des Titelbilds, für PATCH' }
         updated_at: { type: [string, 'null'], description: 'Nur Einzelansicht, Quelle app, mit manage_news: Stand für PATCH' }
         updated_by_name: { type: [string, 'null'], description: 'Nur Einzelansicht, Quelle app, mit manage_news' }
+        edit_url:
+          {
+            type: [string, 'null'],
+            description: 'Nur Einzelansicht, WordPress mit Quelle site, mit manage_news: Adresse des Beitrags im Editor von WordPress',
+          }
+        untranslated:
+          { type: string, enum: [all, some], description: 'In einer weiteren Sprache (X-Kompanie-Lang), wenn dort etwas fehlt (dann deutsch). Quelle app: nur Einzelansicht. Beiträge der WordPress-Seite: all ohne veröffentlichte Übersetzung in Polylang (ohne Polylang immer). Andere Webseite oder RSS: immer all' }
+        translations:
+          type: object
+          description: 'Nur mit source bzw. nach PATCH mit translations: Fassungen je weiterer Sprache'
+          additionalProperties: { $ref: '#/components/schemas/ContentTranslation' }
 
     GalleryAlbumSummary:
       type: object
@@ -9486,6 +11203,7 @@ components:
         id: { type: integer }
         title: { type: string }
         source: { type: string, enum: [app, drive], description: 'Album der App (in der App änderbar) oder aus Google Drive' }
+        editable: { type: boolean, description: 'In der App änderbar: Alben der App, mit Google Drive als Ablage auch aus Drive' }
         count: { type: integer, description: Bilder und Videos zusammen }
         video_count: { type: integer, description: davon Videos }
         intern_count: { type: integer }
@@ -9545,6 +11263,7 @@ components:
             type: boolean,
             description: 'In der App hochgeladen (auch über Einreichungen): intern/öffentlich mit PATCH /gallery/photos/{id} umstellbar',
           }
+        editable: { type: boolean, description: 'In der App verschieben, intern stellen und löschen (upload oder Google Drive als Ablage)' }
         name: { type: string }
         ready:
           type: boolean
@@ -9557,11 +11276,17 @@ components:
         title: { type: string }
         year: { type: string }
         source: { type: string, enum: [app, drive], description: 'Album der App (in der App änderbar) oder aus Google Drive' }
+        editable: { type: boolean, description: 'In der App änderbar: Alben der App, mit Google Drive als Ablage auch aus Drive' }
         downloads:
           type: boolean
           description: |
             Knöpfe zum Herunterladen zeigen (Einstellung `gallery_downloads`): je Bild in der Großansicht und das Album als ZIP.
             Die App lädt dafür bei Bildern `original` (sonst `large`), bei Videos `video` in Ausschnitten mit Range, und packt das ZIP selbst.
+        cover_id:
+          type: [integer, 'null']
+          description: |
+            In der App gewähltes Titelbild (PUT /gallery/albums/{id}/cover), wenn es in diesem Album für den Betrachter zu sehen
+            ist; null: Die Übersicht wählt automatisch. Ein internes Titelbild bekommen Gäste nie (dann null).
         photos:
           type: array
           items: { $ref: '#/components/schemas/GalleryPhoto' }
@@ -9585,24 +11310,25 @@ components:
             type: [string, 'null'],
             description: 'Gruppe im Zähler über der Liste, wie in der Anwesenheit (Einstellung attendance_groups); null bei Gästen',
           }
-        points: { type: [number, 'null'], description: 'Summe mit Punktefaktor, höchstens zwei Nachkommastellen; null ohne manage_points' }
-        open_cents: { type: [integer, 'null'], description: 'null ohne manage_penalties' }
+        points: { type: [number, 'null'], description: 'Summe mit Punktefaktor, höchstens zwei Nachkommastellen; null ohne view_points' }
+        open_cents: { type: [integer, 'null'], description: 'null ohne view_penalties' }
         rank_title:
           {
             type: [string, 'null'],
             description: 'Aktueller Dienstgrad (nur mit Bereich Dienstgrade; für alle mit Zugang zur Mitgliederliste)',
           }
+        rank_id: { type: [integer, 'null'], description: 'ID des Dienstgrads (wie rank_title), für seinen Namen in einer weiteren Sprache' }
         rank_badge_url: { $ref: '#/components/schemas/BadgeUrl' }
         photo_url: { $ref: '#/components/schemas/PhotoUrl' }
         titles:
-          description: Titel in der Reihenfolge der Titelliste (nur mit Bereich Titel und Recht manage_titles)
+          description: Titel in der Reihenfolge der Titelliste (nur mit Bereich Titel und Recht view_titles)
           type: array
           items: { $ref: '#/components/schemas/TitleRef' }
         joined_on:
-          description: Eintritt als JJJJ-MM-TT oder nur das Jahr JJJJ (unabhängig von der Anzeige auf der eigenen Seite), leer ohne Eintrag; nur mit Recht create_users
+          description: Eintritt als JJJJ-MM-TT oder nur das Jahr JJJJ (unabhängig von der Anzeige auf der eigenen Seite), leer ohne Eintrag; nur mit Recht view_accounts
           type: string
         no_access:
-          description: 'Mitglied ohne Zugang (meldet sich noch nicht an, z. B. für Chroniken angelegt); nur mit Recht create_users, auch in GET /members/{id}'
+          description: 'Mitglied ohne Zugang (meldet sich noch nicht an, z. B. für Chroniken angelegt); nur mit Recht view_accounts, auch in GET /members/{id}'
           type: boolean
 
     DirectoryEntry:
@@ -9620,6 +11346,7 @@ components:
           type: [string, 'null']
         photo_url: { $ref: '#/components/schemas/PhotoUrl' }
         rank_title: { type: [string, 'null'], description: 'Aktueller Dienstgrad (nur mit Bereich Dienstgrade)' }
+        rank_id: { type: [integer, 'null'], description: 'ID des Dienstgrads (wie rank_title), für seinen Namen in einer weiteren Sprache' }
         rank_badge_url: { $ref: '#/components/schemas/BadgeUrl' }
         titles:
           description: Titel in der Reihenfolge der Titelliste (nur mit Bereich Titel)
@@ -9706,16 +11433,16 @@ components:
             penalties:
               type: array
               items: { $ref: '#/components/schemas/Penalty' }
-            rank: { $ref: '#/components/schemas/RankStatus', description: 'Stand mit Fortschritt (nur mit Recht manage_ranks)' }
+            rank: { $ref: '#/components/schemas/RankStatus', description: 'Stand mit Fortschritt (nur mit Recht view_promotions)' }
             rank_history:
               type: array
               items: { $ref: '#/components/schemas/RankHistoryEntry' }
             titles:
-              description: Titel (nur mit Bereich Titel und Recht manage_titles)
+              description: Titel (nur mit Bereich Titel und Recht view_titles)
               type: array
               items: { $ref: '#/components/schemas/TitleRef' }
             companies:
-              description: Kompanien (nur mit Bereich Kompanien und Recht manage_companies)
+              description: Kompanien (nur mit Bereich Kompanien und Recht view_company_members)
               type: array
               items: { $ref: '#/components/schemas/CompanyRef' }
             birthday:
@@ -9728,24 +11455,53 @@ components:
               allOf:
                 - $ref: '#/components/schemas/PersonalInfo'
             join_year:
-              description: Eintrittsjahr mit Anzeige (nur mit Recht create_users; null ohne Eintrag)
+              description: Eintrittsjahr mit Anzeige (nur mit Recht view_accounts, ändern mit create_users; null ohne Eintrag)
               oneOf:
                 - $ref: '#/components/schemas/JoinYear'
                 - type: 'null'
             rights:
               description: |
                 Ausnahmen bei den Rechten (`PUT /members/{id}/rights`); null für Admins, Gäste, sich selbst und wenn der
-                Betrachter sie nicht ändern darf.
+                Betrachter sie nicht sehen darf (view_accounts, Grenzen wie beim Ändern). Ohne promote_users ist
+                `editable` leer.
               oneOf:
                 - $ref: '#/components/schemas/MemberRights'
                 - type: 'null'
             photo_editable:
-              { type: boolean, description: 'Ob der Betrachter das Foto ändern darf (create_users und dieses Konto verwalten)' }
+              {
+                type: boolean,
+                description: 'Ob der Betrachter das Foto ändern darf (create_users, bei Ehemaligen auch manage_former, und dieses Konto verwalten)',
+              }
             former:
               description: Ehemalig (Grund, Eintritt, Ausscheiden); null, wenn die Person nicht ehemalig ist
               oneOf:
                 - $ref: '#/components/schemas/FormerInfo'
                 - type: 'null'
+            admission:
+              description: Stand als Anwärter (nur für view_accounts); null, wenn die Person kein Anwärter ist
+              oneOf:
+                - $ref: '#/components/schemas/Admission'
+                - type: 'null'
+            attendance:
+              description: |
+                Anwesenheit der Person (nur mit Bereich Anwesenheit und Recht view_attendance): gespeicherte Einträge,
+                jüngste Termine zuerst, und Summen über alle. Eine Absage, die eine Liste nur vorschlägt, fehlt, bis die
+                Liste gespeichert ist. Einträge nach `today` sind kommende Termine (dort nur `excused` möglich).
+              type: object
+              required: [today, entries, counts]
+              properties:
+                today: { type: string, format: date, description: Heute in der Zeitzone der Kompanie }
+                entries:
+                  type: array
+                  items:
+                    type: object
+                    required: [list_id, title, date, status]
+                    properties:
+                      list_id: { type: integer }
+                      title: { type: string }
+                      date: { type: string, format: date }
+                      status: { $ref: '#/components/schemas/AttendanceStatus' }
+                counts: { $ref: '#/components/schemas/AttendanceCounts' }
 
     FormerReason:
       type: string
@@ -9913,32 +11669,53 @@ components:
         [
           member,
           calendar,
+          respond_calendar,
           view_intern,
+          view_points,
           manage_points,
+          view_penalties,
           manage_penalties,
+          view_promotions,
           manage_ranks,
+          view_titles,
           manage_titles,
+          view_attendance,
           manage_attendance,
           manage_events,
+          view_responses,
           manage_calendar,
+          view_restricted_documents,
           manage_documents,
+          view_board_history,
           post_board,
+          view_poll_results,
           manage_polls,
+          view_inventory,
           manage_inventory,
           manage_offices,
+          view_lists,
           manage_lists,
+          view_mail,
           send_mail,
           manage_sponsors,
+          view_company_members,
           manage_companies,
           submit_gallery,
+          view_submissions,
           review_gallery,
           manage_gallery,
           manage_pages,
+          manage_website,
           manage_news,
           view_personal,
           manage_personal,
+          view_accounts,
           create_users,
+          manage_former,
+          view_passive,
+          manage_passive,
           promote_users,
+          view_reports,
           review_reports,
         ]
 
@@ -9959,7 +11736,7 @@ components:
           type: array
           items: { $ref: '#/components/schemas/GrantableCapability' }
         editable:
-          description: Rechte, die der Betrachter hier ändern darf
+          description: Rechte, die der Betrachter hier ändern darf (leer ohne promote_users, mit view_accounts nur zum Sehen)
           type: array
           items: { $ref: '#/components/schemas/GrantableCapability' }
 
@@ -10018,6 +11795,174 @@ components:
             country: { type: string }
             country_name: { type: string }
 
+    PassiveMember:
+      type: object
+      description: |
+        Ein Passiver (Bereich passive): eigener Eintrag ohne Konto. `address`, `phone`, `email` und `birth_date` nur mit
+        `view_personal` bzw. für den eigenen Betreuer (`GET /me/passive-members`), sonst fehlen sie.
+      required: [id, first_name, last_name, name, caretaker]
+      properties:
+        id: { type: integer }
+        first_name: { type: string }
+        last_name: { type: string }
+        name: { type: string, description: 'Vorname Nachname' }
+        caretaker:
+          description: Mitglied als Betreuer, null ohne
+          oneOf:
+            - type: 'null'
+            - type: object
+              required: [id, name]
+              properties:
+                id: { type: integer }
+                name: { type: string }
+        address:
+          oneOf:
+            - type: 'null'
+            - $ref: '#/components/schemas/Address'
+        phone: { type: string, description: 'Leer, wenn keine hinterlegt ist' }
+        email: { type: string, description: 'Leer, wenn keine hinterlegt ist' }
+        birth_date: { type: [string, 'null'], format: date }
+        joined: { type: string, description: 'Eintritt als freier Text (z. B. „2023“ oder „vor 2014“), leer ohne' }
+        note: { type: string, description: 'Bemerkung, leer ohne' }
+        payments:
+          type: array
+          description: Gezahlte Beiträge, neuestes Jahr zuerst (auch für den Betreuer)
+          items: { $ref: '#/components/schemas/PassivePayment' }
+    PassiveImportResult:
+      type: object
+      required:
+        [
+          headers,
+          header_line,
+          columns,
+          method_columns,
+          ignored,
+          personal,
+          year,
+          paid_on,
+          methods,
+          rows,
+          new,
+          payments,
+          existing,
+          errors,
+          applied,
+        ]
+      properties:
+        headers: { type: array, items: { type: string }, description: 'Zellen der Kopfzeile' }
+        header_line: { type: integer, description: 'Nummer der Kopfzeile ab 1' }
+        columns: { type: object, additionalProperties: { type: integer }, description: 'Feld => Nummer der Spalte ab 0' }
+        method_columns:
+          type: array
+          items:
+            type: object
+            required: [column, method]
+            properties:
+              column: { type: integer }
+              method: { type: string }
+        ignored:
+          type: array
+          items:
+            type: object
+            required: [column, reason]
+            properties:
+              column: { type: string }
+              reason: { type: string }
+        personal: { type: boolean, description: 'Ob persönliche Angaben übernommen werden (manage_personal)' }
+        year: { type: integer }
+        paid_on: { type: string, format: date }
+        methods: { type: array, items: { type: string } }
+        rows:
+          type: array
+          items:
+            type: object
+            required: [line, name, first_name, last_name]
+            properties:
+              line: { type: integer }
+              name: { type: string }
+              first_name: { type: string }
+              last_name: { type: string }
+              existing: { type: boolean }
+              error: { type: string }
+              warnings: { type: array, items: { type: string } }
+              caretaker:
+                oneOf:
+                  - type: 'null'
+                  - type: object
+                    required: [id, name]
+                    properties:
+                      id: { type: integer }
+                      name: { type: string }
+              joined: { type: string }
+              note: { type: string }
+              address:
+                oneOf:
+                  - type: 'null'
+                  - $ref: '#/components/schemas/Address'
+              phone: { type: string }
+              email: { type: string }
+              birth_date: { type: [string, 'null'], format: date }
+              payment:
+                oneOf:
+                  - type: 'null'
+                  - type: object
+                    required: [year, amount_cents, paid_on, method]
+                    properties:
+                      year: { type: integer }
+                      amount_cents: { type: integer }
+                      paid_on: { type: string, format: date }
+                      method: { type: string }
+        new: { type: integer, description: 'Neue Passive (nach apply: angelegt)' }
+        payments: { type: integer, description: 'Davon mit Zahlung' }
+        existing: { type: integer }
+        errors: { type: integer }
+        applied: { type: boolean }
+    PassivePayment:
+      type: object
+      required: [id, year, amount_cents, paid_on, method]
+      properties:
+        id: { type: integer }
+        year: { type: integer }
+        amount_cents: { type: integer }
+        paid_on: { type: string, format: date }
+        method: { type: string, description: 'Bezeichnung der Zahlungsart' }
+    PassivePaymentInput:
+      type: object
+      properties:
+        year: { type: integer, description: 'Ab 1900, höchstens das nächste Jahr' }
+        amount_cents: { type: integer, minimum: 1, maximum: 100000 }
+        paid_on: { type: string, format: date, description: 'JJJJ-MM-TT, nicht in der Zukunft' }
+        method: { type: string, description: 'Eine der eingerichteten Zahlungsarten; beim Ändern auch die bisherige' }
+    PassiveSettings:
+      type: object
+      required: [fee_cents, methods, birthday_ages, birthday_days]
+      properties:
+        fee_cents: { type: integer, description: '0 = kein Vorschlag' }
+        methods: { type: array, items: { type: string }, description: 'Zahlungsarten zur Auswahl (vorgegeben Bar, SEPA, PayPal)' }
+        birthday_ages:
+          {
+            type: array,
+            items: { type: integer },
+            description: 'Alter, an deren Geburtstag erinnert wird, aufsteigend; leer (Vorgabe) = keine Erinnerung',
+          }
+        birthday_days: { type: integer, minimum: 0, maximum: 30, description: 'Tage vorher (Vorgabe 7, 0 = am Tag selbst)' }
+    PassiveInput:
+      type: object
+      description: Felder zum Anlegen und Ändern; persönliche Angaben (address, phone, email, birth_date) nur mit manage_personal.
+      properties:
+        first_name: { type: string, maxLength: 100 }
+        last_name: { type: string, maxLength: 100 }
+        caretaker_id: { type: [integer, 'null'], description: 'Konto-ID eines Mitglieds; null oder leer für keinen' }
+        address:
+          oneOf:
+            - type: 'null'
+            - $ref: '#/components/schemas/Address'
+        phone: { type: string, description: 'Ziffern, Leerzeichen und + ( ) / -; leer entfernt sie' }
+        email: { type: string, format: email, description: 'Leer entfernt sie' }
+        joined: { type: string, maxLength: 40, description: 'Eintritt als freier Text; leer entfernt ihn' }
+        note: { type: string, maxLength: 500, description: 'Bemerkung; leer entfernt sie' }
+        birth_date:
+          { type: [string, 'null'], format: date, description: 'JJJJ-MM-TT, ab 1900, nicht in der Zukunft; null oder leer entfernt es' }
     PersonalInfo:
       type: object
       required: [email, phone, address]
@@ -10080,7 +12025,7 @@ components:
       description: |
         Foto des Mitglieds oder null: `<App>/mitgliedsfoto/<id>?v=<Fassung>&s=128`. Die App ersetzt `s` bei Bedarf
         durch 480, 1024 oder 4096 (Originalauflösung, für die Großansicht nachgeladen; 404, wenn es sie nicht gibt). Ausgeliefert als image/jpeg an die Person selbst und an alle, die die Mitglieder in der Verwaltung
-        sehen (manage_points, manage_penalties, manage_ranks, manage_titles, create_users oder promote_users); mit dem
+        sehen (view_points, view_penalties, view_promotions, view_titles, view_attendance, view_company_members, view_personal, view_accounts, manage_former); mit dem
         Bereich directory an alle, auch ohne Anmeldung, wenn das Foto zu einem Mitglied oder Anwärter gehört (Issue #112,
         dann `Cache-Control: public`); sonst 401/403, im Wartungsmodus 503. Sonst `Cache-Control: private`, bei passender
         Fassung einen Tag; immer `X-Robots-Tag: noindex`. Die Adresse wechselt mit jedem Foto.
@@ -10491,14 +12436,14 @@ components:
               type: array
               items: { $ref: '#/components/schemas/DirectoryEntry' }
             member_count: { type: integer, description: Nur zusammen mit members }
-            member_ids: { type: array, items: { type: integer }, description: 'Nur mit manage_companies: alle Zugeordneten' }
+            member_ids: { type: array, items: { type: integer }, description: 'Nur mit view_company_members: alle Zugeordneten' }
 
     CompanyInput:
       type: object
       properties:
         name: { type: string, maxLength: 100, description: 'Mehrfache Leerzeichen werden zu einem' }
         short_name: { type: string, maxLength: 30 }
-        founded_year: { type: [integer, 'null'], description: 'Von 1800 bis zum laufenden Jahr' }
+        founded_year: { type: [integer, 'null'], minimum: 1, description: 'Ganze Zahl ab 1 bis zum laufenden Jahr' }
         description: { type: string, maxLength: 20000, description: 'HTML wie bei News, wird bereinigt; Bilder werden entfernt' }
         website_url:
           {
@@ -10521,6 +12466,36 @@ components:
           description: 'Adresse des Logos (`/sponsorlogo/<id>?v=<Fassung>`, öffentlich und lange zwischengespeichert, solange Gäste `view_sponsors` haben); null ohne Logo'
         logo_type: { type: [string, 'null'], enum: [png, svg, null] }
 
+    WebsiteSettings:
+      type: object
+      required: [home_page_id, home_page_title, home_page_missing, pages, pages_enabled, url, entry]
+      properties:
+        home_page_id: { type: [integer, 'null'] }
+        home_page_title: { type: [string, 'null'] }
+        home_page_missing: { type: boolean, description: 'Startseite gewählt, aber gelöscht oder nicht mehr für alle sichtbar' }
+        pages:
+          type: array
+          description: Seiten, die Startseite sein können (audience public), in ihrer Reihenfolge
+          items:
+            type: object
+            required: [id, title]
+            properties:
+              id: { type: integer }
+              title: { type: string }
+        pages_enabled: { type: boolean, description: Bereich pages an }
+        url: { type: [string, 'null'], description: 'Adresse der Webseite; null, wenn die App nicht in einem eigenen Ordner liegt' }
+        entry:
+          type: object
+          required: [state, file, folder, content, message]
+          properties:
+            state:
+              type: string
+              enum: [installed, missing, outdated, occupied, not_writable, root]
+              description: 'installed: da; missing: fehlt, anlegbar; outdated: eigene Datei für einen anderen Ordner; occupied: andere Startseite im Ordner; not_writable: Ordner nicht beschreibbar; root: App liegt nicht in einem eigenen Ordner'
+            file: { type: [string, 'null'], description: 'Name der anderen Startseite bei occupied' }
+            folder: { type: string, description: 'Ordner der App, z. B. app' }
+            content: { type: string, description: 'Inhalt der Einstiegsdatei (zum Hochladen von Hand)' }
+            message: { type: string, description: Hinweis für die Verwaltung }
     PageSummary:
       type: object
       required: [id, title, audience]
@@ -10535,6 +12510,23 @@ components:
           }
         updated_at: { type: string, format: date-time, description: 'Nur mit manage_pages: Stand der Seite (für PATCH mitschicken)' }
         updated_by_name: { type: [string, 'null'], description: 'Nur mit manage_pages: wer zuletzt gespeichert hat' }
+        title_i18n:
+          type: object
+          additionalProperties: { type: string }
+          description: 'Titel je weiterer Sprache, soweit eingetragen (Sprache => Titel)'
+        untranslated_locales:
+          type: array
+          items: { type: string }
+          description: 'Nur mit manage_pages: weitere Sprachen, in denen Titel oder Texte noch fehlen'
+    ContentTranslation:
+      type: object
+      description: 'Fassung eines Inhalts aus Blöcken (Seite, News der App, Nachricht am Brett) in einer weiteren Sprache: Aufbau, Zielgruppe und Einstellungen der Blöcke gelten für alle Sprachen.'
+      properties:
+        title: { type: string, description: 'Höchstens so lang wie auf Deutsch erlaubt (Seiten 100, News 150 Zeichen, Brett 1000)' }
+        blocks:
+          type: object
+          description: 'Kennung des Blocks => übersetzte Felder (text: html; countdown: title, running_text, after_text; button: label; events, contacts, sponsors, map: title; notice: title, text; schedule, facts: title, items mit so vielen Einträgen wie auf Deutsch)'
+          additionalProperties: { type: object }
     PageDetail:
       allOf:
         - $ref: '#/components/schemas/PageSummary'
@@ -10552,6 +12544,16 @@ components:
                 items: { $ref: '#/components/schemas/Block' },
                 description: 'Inhalt aus Blöcken, nur die für die Person sichtbaren (members-Blöcke nur für Mitglieder bzw. mit manage_pages). Bestehende Seiten: ein Textblock aus body. Leere Textblöcke nur mit manage_pages.',
               }
+            untranslated:
+              {
+                type: string,
+                enum: [all, some],
+                description: 'Nur in einer weiteren Sprache, wenn dort etwas fehlt: all (nichts übersetzt) oder some; das Fehlende steht auf Deutsch',
+              }
+            translations:
+              type: object
+              description: 'Nur mit source bzw. nach PATCH mit translations: Fassungen je weiterer Sprache, Bilder als Adressen'
+              additionalProperties: { $ref: '#/components/schemas/ContentTranslation' }
 
     Block:
       description: 'Vorgefertigter Block (eigene Seiten, News in der App, Schwarzes Brett). Unbekannte type lehnt der Server beim Speichern ab (400 invalid); die App übergeht sie beim Anzeigen.'
@@ -10868,7 +12870,7 @@ components:
             document_id: { type: integer, description: 'Dokument aus dem Bereich Dokumente (muss beim Speichern existieren)' }
             document:
               readOnly: true
-              description: 'Nur in Antworten. Der Block fehlt ganz, wenn Dokumente ausgeschaltet sind oder die Person das Dokument dort nicht sehen darf (view_documents, bei visibility managers manage_documents; ohne Anmeldung mit den Rechten von Gast); mit manage_pages kommt er dann mit document null. Die Datei prüft die Rechte beim Abruf erneut.'
+              description: 'Nur in Antworten. Der Block fehlt ganz, wenn Dokumente ausgeschaltet sind oder die Person das Dokument dort nicht sehen darf (view_documents, bei visibility managers view_restricted_documents; ohne Anmeldung mit den Rechten von Gast); mit manage_pages kommt er dann mit document null. Die Datei prüft die Rechte beim Abruf erneut.'
               oneOf:
                 - type: 'null'
                 - type: object
@@ -10929,6 +12931,15 @@ components:
         id: { type: integer }
         title: { type: string, maxLength: 191 }
         sort: { type: integer }
+        translations:
+          type: object
+          description: 'Mit weiteren Sprachen, zum Bearbeiten: Titel je Sprache (alle eingeschalteten, '''' = deutsch)'
+          additionalProperties: { type: object, properties: { title: { type: string } } }
+
+    TitleTranslationsInput:
+      type: object
+      description: 'Name je weiterer eingeschalteter Sprache (Sprache => {title}; nicht de, sonst → 400); nur die genannten Sprachen ändern sich, leer = deutsch'
+      additionalProperties: { type: object, properties: { title: { type: string } } }
 
     DocumentInfo:
       type: object
@@ -10937,7 +12948,7 @@ components:
         title: { type: string, maxLength: 191 }
         category_id: { type: [integer, 'null'] }
         date: { type: string, format: date, description: Stand }
-        visibility: { type: string, enum: [members, managers], description: 'managers: nur wer manage_documents hat' }
+        visibility: { type: string, enum: [members, managers], description: 'managers: nur wer view_restricted_documents hat' }
         ext: { type: string }
         kind: { type: string, enum: [pdf, image, file], description: 'pdf und image zeigt die App an, file nur herunterladen' }
         mime: { type: string }
@@ -10945,6 +12956,10 @@ components:
         version: { type: string, description: Wechselt mit jeder neuen Fassung }
         url: { type: string, description: 'Auslieferung mit Prüfung der Anmeldung: <App>/dokument/<id>?v=<version>' }
         updated_at: { type: string }
+        translations:
+          type: object
+          description: 'Mit weiteren Sprachen, zum Bearbeiten: Titel je Sprache (alle eingeschalteten, '''' = deutsch)'
+          additionalProperties: { type: object, properties: { title: { type: string } } }
 
     DocumentFile:
       type: object
@@ -10977,6 +12992,11 @@ components:
         source: { type: string, enum: [calendar, free] }
         title: { type: string, description: Momentaufnahme beim Anlegen }
         date: { type: string, format: date }
+        kind: { type: [string, 'null'], description: Erste Terminart der Liste }
+        kinds: { type: array, items: { type: string }, description: Alle Terminarten der Liste (eine Teilnahme zählt für jede) }
+        upcoming:
+          type: boolean
+          description: Datum nach heute (Zeitzone der Kompanie); dann ist nur der Status excused erlaubt.
         counts: { $ref: '#/components/schemas/AttendanceCounts' }
 
     AttendanceDetail:
@@ -10985,8 +13005,19 @@ components:
         - type: object
           properties:
             event_key: { type: [string, 'null'], description: ID des Kalendertermins (nur source calendar) }
+            responses_open:
+              type: [boolean, 'null']
+              description: 'null: keine Rückmeldungen (freie Liste, Termin nicht mehr im Kalender); sonst ob man noch zu- und absagen kann'
             updated_by_name: { type: [string, 'null'] }
             updated_at: { type: string }
+            admissions_new:
+              type: array
+              description: 'Nur in der Antwort von PUT /attendance für create_users: wer dadurch neu die Voraussetzung für die Aufnahme erfüllt'
+              items:
+                type: object
+                properties:
+                  user_id: { type: integer }
+                  name: { type: string }
             people:
               type: array
               description: Alle mit einer Rolle (ohne Gäste), nach Namen
@@ -11003,6 +13034,13 @@ components:
                       - $ref: '#/components/schemas/AttendanceStatus'
                       - type: 'null'
                   booked: { type: boolean, description: Hat für diese Liste schon Punkte (ohne stornierte) }
+                  response:
+                    type: [string, 'null']
+                    enum: ['yes', 'no', null]
+                    description: Zu- oder Absage zum Termin (nur Listen aus dem Kalender, solange es den Termin gibt)
+                  response_note: { type: string, description: Hinweis zur Zu- oder Absage }
+                  response_late: { type: boolean, description: 'Zu- oder Absage nachträglich übertragen (vor der Frist getippt, danach angekommen)' }
+                  may_respond: { type: boolean, description: Darf bei Terminen zu- und absagen (nur dann lässt sich etwas eintragen) }
             counts_by_group:
               type: object
               description: Je Status die Gruppen in der Reihenfolge der Rollen
@@ -11057,12 +13095,18 @@ components:
         threshold_reached_since:
           { type: [string, 'null'], format: date, description: 'Seit wann die Summe durchgehend die Schwelle des nächsten erreicht' }
         below_current_threshold: { type: boolean }
+        soon:
+          type: boolean
+          description: 'Bald bereit: Schwelle des nächsten noch nicht erreicht, es fehlt höchstens 1 Punkt; zweiter Kreis an der Kachel „Beförderungen“, Abschnitt „Bald erreicht“'
 
     RankHistoryEntry:
       type: object
       properties:
+        id: { type: integer, description: 'Für PATCH /members/{id}/rank-history/{entry}' }
         from: { type: [string, 'null'] }
         to: { type: [string, 'null'] }
+        from_rank_id: { type: [integer, 'null'], description: 'Dienstgrad vorher (null ohne); from/to sind die deutschen Bezeichnungen von damals' }
+        to_rank_id: { type: [integer, 'null'], description: 'Dienstgrad nachher (null ohne), für seinen Namen in einer weiteren Sprache' }
         to_badge_url:
           description: Heutiges Abzeichen des neuen Dienstgrads (der Verlauf speichert nur Bezeichnungen); null ohne
           $ref: '#/components/schemas/BadgeUrl'

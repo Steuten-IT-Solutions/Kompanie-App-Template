@@ -8,6 +8,7 @@ import App from './App';
 import { config, preparePreview } from './api';
 import { dataUpdated } from './dataCache';
 import { handlePageMessage } from './pageUpdate';
+import { watchForUpdates } from './appUpdate';
 import { deviceStore } from './deviceStore';
 import { previewRole } from './preview';
 import { skeletons } from './skeleton';
@@ -16,7 +17,12 @@ import { takeRememberedRoute } from './share';
 import { watchRuntimeErrors } from './lastError';
 import { watchSharpS } from './sharpS';
 import { watchButtonWords } from './buttonWords';
-import { initBackClose } from './backClose';
+import { afterBackSync, initBackClose, openBackLayer } from './backClose';
+import { beforeLeave, initUnsaved } from './unsaved';
+import { setLeaveGuard } from './router';
+import { confirmAsk } from './ask';
+import { t } from './i18n';
+import { initTileLayouts } from './tileStore';
 // Gewählte Schrift aus kompanie.json, lokal gebündelt (kein Abruf bei Google).
 import './generated/fonts';
 import './generated/theme.css';
@@ -49,6 +55,9 @@ if (isStandalone() && window.location.hash.startsWith('#/installieren')) {
 
 // „Zurück“ schließt offene Fenster; nach dem Neuladen mit offenem Fenster den übrigen Eintrag im Verlauf überspringen.
 initBackClose();
+// Nicht gespeicherte Eingaben: vor dem Verlassen nachfragen (unsaved.ts).
+initUnsaved((message) => confirmAsk(message, { title: t('Nicht gespeichert'), okLabel: t('Verlassen') }), { openBackLayer, afterBackSync });
+setLeaveGuard(beforeLeave);
 
 // Letzte Fehlermeldung für „Fehler melden“ (Issue #64)
 watchRuntimeErrors();
@@ -69,13 +78,15 @@ function restoreSkeletons(): Promise<unknown> {
 }
 
 // Vorschau „App als Rolle ansehen“ (Issue #63): erst die Konfiguration der Rolle holen, dann starten.
-void Promise.all([preparePreview(), restoreSkeletons()]).then(([notice]) =>
+void Promise.all([preparePreview(), restoreSkeletons()]).then(([notice]) => {
+  // Vorgemerkte Anordnungen der Kacheln (ohne Verbindung geändert) gelten sofort und gehen an den Server.
+  initTileLayouts();
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <App notice={notice} />
     </StrictMode>,
-  ),
-);
+  );
+});
 
 const cfg = config;
 if ('serviceWorker' in navigator && cfg) {
@@ -92,6 +103,8 @@ if ('serviceWorker' in navigator && cfg) {
     const sw = new URL(cfg.swUrl, location.href);
     sw.searchParams.set('api', new URL(cfg.apiBase, location.href).href);
     sw.searchParams.set('assets', assets);
+    // Neue Version beim Zurückholen der App erkennen und den Neustart anbieten (appUpdate.ts).
+    watchForUpdates(cfg.appUrl);
     navigator.serviceWorker
       .register(sw.toString(), { scope: cfg.appUrl })
       // In der Vorschau nicht: Der Server lehnt dort jede Änderung ab (auch das Freigeben fremder Abos).

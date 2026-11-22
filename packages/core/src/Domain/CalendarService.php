@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\Cache;
 use KompanieApp\Core\Port\ExtendedHttpClient;
 use KompanieApp\Core\Port\HttpClient;
@@ -34,7 +35,8 @@ use KompanieApp\Core\Port\Settings;
  */
 final class CalendarService
 {
-    public const CACHE_KEY = 'calendar_events';
+    /** _v2: seit den Zu- und Absagen haben Termine aus iCal eine stabile Kennung (response_key); ältere Kopien gelten nicht. */
+    public const CACHE_KEY = 'calendar_events_v2';
     public const ERROR_KEY = 'calendar_error';
     public const TASK = 'calendar_refresh';
     /** Vom Admin gewählte Quelle (SOURCES); leer: wie vor der Auswahl (das Eingetragene gilt). */
@@ -42,7 +44,7 @@ final class CalendarService
     public const SOURCE_APP = 'app';
     public const SOURCES = [self::SOURCE_APP, 'google', 'ics'];
     /** Rechte der Standardrolle „Kalender verwalten“ (nur mit der Quelle app, Features::roleOf). */
-    public const ROLE = ['member', 'manage_calendar'];
+    public const ROLE = ['member', 'view_responses', 'manage_calendar'];
     /** Vor der Kennung eines Termins der App (die öffentlichen Termine haben „p“ in der Terminliste). */
     public const APP_ID_PREFIX = 'i';
     /** So lange bleibt die letzte gute Fassung als Rückfall erhalten. */
@@ -87,7 +89,7 @@ final class CalendarService
     public function requireInApp(): EventService
     {
         if (!$this->inApp() || $this->internal === null) {
-            throw new ApiError(409, 'not_in_app', 'Der interne Kalender wird nicht in der App gepflegt. Ein Admin kann das unter Einstellungen → Kalender ändern.');
+            throw new ApiError(409, 'not_in_app', I18n::t('Der interne Kalender wird nicht in der App gepflegt. Ein Admin kann das unter Einstellungen → Kalender ändern.'));
         }
         return $this->internal;
     }
@@ -215,6 +217,20 @@ final class CalendarService
         return null;
     }
 
+    /**
+     * Termine ohne Abruf: bei der Quelle App die Termine, sonst die letzte gespeicherte Fassung (auch wenn sie nicht mehr
+     * frisch ist); null, wenn es noch keine gibt. Für Zähler, die nicht auf den Kalender warten sollen (z. B. in /config).
+     *
+     * @return array<int, array<string, mixed>>|null
+     */
+    public function cached(): ?array
+    {
+        if ($this->source() === self::SOURCE_APP) {
+            return $this->appEvents();
+        }
+        return $this->copy()['events'] ?? null;
+    }
+
     public function clearCache(): void
     {
         $this->cache->delete(self::CACHE_KEY);
@@ -250,7 +266,7 @@ final class CalendarService
                 'google' => $this->fetchGoogle(['key' => (string) $this->settings->get('google_api_key', '')], []),
                 'google_connection' => $this->fetchWithConnection(),
                 'ics' => $this->fetchIcs((string) $this->settings->get('calendar_ics_url')),
-                default => throw new ApiError(503, 'not_configured', 'Der Kalender ist noch nicht eingerichtet.'),
+                default => throw new ApiError(503, 'not_configured', I18n::t('Der Kalender ist noch nicht eingerichtet.')),
             };
         } catch (ApiError $e) {
             if ($e->status === 502) {
@@ -301,7 +317,8 @@ final class CalendarService
             'location' => $e['location'],
             'description' => $e['description'],
             'url' => $e['url'],
-        ], $this->internal->between($from, $to));
+            'respond_until' => $e['respond_until'] ?? null,
+        ] + (isset($e['untranslated']) ? ['untranslated' => $e['untranslated']] : []), $this->internal->between($from, $to));
         usort($events, static fn (array $a, array $b): int => strcmp((string) $a['start'], (string) $b['start']));
         return $events;
     }
@@ -326,17 +343,18 @@ final class CalendarService
     {
         $drive = $this->drive;
         if ($drive === null) {
-            throw new ApiError(503, 'not_configured', 'Der Kalender ist noch nicht eingerichtet.');
+            throw new ApiError(503, 'not_configured', I18n::t('Der Kalender ist noch nicht eingerichtet.'));
         }
         try {
             $token = $drive->accessToken();
         } catch (\RuntimeException $e) {
-            throw ApiError::upstream('Google Kalender: ' . $e->getMessage());
+            throw ApiError::upstream(I18n::t('Google Kalender: {error}', ['error' => $e->getMessage()]));
         }
-        $hint = $drive->oauth() !== null
-            ? 'Kann das verbundene Google-Konto' . ($drive->oauthEmail() !== '' ? ' (' . $drive->oauthEmail() . ')' : '')
-                . ' den Kalender sehen, und ist die Google Calendar API im Google-Cloud-Projekt aktiviert?'
-            : 'Ist der Kalender für ' . $drive->clientEmail() . ' freigegeben („Alle Termindetails sehen“), und ist die Google Calendar API im Google-Cloud-Projekt aktiviert?';
+        $hint = match (true) {
+            $drive->oauth() !== null && $drive->oauthEmail() !== '' => I18n::t('Kann das verbundene Google-Konto ({email}) den Kalender sehen, und ist die Google Calendar API im Google-Cloud-Projekt aktiviert?', ['email' => $drive->oauthEmail()]),
+            $drive->oauth() !== null => I18n::t('Kann das verbundene Google-Konto den Kalender sehen, und ist die Google Calendar API im Google-Cloud-Projekt aktiviert?'),
+            default => I18n::t('Ist der Kalender für {email} freigegeben („Alle Termindetails sehen“), und ist die Google Calendar API im Google-Cloud-Projekt aktiviert?', ['email' => $drive->clientEmail()]),
+        };
         return $this->fetchGoogle([], ['Authorization' => 'Bearer ' . $token], $hint);
     }
 
@@ -368,7 +386,7 @@ final class CalendarService
             $calId = (string) $calId;
             $res = $responses[$calId] ?? $this->tryGet($request['url'], $headers);
             if ($res instanceof \RuntimeException) {
-                throw ApiError::upstream('Der Kalender ist gerade nicht erreichbar: ' . $res->getMessage());
+                throw ApiError::upstream(I18n::t('Der Kalender ist gerade nicht erreichbar: {error}', ['error' => $res->getMessage()]));
             }
             $items = [];
             // Mehr als 250 Termine im Jahr: weiterblättern (höchstens 4 Seiten). Sonst fehlten die späteren, und der
@@ -379,7 +397,9 @@ final class CalendarService
                     // Mit HTTP-Status: Den braucht auch die Ursache in den Statusmeldungen (Telemetry\Detail).
                     $msg = isset($body['error']['message']) ? $body['error']['message'] . ' (HTTP ' . $res['status'] . ')' : 'HTTP ' . $res['status'];
                     $withHint = $hint !== '' && in_array($res['status'], [401, 403, 404], true);
-                    throw ApiError::upstream('Google Kalender: ' . $msg . ($withHint ? ' – ' . $hint : ''));
+                    throw ApiError::upstream($withHint
+                        ? I18n::t('Google Kalender: {error} – {hint}', ['error' => $msg, 'hint' => $hint])
+                        : I18n::t('Google Kalender: {error}', ['error' => $msg]));
                 }
                 array_push($items, ...array_values((array) ($body['items'] ?? [])));
                 $token = $body['nextPageToken'] ?? null;
@@ -388,7 +408,7 @@ final class CalendarService
                 }
                 $res = $this->tryGet($request['url'] . '&pageToken=' . rawurlencode($token), $headers);
                 if ($res instanceof \RuntimeException) {
-                    throw ApiError::upstream('Der Kalender ist gerade nicht erreichbar: ' . $res->getMessage());
+                    throw ApiError::upstream(I18n::t('Der Kalender ist gerade nicht erreichbar: {error}', ['error' => $res->getMessage()]));
                 }
             }
             foreach ($items as $item) {
@@ -430,7 +450,7 @@ final class CalendarService
         $url = (string) preg_replace('#^webcal://#i', 'https://', trim($url));
         $res = $this->get($url);
         if ($res['status'] !== 200) {
-            throw ApiError::upstream('Der Kalender-Link lieferte HTTP ' . $res['status'] . '.');
+            throw ApiError::upstream(I18n::t('Der Kalender-Link lieferte HTTP {status}.', ['status' => $res['status']]));
         }
         return $this->parseIcs($res['body']);
     }
@@ -440,7 +460,7 @@ final class CalendarService
     {
         $res = $this->tryGet($url);
         if ($res instanceof \RuntimeException) {
-            throw ApiError::upstream('Der Kalender ist gerade nicht erreichbar: ' . $res->getMessage());
+            throw ApiError::upstream(I18n::t('Der Kalender ist gerade nicht erreichbar: {error}', ['error' => $res->getMessage()]));
         }
         return $res;
     }
@@ -586,9 +606,20 @@ final class CalendarService
             }
         }
 
+        // Stabile Kennung für Zu- und Absagen (response_key): Die id hängt am Beginn und ändert sich, wenn jemand den Termin
+        // verschiebt. Einzeltermine zählen über die UID, Termine einer Serie über UID und ursprünglichen Beginn (einzeln
+        // geänderte über RECURRENCE-ID, also wie der Termin der Serie, den sie ersetzen).
+        $uid = (string) ($e['UID']['value'] ?? '');
+        $rid = isset($e['RECURRENCE-ID']) ? $this->icsDate($e['RECURRENCE-ID']) : null;
         $out = [];
         foreach ($starts as $s) {
-            $out[] = $this->icsEvent($e, $s, $duration, $allDay);
+            $key = match (true) {
+                $uid === '' => null,
+                $rid !== null => md5('r|' . $uid . '|' . $rid[0]->getTimestamp()),
+                !empty($e['RRULE']) => md5('r|' . $uid . '|' . $s->getTimestamp()),
+                default => md5('r|' . $uid),
+            };
+            $out[] = $this->icsEvent($e, $s, $duration, $allDay, $key);
         }
         return $out;
     }
@@ -640,7 +671,7 @@ final class CalendarService
     }
 
     /** @return array<string, mixed> */
-    private function icsEvent(array $e, \DateTimeImmutable $start, int $duration, bool $allDay): array
+    private function icsEvent(array $e, \DateTimeImmutable $start, int $duration, bool $allDay, ?string $responseKey = null): array
     {
         $end = $start->modify('+' . $duration . ' seconds');
         if ($allDay) {
@@ -653,8 +684,10 @@ final class CalendarService
             $startStr = $start->setTimezone($tz)->format('c');
             $endStr = $end->setTimezone($tz)->format('c');
         }
+        $id = md5(($e['UID']['value'] ?? '') . $startStr);
         return [
-            'id' => md5(($e['UID']['value'] ?? '') . $startStr),
+            'id' => $id,
+            'response_key' => $responseKey ?? $id,
             'title' => isset($e['SUMMARY']) ? self::icsText($e['SUMMARY']['value']) : '(ohne Titel)',
             'start' => $startStr,
             'end' => $endStr,

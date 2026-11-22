@@ -9,6 +9,7 @@ use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Domain\Input;
 use KompanieApp\Core\Domain\PollService;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 
 /**
  * Umfrage einbinden: Titel und Stand einer vorhandenen Umfrage mit dem Weg zum Abstimmen. Nur für alle, die an Umfragen
@@ -32,7 +33,7 @@ final class PollBlock implements BlockType
     {
         $id = Input::integer($in['poll_id'] ?? null);
         if ($id === null || $id <= 0 || $this->app->polls()->repository()->find($id) === null) {
-            throw ApiError::invalid('Bitte eine Umfrage auswählen.');
+            throw ApiError::invalid(I18n::t('Bitte eine Umfrage auswählen.'));
         }
         return ['poll_id' => $id];
     }
@@ -62,7 +63,7 @@ final class PollBlock implements BlockType
      */
     private function poll(array $data, ?User $viewer): ?array
     {
-        if (!$this->app->features()->enabled('polls') || !(PollService::isParticipant($viewer) || PollService::canManage($viewer))) {
+        if (!$this->app->features()->enabled('polls') || !(PollService::isParticipant($viewer) || PollService::seesAllResults($viewer))) {
             return null;
         }
         /** @var User $viewer */

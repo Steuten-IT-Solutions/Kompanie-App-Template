@@ -31,10 +31,20 @@ jobs:
     outputs:
       repos: ${{ steps.ziele.outputs.repos }}
     steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: '8.2'
+          tools: none
+
       - name: Eingaben prüfen und Kompanien bestimmen
         id: ziele
         env:
           GH_TOKEN: ${{ github.token }}
+          WARTUNG: ${{ vars.KOMPANIE_WARTUNG }}
           REPO: ${{ inputs.repo }}
           ACTION: ${{ inputs.action }}
           VERSION: ${{ inputs.version }}
@@ -49,10 +59,12 @@ jobs:
             [[ "$REPO" =~ ^Steuten-IT-Solutions/[A-Za-z0-9._-]+$ ]] || { echo "::error::Ungültiges Kompanie-Repo: $REPO"; exit 1; }
             REPOS="$REPO"
           else
-            REPOS="$(gh api --paginate 'orgs/Steuten-IT-Solutions/repos?type=public&per_page=100' --jq '.[] | select(.archived | not) | select((.topics // []) | index("kompanie-app")) | .full_name')"
+            # Alle Kompanien: nur die mit laufendem Wartungsabo. Ein einzelnes Repo (promote, withdraw) gilt immer,
+            # damit sich eine fehlerhafte Version auch bei Kompanien ohne Wartung zurückziehen lässt.
+            REPOS="$(scripts/kompanien.sh)"
           fi
           JSON="$(printf '%s\n' "$REPOS" | { grep -E '^Steuten-IT-Solutions/[A-Za-z0-9._-]+$' || true; } | jq -R . | jq -cs .)"
-          [ "$JSON" != '[]' ] || { echo "::error::Keine Kompanie gefunden."; exit 1; }
+          [ "$JSON" != '[]' ] || { echo "::error::Keine Kompanie (mit Wartungsabo) gefunden."; exit 1; }
           echo "Kompanien: $JSON"
           echo "repos=$JSON" >> "$GITHUB_OUTPUT"
 
