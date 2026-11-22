@@ -24,6 +24,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+## [0.13.0] – 2026-11-22
+
 ### Neu
 
 - **Englisch**: Unter [Einstellungen → Sprachen](app:einstellungen/sprachen) schaltest du Englisch als weitere
@@ -50,20 +52,20 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Versionen bekommt (Wartung bis …, oder unbefristet). Nach dem Ende läuft die App mit ihrer Version weiter; neue
   Versionen, auch Sicherheitsupdates, gibt es erst nach einer Verlängerung. Zurückgehen auf ältere Versionen bleibt
   möglich.
-- **Beförderung mit Datum**: Beim Ändern des Dienstgrads eines Mitglieds (z. B. aus
+- **Beförderung mit Datum, korrigieren und löschen**: Beim Ändern des Dienstgrads eines Mitglieds (z. B. aus
   [Beförderungen](app:verwaltung/befoerderungen)) wählst du jetzt das Datum der Änderung, vorgegeben ist heute. Ein
   früherer Tag geht, ein Tag in der Zukunft oder vor der letzten Änderung dieser Person nicht. Mit Punkten zählen bei
   einem früheren Tag nur die Punkte bis zu diesem Tag, für die Schwelle und für den Stand im Verlauf. Das Datum einer
   schon eingetragenen Änderung korrigierst du nachträglich im Verlauf mit dem Stift (_Datum ändern_), nach denselben
   Regeln; die Korrektur steht im Änderungsprotokoll.
-- **Beförderung oder Degradierung löschen**: Ein falsch eingetragener Wechsel im Verlauf des Dienstgrads eines
-  Mitglieds (z. B. aus [Beförderungen](app:verwaltung/befoerderungen)) lässt sich mit dem Papierkorb nach einer Rückfrage
-  ganz löschen, mit demselben Recht wie das Ändern des Dienstgrads. Beim neuesten Eintrag gilt danach wieder der
-  Dienstgrad davor; ältere Einträge verschwinden nur aus dem Verlauf. Das Löschen steht im Änderungsprotokoll.
-- **Dienstgrad einer Beförderung korrigieren**: Mit dem Stift (_Eintrag ändern_) im Verlauf änderst du jetzt neben dem
+  Mit dem Stift (_Eintrag ändern_) im Verlauf änderst du jetzt neben dem
   Datum auch den neuen Dienstgrad eines eingetragenen Wechsels. Beförderung oder Degradierung ergibt sich neu, mit
   Punkten gilt die Schwelle mit dem Stand des Eintrags; der Eintrag danach beginnt beim neuen Dienstgrad. Beim neuesten
   Eintrag ändert sich auch der aktuelle Dienstgrad. Die Korrektur steht im Änderungsprotokoll.
+  Ein falsch eingetragener Wechsel im Verlauf des Dienstgrads eines
+  Mitglieds (z. B. aus [Beförderungen](app:verwaltung/befoerderungen)) lässt sich mit dem Papierkorb nach einer Rückfrage
+  ganz löschen, mit demselben Recht wie das Ändern des Dienstgrads. Beim neuesten Eintrag gilt danach wieder der
+  Dienstgrad davor; ältere Einträge verschwinden nur aus dem Verlauf. Das Löschen steht im Änderungsprotokoll.
 - **Bald fällige Beförderungen**: Am Knopf [Beförderungen](app:verwaltung/befoerderungen) zeigt neben der Zahl im roten
   Kreis ein Kreis in der Farbe der Kompanie, wie viele Mitglieder bald die Schwelle für ihren nächsten Dienstgrad
   erreichen (es fehlt höchstens noch ein Punkt); sie stehen in der Übersicht im neuen Abschnitt „Bald erreicht“.
@@ -76,7 +78,7 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Kachel, wird die schmalste Kachel derselben Zeile (bei gleicher Breite die linke) um deren Breite breiter. Am
   Computer und auf dem Handy quer haben die Kachel-Seiten dafür jetzt eine feste Spaltenzahl. Am Computer sind
   Kachel-Seiten breiter als andere Seiten und haben 5 Spalten statt 3 (ab etwa 900 px Fensterbreite).
-- **Raster als Vorgabe für alle**: Wer die Einstellungen ändern darf, ordnet eine Kachel-Seite an und tippt beim
+  Wer die Einstellungen ändern darf, ordnet eine Kachel-Seite an und tippt beim
   Anordnen auf _Als Vorgabe für alle_. Plätze und Breiten gelten dann für jede Person ohne eigene Anordnung, auch ohne
   Anmeldung und in der Vorschau, je Bildschirmbreite; _Vorgabe löschen_ kehrt zur Reihenfolge unter
   [Einstellungen → Navigation](app:einstellungen/navigation) zurück. Die Änderung steht im Änderungsprotokoll.
@@ -85,10 +87,6 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   öffnet das Album mit dem Bild in der Großansicht. Interne Bilder sieht nur, wer angemeldet ist und sie sehen darf; alle
   anderen bekommen einen Hinweis mit „Anmelden“. Das Teilen-Symbol steht oben neben dem Knopf zum Herunterladen; die
   Knöpfe zum Verwalten (Titelbild, intern, Verschieben, Löschen) stehen jetzt in einer eigenen Zeile unter der Anzahl.
-- **Rechtzeitig getippte Zu- und Absagen gelten auch verspätet**: Wer vor dem Ende der Frist zu- oder absagt, aber kein
-  Netz hat, dessen Antwort gilt auch dann, wenn die App sie erst nach Beginn des Termins übertragen kann, ohne
-  zeitliche Grenze; maßgeblich ist die Uhrzeit des Handys. Bei den Rückmeldungen und in der
-  [Anwesenheit](app:verwaltung/anwesenheit) steht dann „nachträglich übertragen“.
 - **Neustart nach einem Update anbieten**: Holt jemand die App aus dem Hintergrund, sucht sie nach einer neuen Version
   (höchstens alle 15 Minuten, bei offener App einmal pro Stunde). Ist eine da, lädt die App sie im Hintergrund und
   zeigt oben _Die App wurde aktualisiert_ mit dem Knopf _Neu starten_. So sieht man Neuerungen sofort, statt erst beim
@@ -106,7 +104,6 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   (schreiben, ändern, veröffentlichen, löschen, Bilder hochladen), aber keine Seiten; eine Rolle wie Autor oder
   Redakteur in WordPress braucht es nicht. Die Rolle „News verwalten“ gibt es jetzt auch mit dieser Quelle; vergib sie
   unter [Einstellungen → Rollen](app:einstellungen/rollen).
-
 - **Galerie in Google Drive ablegen**: Nutzt die Galerie Google Drive, landen eingereichte und in der App hochgeladene
   Bilder und Videos jetzt in Drive statt auf dem Server. Offene Einreichungen liegen im Ordner „Einreichungen …“ in der
   Ablage des verbundenen Google-Kontos, außerhalb des Galerie-Ordners. Bei der Freigabe verschiebt die App sie in den
@@ -153,18 +150,6 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   sieht die Mitgliederliste bzw. den Bereich und die Angaben, aber keine Knöpfe zum Ändern. Ändern gibt es nur zusammen mit Sehen. Rollen und Personen, die ein
   Recht zum Ändern hatten, haben nach dem Update auch das Recht zum Sehen; es ändert sich also für niemanden etwas,
   bis du es umstellst.
-- **Beitrag der Passiven**: Unter [Verwaltung → Passive](app:verwaltung/passive) trägst du jetzt je Passivem und Jahr
-  ein, dass der Beitrag bezahlt ist, mit Betrag, Datum und Zahlungsart. Oben wählst du das Jahr, siehst, wie viele
-  bezahlt haben, und kannst nur die offenen oder nur die bezahlten zeigen. Vor dem Eintrittsjahr (Feld _Eintritt_,
-  z. B. 2027) gilt der Beitrag nicht als offen, sondern als „noch nicht dabei“. Einen Jahresbeitrag stellst du als Vorschlag
-  ein, er steht beim Eintragen schon im Feld; die Zahlungsarten zur Auswahl richtest du dort auch ein (vorgegeben
-  Bar, SEPA und PayPal). Eintragen darf, wer Passive verwaltet. Betreuer sehen unter
-  [Meins → Meine Passiven](app:meins/passive), ob der Beitrag für das laufende Jahr bezahlt ist.
-- **Geburtstage der Passiven**: Unter [Verwaltung → Passive](app:verwaltung/passive) richtest du bei _Erinnerung an
-  Geburtstage_ ein, bei welchen Altern erinnert wird (z. B. 50, 60, 70, 75, 80) und wie viele Tage vorher (Vorgabe 7).
-  Anfangs ist keine Altersliste eingetragen, die Erinnerung also aus. Erinnert werden alle, die Passive verwalten und
-  persönliche Angaben sehen dürfen: per Benachrichtigung (einmal je Geburtstag) und oben in der Liste unter
-  _Anstehende Geburtstage_.
 - **Titelbild eines Albums wählen**: Wer die Galerie verwalten darf, öffnet ein Bild in der Großansicht und tippt auf
   _Als Titelbild des Albums verwenden_. Dieses Bild steht dann in der Galerie-Übersicht für das Album, auch bei Alben aus
   Google Drive. Noch einmal getippt, wählt die App das Titelbild wieder selbst. Ist das gewählte Bild nur für Mitglieder,
@@ -206,6 +191,17 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   persönliche Angaben sehen darf, und ändert nur, wer sie pflegen darf. Betreuer sehen ihre eigenen Passiven unter
   [Meins → Meine Passiven](app:meins/passive) mit allen Angaben, nur zum Lesen. Die Passiven sind Teil der
   Datensicherung.
+  Dort trägst du auch je Passivem und Jahr
+  ein, dass der Beitrag bezahlt ist, mit Betrag, Datum und Zahlungsart. Oben wählst du das Jahr, siehst, wie viele
+  bezahlt haben, und kannst nur die offenen oder nur die bezahlten zeigen. Vor dem Eintrittsjahr (Feld _Eintritt_,
+  z. B. 2027) gilt der Beitrag nicht als offen, sondern als „noch nicht dabei“. Einen Jahresbeitrag stellst du als Vorschlag
+  ein, er steht beim Eintragen schon im Feld; die Zahlungsarten zur Auswahl richtest du dort auch ein (vorgegeben
+  Bar, SEPA und PayPal). Eintragen darf, wer Passive verwaltet. Betreuer sehen unter
+  [Meins → Meine Passiven](app:meins/passive), ob der Beitrag für das laufende Jahr bezahlt ist.
+  Bei _Erinnerung an Geburtstage_ richtest du ein, bei welchen Altern erinnert wird (z. B. 50, 60, 70, 75, 80) und wie viele Tage vorher (Vorgabe 7).
+  Anfangs ist keine Altersliste eingetragen, die Erinnerung also aus. Erinnert werden alle, die Passive verwalten und
+  persönliche Angaben sehen dürfen: per Benachrichtigung (einmal je Geburtstag) und oben in der Liste unter
+  _Anstehende Geburtstage_.
 - **Anwesenheit auf der Seite eines Mitglieds**: Unter [Verwaltung → Mitglieder](app:verwaltung/mitglieder) steht bei
   jeder Person, wie oft sie anwesend war, wie oft sie entschuldigt und wie oft sie unentschuldigt gefehlt hat. Vorgegeben
   ist das laufende Jahr; du kannst auf frühere Jahre oder „Gesamt“ umschalten, und ein Tipp öffnet die Termine dazu. Es
@@ -216,10 +212,13 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Rolle_ mit _App als … ansehen_; das Banner zeigt ihren Namen und ihre Rollen. Wie die Vorschau als Rolle ist sie nur
   für Admins und nur zum Ansehen. _Meins_ und andere persönliche Stellen zeigen dabei die Daten der Person (z. B. ihre
   Punkte, Strafen, Anwesenheit, Zu- und Absagen und ihr Konto), nur ihre Antworten in anonymen Umfragen nicht.
-
 - **Zu- und Absagen ohne Internet**: Ohne Verbindung merkt sich die App Zusagen, Absagen, Hinweise und das Zurücknehmen
   auf dem Gerät, zeigt sie gleich an (mit „Noch nicht übertragen“) und sendet sie von selbst, sobald wieder Netz da ist.
   Wie bei der Anwesenheit fragt die App beim Abmelden nach, wenn noch etwas nicht übertragen ist.
+  Wer vor dem Ende der Frist zu- oder absagt, aber kein
+  Netz hat, dessen Antwort gilt auch dann, wenn die App sie erst nach Beginn des Termins übertragen kann, ohne
+  zeitliche Grenze; maßgeblich ist die Uhrzeit des Handys. Bei den Rückmeldungen und in der
+  [Anwesenheit](app:verwaltung/anwesenheit) steht dann „nachträglich übertragen“.
 - **Punkte und Strafen ohne Internet**: Wer ohne Verbindung Punkte oder Strafen vergibt, verliert die Eingabe nicht mehr:
   Die App speichert die Buchung auf dem Gerät, zeigt im Formular „noch nicht übertragen“ und bucht sie von selbst, sobald
   wieder Netz da ist. Jede Buchung hat eine eigene Kennung; ging nur die Antwort unterwegs verloren, bucht der Server
@@ -299,7 +298,6 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   [Nutzung](app:einstellungen/nutzung) in einer Reihe. Die eigene [Übersicht](app:meins) und ein Mitglied in der
   Verwaltung stehen in zwei Spalten. Die Leiste mit den Bereichen steht am Computer wie beim Handy quer senkrecht am
   linken Rand. Handy hochkant bleibt, wie es ist.
-
 - **Gemeinsame Amtszeiten einklappbar**: Bei einer Ämtergruppe mit gemeinsamen Amtszeiten (z. B. Königshaus) unter
   [Ämter](app:mitglieder/aemter) lässt sich jede Amtszeit mit einem Tipp auf ihren Kopf auf- und zuklappen. Die laufende
   Amtszeit ist aufgeklappt (läuft keine, die neueste), alle anderen sind zu und zeigen nur Jahre und Namen; Bild und Ämter erscheinen erst beim
@@ -368,17 +366,14 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   die Erinnerung an Zu- und Absagen jetzt ausgeschaltet, wenn du den Haken entfernst und speicherst. In der
   WordPress-Version war der Haken nach dem Neuladen wieder gesetzt, weil WordPress beim ersten Ausschalten nichts
   gespeichert hat.
-
 - **Anwesenheit ohne Verbindung**: Wer in einer Anwesenheitsliste unter
   [Verwaltung → Anwesenheit](app:verwaltung/anwesenheit) ohne Internet auf _Speichern_ tippt, verliert die Häkchen nicht
   mehr. Die App merkt sie sich auf dem Gerät, auch über einen Neustart, zeigt sie mit dem Hinweis „Noch nicht
   übertragen“ und überträgt sie von selbst, sobald wieder Netz da ist. Übertragen wird nur, was geändert wurde, Einträge
   anderer bleiben. Bisher waren solche Eingaben nach dem Schließen der Liste weg.
-
 - **Ämter-Liste**: Unter [Verwaltung → Ämter](app:verwaltung/aemter) steht ein langer, zweizeiliger Name eines Amts jetzt
   linksbündig wie die übrigen statt mittig. Unter „Gemeinsame Amtszeiten“ hat der Knopf „Neue gemeinsame Amtszeit“ wieder
   Abstand zur Karte darüber.
-
 - **Benachrichtigung zu eingereichten Videos**: Wird ein eingereichtes Video in der Galerie freigegeben oder abgelehnt,
   spricht die Benachrichtigung jetzt vom Video („Video freigegeben“, „Dein Video … ist jetzt im Album …“) statt immer vom
   Bild. Wer prüft, liest bei neuen Einreichungen „Bilder oder Videos“, und die Rückfrage beim Ablehnen ohne Grund nennt
