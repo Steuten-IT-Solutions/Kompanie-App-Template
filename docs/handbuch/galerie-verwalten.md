@@ -58,8 +58,7 @@ Wähle sie wie oben aus und tippe auf **Nur für Mitglieder** (nur {rolle.member
    Mehrere Alben setzt du in der Übersicht in ein anderes Jahr: lange auf ein Album drücken, weitere antippen, **Jahr ändern**, Jahr eingeben, **Ändern**.
 
 ### Den Titel eines Albums auch auf Englisch eintragen
-
-Hat der Admin unter **Einstellungen → Sprachen** Englisch eingeschaltet, steht unter **Album bearbeiten** (und beim Anlegen unter **Einstellungen → Galerie**) der aufklappbare Abschnitt **Auf English schreiben (freiwillig)** mit **Titel auf English**. Wer die App auf Englisch nutzt, sieht diesen Titel; bleibt er leer, erscheint der deutsche. Ein Album aus Google Drive behält in Drive den deutschen Namen.
+Hat der Admin unter **Einstellungen → Sprachen** Englisch eingeschaltet, trägt ein Admin den englischen Titel eines Albums der App dort im Abschnitt **Übersetzungen** in der Gruppe **Alben der Galerie** ein. Unter **Album bearbeiten** steht dazu nur ein Hinweis mit Link dorthin. Wer die App auf Englisch nutzt, sieht diesen Titel; bleibt er leer, erscheint der deutsche. Ein Album aus Google Drive behält in Drive den deutschen Namen.
 
 ### Ein Album löschen
 

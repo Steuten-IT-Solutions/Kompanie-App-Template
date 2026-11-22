@@ -5,23 +5,7 @@ import { dataUpdated } from './dataCache';
 import { ErrorBox, Loading, Sheet, useAsync } from './ui';
 import { useBackClose } from './backClose';
 import { t, tn } from './i18n';
-import { extraLocales, fieldTranslationsInput, FieldTranslationsEditor, type FieldTranslations } from './translationFields';
-
-/** Titel eines Albums je weitere Sprache (Plan „Mehrsprachigkeit“, PR 9e) */
-const ALBUM_TITLE = [{ key: 'title', label: (language: string) => t('Titel auf {language}', { language }), maxLength: 120 }];
-export const albumTitleInput = (value: FieldTranslations, before?: FieldTranslations) => fieldTranslationsInput(['title'], value, before);
-
-export function AlbumTitleTranslations(props: { german: string; value: FieldTranslations; onChange: (next: FieldTranslations) => void }) {
-  return (
-    <FieldTranslationsEditor
-      fields={ALBUM_TITLE}
-      german={{ title: props.german }}
-      value={props.value}
-      onChange={props.onChange}
-      hint={(language) => t('Wer die App auf {language} nutzt, sieht diesen Titel. Bleibt er leer, erscheint der deutsche.', { language })}
-    />
-  );
-}
+import { hasLanguageChoice, TranslationsHint } from './language';
 
 /**
  * Galerie direkt in der Galerie verwalten (Recht manage_gallery, Admins sowieso): hochgeladene Bilder und Videos
@@ -229,10 +213,8 @@ export function AlbumEditSheet({
   const [year, setYear] = useState(album.year);
   const [busy, setBusy] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
-  // Mit weiteren Sprachen: deutscher Titel und Fassungen aus der Verwaltung (die Galerie zeigt den in der Sprache der App)
-  const multi = extraLocales().length > 0;
-  const [titles, setTitles] = useState<FieldTranslations>({});
-  const [before, setBefore] = useState<FieldTranslations | undefined>(undefined);
+  // Mit weiteren Sprachen: deutscher Titel aus der Verwaltung (die Galerie zeigt den in der Sprache der App)
+  const multi = hasLanguageChoice();
   const [loaded, setLoaded] = useState(!multi);
   useEffect(() => {
     if (!multi) return;
@@ -242,8 +224,6 @@ export function AlbumEditSheet({
       .then((a) => {
         if (!alive) return;
         setTitle(a.title);
-        setTitles((a.translations ?? {}) as FieldTranslations);
-        setBefore((a.translations ?? {}) as FieldTranslations);
       })
       .catch((e: Error) => alive && setEditError(e.message))
       .finally(() => alive && setLoaded(true));
@@ -273,8 +253,7 @@ export function AlbumEditSheet({
         className="form stack"
         onSubmit={async (e) => {
           e.preventDefault();
-          const translations = multi ? albumTitleInput(titles, before ?? {}) : undefined;
-          if (await run(() => api.updateGalleryAlbum(album.id, { title: title.trim(), year: Number(year), translations }))) onSaved();
+          if (await run(() => api.updateGalleryAlbum(album.id, { title: title.trim(), year: Number(year) }))) onSaved();
         }}
       >
         <label className="field">
@@ -285,7 +264,7 @@ export function AlbumEditSheet({
           <span>{t('Jahr')}</span>
           <input type="number" min={1800} value={year} onChange={(e) => setYear(e.target.value)} required />
         </label>
-        {multi && loaded && <AlbumTitleTranslations german={title} value={titles} onChange={setTitles} />}
+        <TranslationsHint />
         {editError && (
           <p className="form-error small" role="alert">
             {editError}

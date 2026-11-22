@@ -9,9 +9,7 @@ import { Caps, Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { prefetchOnTap, sources } from '../viewData';
 import { confirmAsk } from '../ask';
 import { IconButton } from '../icons';
-import { LANGUAGE_NAMES, UntranslatedNote } from '../language';
-import type { Locale } from '../i18n';
-import { extraLocales, FieldTranslationsEditor, type FieldTranslations, type TranslatedField } from '../translationFields';
+import { TranslationsHint, UntranslatedNote } from '../language';
 
 // Umfragen (Issue #4): #/umfragen (alle, auch beendete), #/umfragen/<id> (antworten, ändern, zurückziehen, Ergebnisse)
 // und #/umfragen/verwalten (anlegen, ändern, beenden, löschen; nur mit manage_polls). Laufende Umfragen stehen am
@@ -36,41 +34,6 @@ const RESULT_LABELS: Record<PollResults, string> = {
   after_end: t('Alle nach dem Ende'),
   managers: t('Nur wer alle Ergebnisse sehen darf'),
 };
-
-/** Frage und Beschreibung je weitere Sprache (Plan „Mehrsprachigkeit“, PR 9d); die Möglichkeiten darunter. */
-const TRANSLATED: TranslatedField[] = [
-  { key: 'title', label: (language) => t('Frage auf {language}', { language }), maxLength: TITLE_MAX },
-  { key: 'description', label: (language) => t('Beschreibung auf {language}', { language }), multiline: true },
-];
-type OptionTranslations = Partial<Record<Locale, string[]>>;
-
-/**
- * Fassungen für die Anfrage: beim Anlegen nur Sprachen mit Eintrag, beim Ändern nur geänderte; Möglichkeiten gleich
- * viele wie auf Deutsch (leer = deutsch).
- */
-function pollTranslationsInput(
-  fields: FieldTranslations,
-  options: OptionTranslations,
-  count: number,
-  poll?: Poll,
-): PollInput['translations'] {
-  const pad = (list: string[] | undefined) => Array.from({ length: count }, (_, i) => (list?.[i] ?? '').trim());
-  const out: NonNullable<PollInput['translations']> = {};
-  for (const lang of extraLocales()) {
-    const next = {
-      title: (fields[lang]?.title ?? '').trim(),
-      description: (fields[lang]?.description ?? '').trim(),
-      options: pad(options[lang]),
-    };
-    const old = poll?.translations?.[lang];
-    const changed = poll
-      ? JSON.stringify(next) !==
-        JSON.stringify({ title: old?.title ?? '', description: old?.description ?? '', options: pad(old?.options) })
-      : next.title !== '' || next.description !== '' || next.options.some((o) => o !== '');
-    if (changed) out[lang] = count > 0 ? next : { title: next.title, description: next.description };
-  }
-  return Object.keys(out).length > 0 ? out : undefined;
-}
 
 /** Wann die Ergebnisse sichtbar werden – vor dem Antworten deutlich gezeigt. */
 function resultsHint(poll: Poll): string {
@@ -327,14 +290,6 @@ function PollForm({ poll, onSaved, onCancel }: { poll?: Poll; onSaved: (p: Poll,
   const [description, setDescription] = useState(german?.description ?? poll?.description ?? '');
   const [type, setType] = useState<PollType>(poll?.type ?? 'single');
   const [options, setOptions] = useState<string[]>(german?.options ?? (poll ? poll.options.map((o) => o.title) : ['', '']));
-  const [trFields, setTrFields] = useState<FieldTranslations>(() =>
-    Object.fromEntries(
-      Object.entries(poll?.translations ?? {}).map(([l, tr]) => [l, { title: tr?.title ?? '', description: tr?.description ?? '' }]),
-    ),
-  );
-  const [trOptions, setTrOptions] = useState<OptionTranslations>(() =>
-    Object.fromEntries(Object.entries(poll?.translations ?? {}).map(([l, tr]) => [l, tr?.options ?? []])),
-  );
   const [anonymous, setAnonymous] = useState(poll?.anonymous ?? false);
   const [results, setResults] = useState<PollResults>(poll?.results ?? 'after_vote');
   const [endsAt, setEndsAt] = useState(toLocalInput(poll?.ends_at ?? null));
@@ -351,8 +306,6 @@ function PollForm({ poll, onSaved, onCancel }: { poll?: Poll; onSaved: (p: Poll,
     if (!poll && !(await confirmAsk(t('Umfrage jetzt veröffentlichen? Alle Mitglieder werden benachrichtigt.')))) return;
     const data: PollInput = { title, description, ends_at: fromLocalInput(endsAt) };
     if (!locked) Object.assign(data, { type, anonymous, results, ...(type !== 'text' ? { options } : {}) });
-    const translations = pollTranslationsInput(trFields, trOptions, type !== 'text' ? options.length : 0, poll);
-    if (translations) data.translations = translations;
     setBusy(true);
     try {
       const saved = poll ? await api.updatePoll(poll.id, data) : await api.createPoll(data);
@@ -362,8 +315,6 @@ function PollForm({ poll, onSaved, onCancel }: { poll?: Poll; onSaved: (p: Poll,
         setDescription('');
         setOptions(['', '']);
         setEndsAt('');
-        setTrFields({});
-        setTrOptions({});
       }
     } catch (err) {
       setError((err as Error).message);
@@ -414,12 +365,7 @@ function PollForm({ poll, onSaved, onCancel }: { poll?: Poll; onSaved: (p: Poll,
                     type="button"
                     className="btn btn-link"
                     aria-label={t('Möglichkeit {n} entfernen', { n: i + 1 })}
-                    onClick={() => {
-                      setOptions(options.filter((_, j) => j !== i));
-                      setTrOptions(
-                        Object.fromEntries(Object.entries(trOptions).map(([l, list]) => [l, (list ?? []).filter((_, j) => j !== i)])),
-                      );
-                    }}
+                    onClick={() => setOptions(options.filter((_, j) => j !== i))}
                   >
                     ×
                   </button>
@@ -455,42 +401,7 @@ function PollForm({ poll, onSaved, onCancel }: { poll?: Poll; onSaved: (p: Poll,
           </select>
         </label>
       </fieldset>
-      <FieldTranslationsEditor
-        fields={TRANSLATED}
-        german={{ title, description }}
-        value={trFields}
-        onChange={setTrFields}
-        hint={(language) =>
-          t(
-            'Wer die App auf {language} nutzt, sieht Frage, Beschreibung und Antwortmöglichkeiten in dieser Fassung. Was leer bleibt, erscheint auf Deutsch.',
-            {
-              language,
-            },
-          )
-        }
-        extra={(lang) =>
-          type !== 'text' && (
-            <div className="field poll-options-edit">
-              <span>{t('Antwortmöglichkeiten auf {language}', { language: LANGUAGE_NAMES[lang] })}</span>
-              {options.map((o, i) => (
-                <input
-                  key={i}
-                  type="text"
-                  aria-label={t('Möglichkeit {n} auf {language}', { n: i + 1, language: LANGUAGE_NAMES[lang] })}
-                  value={trOptions[lang]?.[i] ?? ''}
-                  placeholder={o}
-                  maxLength={OPTION_MAX}
-                  onChange={(e) => {
-                    const list = Array.from({ length: options.length }, (_, j) => trOptions[lang]?.[j] ?? '');
-                    list[i] = e.target.value;
-                    setTrOptions({ ...trOptions, [lang]: list });
-                  }}
-                />
-              ))}
-            </div>
-          )
-        }
-      />
+      <TranslationsHint />
       <label className="field">
         <span>{t('Ende (optional)')}</span>
         <input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />

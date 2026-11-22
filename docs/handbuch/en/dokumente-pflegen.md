@@ -54,7 +54,7 @@ The old file is deleted. If the version date no longer fits, change it afterward
 The categories appear in this order for the {rolle.member} accounts too.
 
 ### Names in English too
-If the admin has switched on English under **Settings → Languages**, uploading and editing show the expandable section **Write in English (optional)** with **Title in English** below the fields. Each category has the **In English** button: enter the English name there and confirm. Those using the app in English see these names; without an entry the German one appears. The file itself is the same for all languages. If you use the app in English yourself, you still see and edit the German names here.
+If the admin has switched on English under **Settings → Languages**, an admin enters the English titles of the {bereich.documents} and names of the categories there, in the **Translations** section in the **{bereich.documents}** and **Document categories** groups. This form only shows a note with a link to it. Those using the app in English see these names; without an entry the German one appears. The file itself is the same for all languages. Here you always edit the German names, even if you use the app in English yourself.
 
 ## Good to know
 - Allowed are PDF, Word, Excel, PowerPoint, OpenDocument and JPG and PNG images, at most 20 MB. If the server only accepts smaller files, the limit is shown below the form.

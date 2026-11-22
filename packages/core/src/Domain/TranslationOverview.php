@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\App;
+use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\I18n\I18n;
@@ -14,6 +15,12 @@ use KompanieApp\Core\I18n\I18n;
  * Basissprache (heute immer Deutsch), dem eingetragenen Text der gewählten Sprache und dem, was Leser ohne Eintrag sehen
  * (fallback, z. B. die übersetzte Vorgabe „Guest“ für „Gast“). Jede Art erscheint nur mit dem Recht, das sie zum Pflegen
  * verlangt (TranslationService::KINDS), und nur, wenn ihr Bereich an ist. Gespeichert wird über PUT /admin/translations.
+ *
+ * Dazu Inhalte mit einfachen Feldern (CONTENT): kommende Termine (öffentlich und im internen Kalender in der App),
+ * laufende Umfragen samt Antwortmöglichkeiten, Dokumente und ihre Kategorien, Alben der Galerie. Je Inhalt und Feld ein
+ * Eintrag mit context (deutscher Titel, bei Terminen mit Datum), label (Name des Felds) und multiline. Gespeichert wird
+ * über die Routen der Inhalte (translations im PATCH), damit Prüfung, Änderungsprotokoll und Benachrichtigungen dieselben
+ * bleiben. News fehlen hier bewusst: Sie werden beim Schreiben übersetzt.
  */
 final class TranslationOverview
 {
@@ -37,12 +44,26 @@ final class TranslationOverview
         'dokumente' => 'documents', 'brett' => 'board', 'dienstgrade' => 'ranks', 'punktekatalog' => 'catalog',
     ];
 
+    /** Inhalt => Rechte (eines reicht) */
+    private const CONTENT = [
+        EventService::KIND => [Capability::ManageEvents],
+        EventService::KIND_INTERNAL => [Capability::ManageCalendar],
+        PollService::KIND => [Capability::ManagePolls],
+        DocumentService::KIND => [Capability::ManageDocuments],
+        DocumentService::KIND_CATEGORY => [Capability::ManageDocuments],
+        GalleryUploadService::KIND => [Capability::ManageSettings, Capability::ManageGallery],
+    ];
+
+    /** Längste Texte der Felder (wie die Prüfung der Inhalte) */
+    private const EVENT_TITLE_MAX = 191;
+    private const EVENT_LOCATION_MAX = 191;
+
     public function __construct(private readonly App $app)
     {
     }
 
     /**
-     * @return array{locale: string, source_locale: string, groups: list<array{kind: string, items: list<array{kind: string, ref: string, field: string, source: string, text: string, fallback: string, max: int}>}>}
+     * @return array{locale: string, source_locale: string, groups: list<array{kind: string, items: list<array<string, mixed>>}>}
      */
     public function describe(User $user, mixed $locale): array
     {
@@ -77,6 +98,15 @@ final class TranslationOverview
                 ];
             }
             $groups[] = ['kind' => $kind, 'items' => $items];
+        }
+        foreach (self::CONTENT as $kind => $capabilities) {
+            if (array_filter($capabilities, $user->can(...)) === []) {
+                continue;
+            }
+            $items = $this->contentItems($kind, $locale);
+            if ($items !== null) {
+                $groups[] = ['kind' => $kind, 'items' => $items];
+            }
         }
         return ['locale' => $locale, 'source_locale' => I18n::SOURCE_LOCALE, 'groups' => $groups];
     }
@@ -157,6 +187,133 @@ final class TranslationOverview
             I18n::in($locale, static fn (): string => $config->configuredSectionLabel('intern')),
         );
         return $out;
+    }
+
+    /**
+     * Einträge eines Inhalts mit einfachen Feldern; null, wenn der Bereich aus ist.
+     *
+     * @return list<array<string, mixed>>|null
+     */
+    private function contentItems(string $kind, string $locale): ?array
+    {
+        $features = $this->app->features();
+        $today = $this->app->time()->today()->format('Y-m-d');
+        $rows = match ($kind) {
+            EventService::KIND => $features->enabled('events') ? $this->events('events', $today) : null,
+            EventService::KIND_INTERNAL => $features->enabled('calendar') && $this->app->calendar()->inApp() ? $this->events('internal_events', $today) : null,
+            PollService::KIND => $features->enabled('polls') ? $this->polls() : null,
+            DocumentService::KIND => $features->enabled('documents')
+                ? array_map(static fn (array $r): array => ['id' => (int) $r['id'], 'context' => (string) $r['title'], 'fields' => ['title' => (string) $r['title']]], $this->app->db->select('SELECT id, title FROM {documents} ORDER BY title ASC, id ASC'))
+                : null,
+            DocumentService::KIND_CATEGORY => $features->enabled('documents')
+                ? array_map(static fn (array $r): array => ['id' => (int) $r['id'], 'context' => (string) $r['title'], 'fields' => ['title' => (string) $r['title']]], $this->app->db->select('SELECT id, title FROM {doc_categories} ORDER BY sort ASC, id ASC'))
+                : null,
+            GalleryUploadService::KIND => $features->enabled('gallery')
+                ? array_values(array_map(static fn (array $a): array => ['id' => (int) $a['id'], 'context' => trim($a['title'] . ' ' . $a['year']), 'fields' => ['title' => (string) $a['title']]], array_filter($this->app->galleryUploads()->albums(), static fn (array $a): bool => (bool) $a['editable'] && $a['title'] !== '')))
+                : null,
+            default => null,
+        };
+        if ($rows === null) {
+            return null;
+        }
+        $saved = $this->app->translations()->repository()->forRefs($kind, array_map(static fn (array $r): string => (string) $r['id'], $rows));
+        $items = [];
+        foreach ($rows as $r) {
+            $tr = $saved[(string) $r['id']][$locale] ?? [];
+            $options = isset($tr['options']) ? json_decode($tr['options'], true) : null;
+            foreach ($r['fields'] as $field => $source) {
+                if ($source === '') {
+                    continue;
+                }
+                $option = str_starts_with($field, 'option:') ? (int) substr($field, 7) : null;
+                $text = $option !== null
+                    ? (is_array($options) && count($options) === $r['option_count'] && is_string($options[$option] ?? null) ? $options[$option] : '')
+                    : ($tr[$field] ?? '');
+                $items[] = [
+                    'kind' => $kind,
+                    'ref' => (string) $r['id'],
+                    'field' => $field,
+                    'source' => $source,
+                    'text' => $text,
+                    'fallback' => $source,
+                    'max' => self::max($kind, $field),
+                    'context' => $r['context'],
+                    'label' => self::label($kind, $field),
+                    'multiline' => $field === 'description',
+                ];
+            }
+        }
+        return $items;
+    }
+
+    /**
+     * Kommende Termine (Ende oder Beginn ab heute), nach Beginn.
+     *
+     * @return list<array{id: int, context: string, fields: array<string, string>}>
+     */
+    private function events(string $table, string $today): array
+    {
+        $rows = $this->app->db->select(
+            'SELECT id, title, start_date, end_date, location, description FROM {' . $table . '} WHERE COALESCE(end_date, start_date) >= ? ORDER BY start_date ASC, id ASC',
+            [$today],
+        );
+        return array_map(static fn (array $r): array => [
+            'id' => (int) $r['id'],
+            'context' => trim($r['title'] . ' · ' . (string) $r['start_date']),
+            'fields' => ['title' => (string) $r['title'], 'location' => (string) $r['location'], 'description' => (string) $r['description']],
+        ], $rows);
+    }
+
+    /**
+     * Laufende Umfragen (nicht beendet), dazu ihre Antwortmöglichkeiten als Felder option:<Nummer ab 0>.
+     *
+     * @return list<array{id: int, context: string, fields: array<string, string>, option_count: int}>
+     */
+    private function polls(): array
+    {
+        $now = $this->app->time()->nowUtc();
+        $rows = $this->app->db->select('SELECT id, title, description FROM {polls} WHERE closed_at IS NULL AND (ends_at IS NULL OR ends_at > ?) ORDER BY id DESC', [$now]);
+        $ids = array_map(static fn (array $r): int => (int) $r['id'], $rows);
+        $options = [];
+        if ($ids !== []) {
+            foreach ($this->app->db->select('SELECT poll_id, title FROM {poll_options} WHERE poll_id IN (' . implode(',', array_fill(0, count($ids), '?')) . ') ORDER BY sort, id', $ids) as $o) {
+                $options[(int) $o['poll_id']][] = (string) $o['title'];
+            }
+        }
+        return array_map(static function (array $r) use ($options): array {
+            $fields = ['title' => (string) $r['title'], 'description' => (string) $r['description']];
+            foreach ($options[(int) $r['id']] ?? [] as $i => $title) {
+                $fields['option:' . $i] = $title;
+            }
+            return ['id' => (int) $r['id'], 'context' => (string) $r['title'], 'fields' => $fields, 'option_count' => count($options[(int) $r['id']] ?? [])];
+        }, $rows);
+    }
+
+    private static function max(string $kind, string $field): int
+    {
+        return match (true) {
+            $kind === PollService::KIND && $field === 'title' => PollService::TITLE_MAX,
+            $kind === PollService::KIND && $field === 'description' => PollService::DESCRIPTION_MAX,
+            $kind === PollService::KIND => PollService::OPTION_MAX,
+            $field === 'description' => EventService::MAX_DESCRIPTION,
+            $field === 'location' => self::EVENT_LOCATION_MAX,
+            $kind === DocumentService::KIND || $kind === DocumentService::KIND_CATEGORY => DocumentService::TITLE_MAX,
+            $kind === GalleryUploadService::KIND => GalleryUploadService::TITLE_MAX,
+            default => self::EVENT_TITLE_MAX,
+        };
+    }
+
+    /** Name des Felds in der Sprache der Anfrage. */
+    private static function label(string $kind, string $field): string
+    {
+        if (str_starts_with($field, 'option:')) {
+            return I18n::t('Antwort {n}', ['n' => (int) substr($field, 7) + 1]);
+        }
+        return match ($field) {
+            'title' => $kind === PollService::KIND ? I18n::t('Frage') : ($kind === DocumentService::KIND_CATEGORY ? I18n::t('Bezeichnung') : I18n::t('Titel')),
+            'location' => I18n::t('Ort'),
+            default => I18n::t('Beschreibung'),
+        };
     }
 
     /**

@@ -92,7 +92,7 @@ final class TranslationOverviewTest extends TestCase
         $this->assertSame(200, $res->status, (string) json_encode($res->data));
         $this->assertSame('en', $res->data['locale'], 'Vorgabe: die erste weitere Sprache');
         $this->assertSame('de', $res->data['source_locale']);
-        $this->assertSame(['nav', 'role', 'rank', 'office', 'office_group', 'event_kind', 'menu'], self::kinds($res->data));
+        $this->assertSame(['nav', 'role', 'rank', 'office', 'office_group', 'event_kind', 'menu'], array_slice(self::kinds($res->data), 0, 7));
 
         $navItems = self::group($res->data, 'nav');
         $this->assertSame(['source' => 'Termine', 'text' => '', 'fallback' => 'Events'], array_intersect_key($navItems['termine'], array_flip(['source', 'text', 'fallback'])), 'ohne eigenen Namen die übersetzte Vorgabe');
@@ -112,10 +112,64 @@ final class TranslationOverviewTest extends TestCase
     public function testKindsOfAreasThatAreOff(): void
     {
         $this->call($this->admin, 'PATCH', '/admin/settings', ['languages' => 'de,en']);
-        $this->app->features()->update(['ranks' => false, 'offices' => false, 'gallery' => false]);
+        $this->app->features()->update(['ranks' => false, 'offices' => false, 'gallery' => false, 'events' => false, 'polls' => false, 'documents' => false]);
         $res = $this->call($this->admin, 'GET', '/admin/translations');
         $this->assertSame(['nav', 'role', 'event_kind', 'menu'], self::kinds($res->data));
         $this->assertArrayNotHasKey('galerie', self::group($res->data, 'nav'));
         $this->assertArrayHasKey('termine', self::group($res->data, 'nav'));
+    }
+
+    public function testContentWithSimpleFields(): void
+    {
+        $this->call($this->admin, 'PATCH', '/admin/settings', ['languages' => 'de,en', 'calendar_source' => 'app']);
+        $future = $this->call($this->admin, 'POST', '/events', ['title' => 'Schützenfest', 'start_date' => '2099-06-01', 'location' => 'Festplatz'])->data['id'];
+        $this->call($this->admin, 'POST', '/events', ['title' => 'Altes Fest', 'start_date' => '2000-06-01'])->data['id'];
+        $entry = $this->call($this->admin, 'POST', '/calendar/entries', ['title' => 'Arbeitsdienst', 'start_date' => '2099-07-01', 'description' => 'Mit Handschuhen'])->data['id'];
+        $poll = $this->call($this->admin, 'POST', '/polls', ['title' => 'Grillfest?', 'type' => 'single', 'options' => ['Ja', 'Nein']])->data['id'];
+        $category = $this->call($this->admin, 'POST', '/document-categories', ['title' => 'Protokolle'])->data['id'];
+        // Fassung aus einem Editor erscheint hier
+        $this->call($this->admin, 'PATCH', "/polls/{$poll}", ['translations' => ['en' => ['title' => 'Barbecue?', 'options' => ['Yes', '']]]]);
+
+        $res = $this->call($this->admin, 'GET', '/admin/translations', [], [], 'en');
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $this->assertContains('event', self::kinds($res->data));
+        $events = self::itemsOf($res->data, 'event');
+        $refs = array_unique(array_column($events, 'ref'));
+        $this->assertSame([(string) $future], array_values($refs), 'nur kommende Termine');
+        $fields = array_column(array_filter($events, static fn (array $i): bool => $i['ref'] === (string) $future), null, 'field');
+        $this->assertSame(['title', 'location'], array_keys($fields), 'leere Felder (Beschreibung) fehlen');
+        $this->assertSame('Location', $fields['location']['label'], 'Feldname in der Sprache der Anfrage');
+        $this->assertSame('Schützenfest · 2099-06-01', $fields['title']['context']);
+        $this->assertFalse($fields['title']['multiline']);
+
+        $calendar = self::itemsOf($res->data, 'calendar_entry');
+        $this->assertSame(['title', 'description'], array_column($calendar, 'field'));
+        $this->assertTrue($calendar[1]['multiline']);
+        $this->assertSame((string) $entry, $calendar[0]['ref']);
+
+        $polls = array_column(self::itemsOf($res->data, 'poll'), null, 'field');
+        $this->assertSame(['title', 'option:0', 'option:1'], array_keys($polls));
+        $this->assertSame('Barbecue?', $polls['title']['text']);
+        $this->assertSame('Yes', $polls['option:0']['text']);
+        $this->assertSame('', $polls['option:1']['text']);
+        $this->assertSame('Answer 2', $polls['option:1']['label']);
+
+        $this->assertSame('Protokolle', self::itemsOf($res->data, 'document_category')[0]['source']);
+        $this->assertSame((string) $category, self::itemsOf($res->data, 'document_category')[0]['ref']);
+        $this->assertNotContains('news', self::kinds($res->data), 'News werden beim Schreiben übersetzt');
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @return list<array<string, mixed>>
+     */
+    private static function itemsOf(array $data, string $kind): array
+    {
+        foreach ($data['groups'] as $g) {
+            if ($g['kind'] === $kind) {
+                return $g['items'];
+            }
+        }
+        return [];
     }
 }

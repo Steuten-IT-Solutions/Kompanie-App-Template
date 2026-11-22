@@ -30,15 +30,14 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Sprache ein (anfangs nur Deutsch). Dann steht oben eine Flagge, mit der jede Person Deutsch oder Englisch wählt, auch
   ohne Anmeldung; unter [Meins → Konto](app:meins/konto) gibt es dieselbe Wahl. Angemeldete behalten ihre Sprache auf allen
   Geräten und bekommen Mails und Benachrichtigungen in dieser Sprache. Übersetzt sind die Texte der App und die vorgegebenen Namen
-  der Bereiche und Rollen (z. B. „Termine“ → „Events“). Alle eigenen Namen trägst du an einer Stelle auf Englisch ein:
-  unter [Einstellungen → Sprachen](app:einstellungen/sprachen) im Abschnitt _Übersetzungen_, je Gruppe (Bereiche der
-  Navigation, Untermenüs, Rollen, Dienstgrade, Ämter und ihre Gruppen, Terminarten) mit Zähler, Suche und „Nur fehlende
-  zeigen“; ohne Eintrag bleibt der deutsche Name. Eigene Seiten
+  der Bereiche und Rollen (z. B. „Termine“ → „Events“). Eigene Namen und einfache Inhalte trägst du an einer Stelle auf
+  Englisch ein: unter [Einstellungen → Sprachen](app:einstellungen/sprachen) im Abschnitt _Übersetzungen_, je Gruppe
+  (Bereiche der Navigation, Untermenüs, Rollen, Dienstgrade, Ämter und ihre Gruppen, Terminarten, kommende Termine,
+  laufende Umfragen, Dokumente und ihre Kategorien, Alben der Galerie) mit Zähler, Suche und „Nur fehlende zeigen“; ohne
+  Eintrag bleibt der deutsche Text, und Benachrichtigungen gehen in der Sprache der Empfänger. Eigene Seiten
   bekommen unter [Verwaltung → Seiten](app:verwaltung/seiten) mit _Schreiben auf: English_ eine englische Fassung, ebenso
   [News](app:news), die ihr in der App schreibt (beim Bearbeiten), und Nachrichten am [Schwarzen Brett](app:brett)
-  (_Auf English schreiben_ unter dem Inhalt; Benachrichtigung und Mail gehen dann in der Sprache der Empfänger),
-  ebenso [Termine](app:termine/verwalten), [Umfragen](app:umfragen/verwalten), die Namen von
-  [Dokumenten](app:dokumente/verwalten) und ihren Kategorien und die Titel der Alben in der [Galerie](app:galerie); wer
+  (_Auf English schreiben_ unter dem Inhalt; Benachrichtigung und Mail gehen dann in der Sprache der Empfänger); wer
   auf Englisch liest und sie nicht hat, sieht die deutsche mit dem Hinweis „Nur auf Deutsch verfügbar“. Mit WordPress
   zeigen die News aus den Beiträgen der Seite auf Englisch die Übersetzung aus dem Plugin Polylang, wenn es aktiv ist;
   Beiträge einer anderen Webseite oder aus einem Feed bleiben deutsch (mit dem Hinweis). Was ihr sonst eintragt, bleibt,

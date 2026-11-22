@@ -30,12 +30,9 @@ Tap **{bereich.events}** at the bottom and then **Manage public events** at the 
 3. Tap **Save**. **Cancel** leaves everything as it was.
 
 ### Enter an event in English too
-If the admin has switched on English under **Settings → Languages**, the form has the expandable section **Write in English (optional)** below the **Description**.
-1. Tap **Write in English (optional)**.
-2. Enter **Title in English**, **Location in English** and **Description in English**. Empty fields show the German text in grey.
-3. Tap **Save**.
+If the admin has switched on English under **Settings → Languages**, an admin enters the title, location and description in English there, in the **Translations** section in the **Upcoming events** group. The form only shows a note with a link to it. The group shows events from today on; past ones drop out.
 
-Those using the app in English see the event in this version, including in the notification. Anything you leave empty appears in German, with the note *Partly only available in German* on the opened event. Date, time and link apply to all languages. If you use the app in English yourself, you still edit the German version at the top of the form.
+Those using the app in English see the event in this version, including in the notification. Anything left empty appears in German, with the note *Partly only available in German* on the opened event. Date, time and link apply to all languages. In this form you always edit the German version, even if you use the app in English yourself.
 
 ### Delete an event
 1. Tap **Delete** next to the event.

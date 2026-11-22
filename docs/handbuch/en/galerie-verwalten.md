@@ -54,8 +54,7 @@ Select them as above and tap **Members only** (only {rolle.member} accounts see 
    You move several albums to another year in the overview: press and hold an album, tap more, **Change year**, enter the year, **Edit**.
 
 ### Enter an album’s title in English too
-
-If the admin has switched on English under **Settings → Languages**, **Edit album** (and, when creating, **Settings → Gallery**) has the expandable section **Write in English (optional)** with **Title in English**. Those using the app in English see this title; if it is empty, the German one appears. An album from Google Drive keeps its German name in Drive.
+If the admin has switched on English under **Settings → Languages**, an admin enters the English title of an app album there, in the **Translations** section in the **Gallery albums** group. **Edit album** only shows a note with a link to it. Those using the app in English see this title; if it is empty, the German one appears. An album from Google Drive keeps its German name in Drive.
 
 ### Delete an album
 
