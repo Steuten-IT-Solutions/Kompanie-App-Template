@@ -1,12 +1,18 @@
 /** Hilfen für Einstellungen → Sprachen → Übersetzungen (views/Uebersetzungen.tsx). */
-import type { ContentKind, TranslationItem } from './api';
+import type { BlocksKind, ContentKind, TranslationItem } from './api';
 import type { NameKind } from './names';
 
 /** Eindeutige Kennung eines Eintrags (Art, Kennung, Feld). */
 export const keyOf = (i: Pick<TranslationItem, 'kind' | 'ref' | 'field'>): string => `${i.kind}\u0000${i.ref}\u0000${i.field}`;
 
 /** Fehlt die Übersetzung? Nicht, wenn Leser ohne Eintrag schon eine eigene Fassung sehen (z. B. die übersetzte Vorgabe). */
-export const isMissing = (i: TranslationItem, text = i.text): boolean => text.trim() === '' && i.fallback === i.source;
+export const isMissing = (i: TranslationItem, text = i.text): boolean =>
+  isBlocks(i) ? (i.done ?? 0) < (i.total ?? 0) : text.trim() === '' && i.fallback === i.source;
+
+const BLOCKS_KINDS: readonly string[] = ['page', 'board'] satisfies BlocksKind[];
+
+/** Inhalt aus Blöcken (eigene Seite, Nachricht am Brett): übersetzt in einem eigenen Formular, nicht über „Speichern“. */
+export const isBlocks = <T extends Pick<TranslationItem, 'kind'>>(i: T): i is T & { kind: BlocksKind } => BLOCKS_KINDS.includes(i.kind);
 
 /** Passt der Eintrag zur Suche (Text der Basissprache, Übersetzung, Vorgabe oder Titel des Inhalts)? */
 export function matches(i: TranslationItem, query: string, text = i.text): boolean {
@@ -35,7 +41,9 @@ export interface ContentRequest {
  * alle leer, als leere Liste (dann gilt die deutsche).
  */
 export function contentRequests(all: TranslationItem[], value: (i: TranslationItem) => string): ContentRequest[] {
-  const changed = new Set(all.filter((i) => !isName(i) && value(i).trim() !== i.text).map((i) => `${i.kind}\u0000${i.ref}`));
+  const changed = new Set(
+    all.filter((i) => !isName(i) && !isBlocks(i) && value(i).trim() !== i.text).map((i) => `${i.kind}\u0000${i.ref}`),
+  );
   const out = new Map<string, ContentRequest>();
   for (const i of all) {
     const ref = `${i.kind}\u0000${i.ref}`;

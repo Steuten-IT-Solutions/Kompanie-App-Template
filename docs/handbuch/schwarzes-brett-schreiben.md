@@ -104,7 +104,7 @@ Hat der Admin unter **Einstellungen → Sprachen** Englisch eingeschaltet, steht
 3. Darunter steht jeder Block mit Text noch einmal, nur mit seinen Texten. Schreibe sie auf Englisch. Beim Textblock zeigt **Deutscher Text** zum Aufklappen, was auf Deutsch steht.
 4. Veröffentliche oder speichere die Nachricht wie sonst auch.
 
-Wer die App auf Englisch nutzt, sieht die englische Fassung und bekommt Benachrichtigung und Mail auf Englisch. Was du leer lässt, erscheint auf Deutsch, mit dem Hinweis *Teilweise nur auf Deutsch verfügbar*. Ändern kannst du die englische Fassung später beim Bearbeiten im selben Abschnitt. Benachrichtigung und Mail gehen aber nur beim Veröffentlichen raus, also schreibe die englische Fassung am besten gleich mit.
+Wer die App auf Englisch nutzt, sieht die englische Fassung und bekommt Benachrichtigung und Mail auf Englisch. Was du leer lässt, erscheint auf Deutsch, mit dem Hinweis *Teilweise nur auf Deutsch verfügbar*. Ändern kannst du die englische Fassung später beim Bearbeiten im selben Abschnitt. Benachrichtigung und Mail gehen aber nur beim Veröffentlichen raus, also schreibe die englische Fassung am besten gleich mit. Laufende Nachrichten kann ein Admin auch unter **Einstellungen → Sprachen** im Abschnitt **Übersetzungen** in der Gruppe **{bereich.board}** übersetzen.
 
 ### Nachsehen, wer was geändert hat
 1. Tippe bei der Nachricht auf **Verlauf**.

@@ -7,6 +7,7 @@ namespace KompanieApp\Core\Domain;
 use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
+use KompanieApp\Core\Domain\Blocks\Blocks;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\I18n\I18n;
 
@@ -20,7 +21,8 @@ use KompanieApp\Core\I18n\I18n;
  * laufende Umfragen samt Antwortmöglichkeiten, Dokumente und ihre Kategorien, Alben der Galerie. Je Inhalt und Feld ein
  * Eintrag mit context (deutscher Titel, bei Terminen mit Datum), label (Name des Felds) und multiline. Gespeichert wird
  * über die Routen der Inhalte (translations im PATCH), damit Prüfung, Änderungsprotokoll und Benachrichtigungen dieselben
- * bleiben. News fehlen hier bewusst: Sie werden beim Schreiben übersetzt.
+ * bleiben. Eigene Seiten und laufende Nachrichten am Brett (BLOCKS) je Inhalt mit Stand. News fehlen hier bewusst: Sie
+ * werden beim Schreiben übersetzt.
  */
 final class TranslationOverview
 {
@@ -52,6 +54,15 @@ final class TranslationOverview
         DocumentService::KIND => [Capability::ManageDocuments],
         DocumentService::KIND_CATEGORY => [Capability::ManageDocuments],
         GalleryUploadService::KIND => [Capability::ManageSettings, Capability::ManageGallery],
+    ];
+
+    /**
+     * Inhalte aus Blöcken => Rechte (alle nötig): je Inhalt ein Eintrag mit Stand (total, done); übersetzt wird Block für
+     * Block in einem eigenen Formular (Route des Inhalts). Am Brett braucht es zum Lesen der Fassungen auch den Verlauf.
+     */
+    private const BLOCKS = [
+        PageService::KIND => [Capability::ManagePages],
+        BoardService::KIND => [Capability::PostBoard, Capability::ViewBoardHistory],
     ];
 
     /** Längste Texte der Felder (wie die Prüfung der Inhalte) */
@@ -104,6 +115,15 @@ final class TranslationOverview
                 continue;
             }
             $items = $this->contentItems($kind, $locale);
+            if ($items !== null) {
+                $groups[] = ['kind' => $kind, 'items' => $items];
+            }
+        }
+        foreach (self::BLOCKS as $kind => $capabilities) {
+            if (count(array_filter($capabilities, $user->can(...))) !== count($capabilities)) {
+                continue;
+            }
+            $items = $this->blockItems($kind, $locale);
             if ($items !== null) {
                 $groups[] = ['kind' => $kind, 'items' => $items];
             }
@@ -242,6 +262,53 @@ final class TranslationOverview
                     'multiline' => $field === 'description',
                 ];
             }
+        }
+        return $items;
+    }
+
+    /**
+     * Eigene Seiten bzw. laufende Nachrichten am Brett: je Inhalt ein Eintrag (field content) mit deutschem Titel,
+     * übersetztem Titel und dem Stand der Fassung (übersetzbare Felder samt Titel, davon übersetzt). null, wenn der
+     * Bereich aus ist.
+     *
+     * @return list<array<string, mixed>>|null
+     */
+    private function blockItems(string $kind, string $locale): ?array
+    {
+        $features = $this->app->features();
+        $rows = match ($kind) {
+            PageService::KIND => $features->enabled('pages')
+                ? $this->app->db->select('SELECT id, title, body, blocks FROM {app_pages} ORDER BY sort ASC, id ASC')
+                : null,
+            BoardService::KIND => $features->enabled('board')
+                ? $this->app->board()->repository()->active($this->app->time()->nowUtc())
+                : null,
+            default => null,
+        };
+        if ($rows === null) {
+            return null;
+        }
+        $saved = $this->app->translations()->repository()->forRefs($kind, array_map(static fn (array $r): string => (string) $r['id'], $rows));
+        $items = [];
+        foreach ($rows as $r) {
+            $fields = $saved[(string) $r['id']][$locale] ?? [];
+            $title = (string) $r['title'];
+            $german = Blocks::decode($r['blocks'] ?? null, (string) ($r['body'] ?? ''));
+            [, , $total, $done] = ContentTranslations::blocksIn($title, $german, $fields);
+            $items[] = [
+                'kind' => $kind,
+                'ref' => (string) $r['id'],
+                'field' => 'content',
+                'source' => $title,
+                'text' => $fields['title'] ?? '',
+                'fallback' => $title,
+                'max' => $kind === PageService::KIND ? PageService::TITLE_MAX : BoardService::TRANSLATION_TITLE_MAX,
+                'context' => $title,
+                'label' => I18n::t('Inhalt'),
+                'multiline' => false,
+                'total' => $total,
+                'done' => $done,
+            ];
         }
         return $items;
     }

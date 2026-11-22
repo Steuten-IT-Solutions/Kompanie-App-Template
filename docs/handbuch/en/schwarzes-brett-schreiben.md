@@ -101,7 +101,7 @@ If the admin has switched on English under **Settings → Languages**, the expan
 3. Below it, each block with text appears again, with only its texts. Write them in English. For the text block, **German text** expands to show what it says in German.
 4. Publish or save the message as usual.
 
-Those using the app in English see the English version and get the notification and email in English. Anything you leave empty appears in German with the note *Partly only available in German*. You can change the English version later when editing, in the same section. The notification and email are only sent when publishing, though, so it’s best to write the English version straight away.
+Those using the app in English see the English version and get the notification and email in English. Anything you leave empty appears in German with the note *Partly only available in German*. You can change the English version later when editing, in the same section. The notification and email are only sent when publishing, though, so it’s best to write the English version straight away. An admin can also translate running messages under **Settings → Languages** in the **Translations** section, in the **{bereich.board}** group.
 
 ### See who changed what
 1. Tap **History** on the message.

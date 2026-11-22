@@ -5008,7 +5008,7 @@ test('Sprachen: englische Namen für eine Terminart und ein Untermenü, Mitglied
   }
 });
 
-test('Sprachen: eigene Seite auf Englisch schreiben, Gäste auf Englisch lesen sie, sonst Hinweis „Nur auf Deutsch“', async ({
+test('Sprachen: eigene Seite zentral auf Englisch übersetzen, Gäste auf Englisch lesen sie, sonst Hinweis „Nur auf Deutsch“', async ({
   page,
   browser,
 }) => {
@@ -5052,30 +5052,36 @@ test('Sprachen: eigene Seite auf Englisch schreiben, Gäste auf Englisch lesen s
     await expect(visitor.locator('.page-article')).toContainText('Über die Brücke');
     await expect(visitor.locator('.untranslated-note')).toHaveText('Only available in German');
 
-    // Schreiben auf Englisch: Titel und Texte, Aufbau bleibt
+    // Unter Seiten nur noch der Hinweis auf die zentrale Stelle
     await page.goto('/app/#/verwaltung/seiten');
     await page.reload();
-    await page.locator('.edit-lang').getByRole('button', { name: 'English' }).click();
-    await expect(page.locator('.page-admin-list .row', { hasText: german })).toContainText('ohne English');
-    await page.locator('.page-admin-list .row', { hasText: german }).getByRole('button', { name: 'Bearbeiten' }).click();
-    const edit = page.locator('.page-admin-list form');
-    await expect(edit.getByLabel('Titel')).toHaveAttribute('placeholder', german);
-    await edit.getByLabel('Titel').fill(english);
+    await expect(page.getByRole('link', { name: 'Einstellungen → Sprachen' })).toBeVisible();
+    await expect(page.locator('.edit-lang')).toHaveCount(0);
+
+    // Zentral unter Übersetzungen: Titel und Texte, Aufbau bleibt
+    await openLanguages(page);
+    const card = page.locator('#einstellungen-uebersetzungen');
+    await openTranslationGroup(card, 'Seiten');
+    const row = card.locator('.translation-blocks', { hasText: german });
+    await expect(row).toContainText('0 von 4 übersetzt');
+    await row.getByRole('button', { name: `„${german}“ übersetzen` }).click();
+    const edit = row.locator('form.blocks-translation');
+    await expect(edit.getByLabel('Titel auf English')).toHaveAttribute('placeholder', german);
+    await edit.getByLabel('Titel auf English').fill(english);
     await edit.getByRole('textbox', { name: 'Text', exact: true }).first().fill('Over the bridge, then left.');
     await expect(edit.locator('textarea')).toHaveAttribute('placeholder', 'Am Markt ist Platz.');
     await edit.locator('textarea').fill('There is room at the market.');
     await edit.getByRole('button', { name: 'Speichern' }).click();
     await expect(page.locator('.toast')).toHaveText('Gespeichert');
-    await expect(page.locator('.page-admin-list .row', { hasText: german })).toContainText('ohne English');
+    await expect(row).toContainText('3 von 4 übersetzt');
 
     // Rest übersetzen: die Überschrift des Hinweises
-    await page.locator('.page-admin-list .row', { hasText: german }).getByRole('button', { name: 'Bearbeiten' }).click();
-    await expect(edit.getByLabel('Titel')).toHaveValue(english);
+    await row.getByRole('button', { name: `„${german}“ übersetzen` }).click();
+    await expect(edit.getByLabel('Titel auf English')).toHaveValue(english);
     await edit.getByLabel('Überschrift').fill('Parking');
     await edit.getByRole('button', { name: 'Speichern' }).click();
     await expect(page.locator('.toast')).toHaveText('Gespeichert');
-    await expect(page.locator('.page-admin-list .row', { hasText: german })).not.toContainText('ohne English');
-    await page.locator('.edit-lang').getByRole('button', { name: 'Deutsch' }).click();
+    await expect(row).toContainText('4 von 4 übersetzt');
 
     await visitor.goto(`/app/#/seiten/${pageId}`);
     await visitor.reload();
@@ -5196,6 +5202,17 @@ test('Sprachen: Nachricht am Brett auch auf Englisch schreiben, Gäste auf Engli
     await expect(editing.getByLabel('Titel', { exact: true })).toHaveValue(german);
     await expect(editing.getByLabel('Titel auf English')).toHaveValue(english);
     await editing.getByRole('button', { name: 'Abbrechen' }).click();
+
+    // Auch zentral unter Übersetzungen, mit Stand (Titel und Text übersetzt)
+    await openLanguages(page);
+    const translations = page.locator('#einstellungen-uebersetzungen');
+    await openTranslationGroup(translations, 'Schwarzes Brett');
+    const row = translations.locator('.translation-blocks', { hasText: german });
+    await expect(row).toContainText('2 von 2 übersetzt');
+    await row.getByRole('button', { name: `„${german}“ übersetzen` }).click();
+    await expect(row.getByLabel('Titel auf English')).toHaveValue(english);
+    await row.getByRole('button', { name: 'Abbrechen' }).click();
+    await page.goto('/app/#/brett');
 
     const visitor = await quietPage(browser);
     await visitor.goto('/app/');

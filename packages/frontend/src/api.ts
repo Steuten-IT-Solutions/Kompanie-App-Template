@@ -726,7 +726,9 @@ export function applyMaintenance(m: MaintenanceInfo): void {
 }
 
 /** Art eines übersetzbaren Namens (wie TranslationService::KINDS) */
-export type TranslationKind = NameKind | ContentKind;
+export type TranslationKind = NameKind | ContentKind | BlocksKind;
+/** Inhalte aus Blöcken (TranslationOverview::BLOCKS): je Inhalt ein Eintrag mit Stand, übersetzt Block für Block */
+export type BlocksKind = 'page' | 'board';
 /** Inhalte mit einfachen Feldern in der Übersicht der Übersetzungen (TranslationOverview::CONTENT) */
 export type ContentKind = 'event' | 'calendar_entry' | 'poll' | 'document' | 'document_category' | 'album';
 
@@ -746,6 +748,9 @@ export interface TranslationItem {
   context?: string;
   label?: string;
   multiline?: boolean;
+  /** Nur bei Inhalten aus Blöcken: übersetzbare Felder samt Titel, davon übersetzt */
+  total?: number;
+  done?: number;
 }
 
 export interface TranslationOverview {

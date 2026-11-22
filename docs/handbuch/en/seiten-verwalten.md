@@ -86,13 +86,13 @@ Optionally enter a **Heading** and the **Place or address** (e.g. “Am Markt 1,
 Hold an entry by the handle on the left, drag it to the place you want and let go. The order is saved straight away. On a computer it also works with the keyboard: select the handle with the Tab key, then arrow up or down. The order applies in the standard navigation; with your own navigation, that decides the place of each page.
 
 ### Write a page in English
-If English is switched on in the app, **Write in: Deutsch | English** appears at the top. This is how you write the English version of a page:
-1. Create the page in German as usual.
-2. Choose **English** at the top and tap **Edit** on the page.
+If English is switched on in the app, an admin translates the pages under **Settings → Languages** in the **Translations** section, in the **{bereich.pages}** group. This page shows a note with a link to it.
+1. Expand the **{bereich.pages}** group. Each page shows how many texts are already translated, e.g. **3 of 4 translated**.
+2. Tap **Translate** next to the page.
 3. Enter the English title and the texts of the blocks. Empty fields show the German text in grey; for the text block, **German text** expands it.
 4. Tap **Save**.
 
-In English you only write texts. Which blocks there are, their order, **For whom?** and settings such as date, link or events you change in German; they apply to both languages. A block you keep in German also keeps its English version. Pages that still lack something in English carry the note **no English** in the list.
+In English you only write texts. Which blocks there are, their order, **For whom?** and settings such as date, link or events you change here in German; they apply to both languages. A block you keep in German also keeps its English version.
 
 ### Delete a page
 Tap **Delete** and confirm. The page’s pictures are then gone too, and the page disappears from the navigation.

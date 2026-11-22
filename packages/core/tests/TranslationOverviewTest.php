@@ -112,7 +112,7 @@ final class TranslationOverviewTest extends TestCase
     public function testKindsOfAreasThatAreOff(): void
     {
         $this->call($this->admin, 'PATCH', '/admin/settings', ['languages' => 'de,en']);
-        $this->app->features()->update(['ranks' => false, 'offices' => false, 'gallery' => false, 'events' => false, 'polls' => false, 'documents' => false]);
+        $this->app->features()->update(['ranks' => false, 'offices' => false, 'gallery' => false, 'events' => false, 'polls' => false, 'documents' => false, 'pages' => false, 'board' => false]);
         $res = $this->call($this->admin, 'GET', '/admin/translations');
         $this->assertSame(['nav', 'role', 'event_kind', 'menu'], self::kinds($res->data));
         $this->assertArrayNotHasKey('galerie', self::group($res->data, 'nav'));
@@ -157,6 +157,30 @@ final class TranslationOverviewTest extends TestCase
         $this->assertSame('Protokolle', self::itemsOf($res->data, 'document_category')[0]['source']);
         $this->assertSame((string) $category, self::itemsOf($res->data, 'document_category')[0]['ref']);
         $this->assertNotContains('news', self::kinds($res->data), 'News werden beim Schreiben übersetzt');
+    }
+
+    public function testPagesAndBoardWithState(): void
+    {
+        $this->call($this->admin, 'PATCH', '/admin/settings', ['languages' => 'de,en']);
+        $page = $this->call($this->admin, 'POST', '/pages', ['title' => 'Anfahrt', 'audience' => 'public', 'blocks' => [
+            ['id' => 'a1', 'type' => 'text', 'html' => '<p>Über die Brücke</p>'],
+            ['id' => 'a2', 'type' => 'notice', 'title' => 'Hinweis', 'text' => 'Parken am Markt', 'tone' => 'info'],
+            ['id' => 'a3', 'type' => 'divider', 'style' => 'line'],
+        ]])->data['id'];
+        $this->call($this->admin, 'PATCH', "/pages/{$page}", ['translations' => ['en' => ['title' => 'Directions', 'blocks' => ['a1' => ['html' => '<p>Over the bridge</p>']]]]]);
+        $message = $this->call($this->admin, 'POST', '/board', ['title' => 'Training fällt aus', 'blocks' => [['id' => 'b1', 'type' => 'text', 'html' => '<p>Heute nicht</p>']]])->data['id'];
+
+        $res = $this->call($this->admin, 'GET', '/admin/translations');
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $pages = self::itemsOf($res->data, 'page');
+        $this->assertCount(1, $pages);
+        $this->assertSame(['ref' => (string) $page, 'field' => 'content', 'source' => 'Anfahrt', 'text' => 'Directions', 'total' => 4, 'done' => 2], array_intersect_key($pages[0], array_flip(['ref', 'field', 'source', 'text', 'total', 'done'])), 'Titel, Text, Hinweis (Titel + Text); Trennlinie zählt nicht');
+        $board = self::itemsOf($res->data, 'board');
+        $this->assertSame([(string) $message, '', 2, 0], [$board[0]['ref'], $board[0]['text'], $board[0]['total'], $board[0]['done']]);
+
+        // Bereich aus: keine Gruppe
+        $this->app->features()->update(['pages' => false]);
+        $this->assertNotContains('page', self::kinds($this->call($this->admin, 'GET', '/admin/translations')->data));
     }
 
     /**

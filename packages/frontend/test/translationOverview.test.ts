@@ -1,7 +1,7 @@
 // Einstellungen → Sprachen → Übersetzungen (src/translationOverview.ts): was fehlt, was die Suche findet.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { contentRequests, isMissing, isName, keyOf, matches } from '../src/translationOverview.ts';
+import { contentRequests, isBlocks, isMissing, isName, keyOf, matches } from '../src/translationOverview.ts';
 import type { TranslationItem } from '../src/api.ts';
 
 const item = (over: Partial<TranslationItem> = {}): TranslationItem => ({
@@ -68,4 +68,15 @@ test('Inhalte: je Inhalt eine Anfrage mit allen Feldern, Antworten als Liste', (
   assert.equal(isName(all[0]), true);
   assert.equal(isName(all[1]), false);
   assert.equal(matches(all[1], 'grill'), true, 'Suche auch im Titel des Inhalts');
+});
+
+test('Seiten und Brett: fehlt, solange nicht alle Felder übersetzt sind; nie über „Speichern“', () => {
+  const page = item({ kind: 'page', ref: '3', field: 'content', source: 'Anfahrt', total: 4, done: 2 });
+  assert.equal(isBlocks(page), true);
+  assert.equal(isMissing(page), true);
+  assert.equal(isMissing({ ...page, done: 4 }), false);
+  assert.deepEqual(
+    contentRequests([page], () => 'anders'),
+    [],
+  );
 });
