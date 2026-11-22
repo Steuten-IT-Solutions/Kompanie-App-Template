@@ -65,12 +65,7 @@ Tap **Admin** at the bottom, then **Settings** and, under **Events and calendar*
 4. From now on everyone with the **Maintain calendar** permission chooses the type in the expanded event under **{bereich.events}**, and in attendance it is shown on every list.
 
 ### Name event types in English
-If your app has English switched on besides German, each type gets an English name too:
-1. In the **Event types** section, at the top under **Set up in**, choose the language **English**.
-2. Enter the English name in each field. The empty field shows the German name in grey; if it stays empty, everyone using English sees the German one.
-3. Tap **Save** in this section.
-
-Creating, renaming and removing only works in **German**. The English name belongs to the German one: if you rename a type in German, enter the English name for the new name again. Events and lists with the old name keep showing the English name you had entered for it. More on this: [Languages](seite:admin-sprachen).
+If your app has English switched on besides German, you enter the English names of the event types under [Languages](seite:admin-sprachen) in the **Translations** section under **Event types**. If a field stays empty, everyone using English sees the German name. The English name belongs to the German one: if you rename a type here, enter the English name again afterwards. Events and lists with the old name keep showing the English name you had entered for it.
 
 ### Check whether the calendar arrives
 1. Tap **Test calendar**.

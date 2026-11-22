@@ -11,9 +11,7 @@ import { PUBLIC_PREVIEW, startPreview } from '../preview';
 import { Caps, ErrorBox, Loading, useAsync } from '../ui';
 import { confirmAsk } from '../ask';
 import { IconButton } from '../icons';
-import { localeTag, SOURCE_LOCALE, t, tn } from '../i18n';
-import { useEditLocale } from '../language';
-import { setNameTranslations, translatedName } from '../names';
+import { localeTag, t, tn } from '../i18n';
 
 const sec = brand.labels.sections;
 
@@ -264,11 +262,6 @@ function RoleForm({
   // Voraussetzung als Baum aus UND/ODER-Gruppen; ältere Server ohne admission_rule: aus den früheren Feldern.
   const [admissionRule, setAdmissionRule] = useState(() => ruleFromRole(role));
   const [replacement, setReplacement] = useState<Level>('member');
-  // Einrichten auf einer weiteren Sprache (bestehende Rollen): Name dieser Sprache, der deutsche bleibt
-  const editLang = useEditLocale();
-  const foreign = editLang !== SOURCE_LOCALE && !!role;
-  const savedForeign = role ? translatedName('role', role.key, editLang) : '';
-  const [foreignLabel, setForeignLabel] = useState(savedForeign);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const fixed = role?.system ?? false;
@@ -318,17 +311,7 @@ function RoleForm({
           : { admission_extra: false }),
       ...(withFactor ? { points_factor: factor } : {}),
     };
-    const text = foreignLabel.trim();
-    void run(
-      async () => {
-        const next = await (role ? api.updateRole(role.key, data) : api.createRole(data));
-        if (foreign && role && text !== savedForeign) {
-          setNameTranslations((await api.saveTranslations(editLang, [{ kind: 'role', ref: role.key, text }])).translations);
-        }
-        return next;
-      },
-      role ? t('Rolle gespeichert') : t('Rolle angelegt'),
-    );
+    void run(() => (role ? api.updateRole(role.key, data) : api.createRole(data)), role ? t('Rolle gespeichert') : t('Rolle angelegt'));
   }
 
   async function remove() {
@@ -353,19 +336,7 @@ function RoleForm({
     <form className="form role-form" onSubmit={submit}>
       <label className="field">
         <span>{t('Name der Rolle')}</span>
-        {foreign ? (
-          <input
-            type="text"
-            lang={editLang}
-            maxLength={30}
-            value={foreignLabel}
-            placeholder={label}
-            onChange={(e) => setForeignLabel(e.target.value)}
-            autoFocus
-          />
-        ) : (
-          <input type="text" maxLength={30} value={label} onChange={(e) => setLabel(e.target.value)} required autoFocus />
-        )}
+        <input type="text" maxLength={30} value={label} onChange={(e) => setLabel(e.target.value)} required autoFocus />
       </label>
       {fixed && (
         <p className="small muted">

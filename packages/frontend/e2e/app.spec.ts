@@ -44,6 +44,29 @@ async function adminMenu(page: Page, name: string) {
   await tiles.getByRole('button', { name, exact: true }).click();
 }
 
+/**
+ * Einstellungen → Sprachen → Übersetzungen: einen Namen auf Englisch eintragen ('' löscht ihn) und speichern. Erwartet
+ * eine eingeschaltete englische Sprache. $source ist der Name der Basissprache (links in der Zeile).
+ */
+/** Abschnitt einer Art unter Übersetzungen aufklappen (bleibt offen, wenn er es schon ist). */
+async function openTranslationGroup(card: Locator, group: string) {
+  const details = card.locator('details.translation-group', {
+    has: card.page().locator('summary .row-title').getByText(group, { exact: true }),
+  });
+  if (!(await details.evaluate((d: HTMLDetailsElement) => d.open))) await details.locator('summary').click();
+}
+
+async function translateName(page: Page, group: string, source: string, text: string) {
+  await page.goto('/app/#/einstellungen/sprachen');
+  const card = page.locator('#einstellungen-uebersetzungen');
+  await openTranslationGroup(card, group);
+  const field = card.getByLabel(`${source} auf English`, { exact: true });
+  await field.fill(text);
+  await card.getByRole('button', { name: /^Speichern/ }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+  return field;
+}
+
 /** „Intern“ (Tab unten) öffnen und dort den Knopf eines Bereichs wählen (Mitglieder oder Dokumente). */
 async function internMenu(page: Page, name: string) {
   await page.locator('.tabbar').getByRole('button', { name: 'Intern' }).click();
@@ -4746,20 +4769,12 @@ test('Sprachen: Admin schaltet Englisch ein, Flagge oben, Wahl gilt am Konto, zu
   await expect(page.locator('html')).toHaveAttribute('lang', 'de');
   await expect(page.getByRole('button', { name: 'Sprache: Deutsch' })).toBeVisible();
 
-  // Einrichten auf Englisch: eigener englischer Name für die Galerie, der deutsche bleibt
-  await page.goto('/app/#/einstellungen/navigation');
-  const navCard = page.locator('#einstellungen-navigation');
-  await page.locator('.edit-lang').getByRole('button', { name: 'English' }).click();
-  const galleryRow = navCard.locator('.row-main').filter({ has: page.getByLabel('Platz von Galerie') });
-  await galleryRow.getByText('Umbenennen').click();
-  const englishName = galleryRow.getByLabel('Eigener Name (leer = Standard)');
-  await expect(englishName).toHaveAttribute('placeholder', 'Galerie');
-  await englishName.fill('Photos');
-  const reloaded = page.waitForEvent('load');
-  await navCard.getByRole('button', { name: 'Navigation speichern' }).click();
-  await expect(page.getByText('Navigation gespeichert')).toBeVisible();
-  // Neue Namen: die Seite lädt einmal neu
-  await reloaded;
+  // Übersetzungen: eigener englischer Name für die Galerie, der deutsche bleibt; ohne Eintrag grau die Vorgabe
+  await page.goto('/app/#/einstellungen/sprachen');
+  const translations = page.locator('#einstellungen-uebersetzungen');
+  await openTranslationGroup(translations, 'Bereiche der Navigation');
+  await expect(translations.getByLabel('Galerie auf English', { exact: true })).toHaveAttribute('placeholder', 'Gallery');
+  await translateName(page, 'Bereiche der Navigation', 'Galerie', 'Photos');
   // Gäste mit Englisch am Gerät sehen den englischen Namen, auf Deutsch bleibt „Galerie“
   const visitor = await quietPage(browser);
   await visitor.goto('/app/#/galerie');
@@ -4768,23 +4783,9 @@ test('Sprachen: Admin schaltet Englisch ein, Flagge oben, Wahl gilt am Konto, zu
   await visitor.reload();
   await expect(visitor.locator('.tabbar')).toContainText('Photos');
   await visitor.close();
-  // Den englischen Namen wieder löschen (die Wahl „Einrichten auf“ gilt weiter)
-  await expect(page.locator('.edit-lang').getByRole('button', { name: 'English' })).toHaveAttribute('aria-pressed', 'true');
-  await navCard
-    .locator('.row-main')
-    .filter({ has: page.getByLabel('Platz von Galerie') })
-    .getByText('Umbenennen')
-    .click();
-  await navCard
-    .locator('.row-main')
-    .filter({ has: page.getByLabel('Platz von Galerie') })
-    .getByLabel('Eigener Name (leer = Standard)')
-    .fill('');
-  const reloadedAgain = page.waitForEvent('load');
-  await navCard.getByRole('button', { name: 'Navigation speichern' }).click();
-  await expect(page.getByText('Navigation gespeichert')).toBeVisible();
-  await reloadedAgain;
-  await page.locator('.edit-lang').getByRole('button', { name: 'Deutsch' }).click();
+  // Den englischen Namen wieder löschen; danach fehlt nichts mehr, was nicht schon die Vorgabe hätte
+  await page.reload();
+  await expect(await translateName(page, 'Bereiche der Navigation', 'Galerie', '')).toHaveValue('');
 
   // Aufräumen: nur Deutsch, die Flagge verschwindet
   await page.goto('/app/#/einstellungen/sprachen');
@@ -4795,7 +4796,7 @@ test('Sprachen: Admin schaltet Englisch ein, Flagge oben, Wahl gilt am Konto, zu
   await expect(page.locator('.topbar-lang')).toHaveCount(0);
 });
 
-test('Sprachen: englischer Name eines Dienstgrads über „Einrichten auf“, Ansicht auf Englisch zeigt ihn', async ({ page }) => {
+test('Sprachen: englischer Name eines Dienstgrads unter Übersetzungen, Ansicht auf Englisch zeigt ihn', async ({ page }) => {
   const stamp = String(Date.now()).slice(-6);
   const german = `Feldwebel ${stamp}`;
   const english = `Sergeant ${stamp}`;
@@ -4813,18 +4814,13 @@ test('Sprachen: englischer Name eines Dienstgrads über „Einrichten auf“, An
   const row = page.locator('.card-list > li', { hasText: german });
   await expect(row).toBeVisible();
 
-  // Einrichten auf Englisch: „Ändern“ trägt den englischen Namen ein, der deutsche bleibt
-  await page.locator('.edit-lang').getByRole('button', { name: 'English' }).click();
-  await row.getByRole('button', { name: 'Ändern' }).click();
-  const field = page.locator('.card-list').getByLabel('Bezeichnung');
+  // Übersetzungen: englischer Name, die Verwaltung zeigt weiter den deutschen
+  const field = await translateName(page, 'Dienstgrade', german, english);
+  await expect(field).toHaveValue(english);
   await expect(field).toHaveAttribute('placeholder', german);
-  await expect(field).toHaveValue('');
-  await field.fill(english);
-  await page.locator('.card-list').getByRole('button', { name: 'Speichern' }).click();
-  await expect(page.locator('.toast')).toHaveText('Gespeichert');
-  await expect(page.locator('.card-list .row-title', { hasText: english })).toBeVisible();
-  await page.locator('.edit-lang').getByRole('button', { name: 'Deutsch' }).click();
+  await adminMenu(page, 'Dienstgrade');
   await expect(page.locator('.card-list .row-title', { hasText: german })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Einstellungen → Sprachen' })).toBeVisible();
 
   // Mitglied1 bekommt den Dienstgrad
   await adminMenu(page, 'Mitglieder');
@@ -4867,7 +4863,7 @@ test('Sprachen: englischer Name eines Dienstgrads über „Einrichten auf“, An
   await expect(page.locator('.toast')).toHaveText('Gespeichert');
 });
 
-test('Sprachen: englischer Name eines Amts über „Einrichten auf“, Gäste auf Englisch sehen ihn', async ({ page, browser }) => {
+test('Sprachen: englischer Name eines Amts unter Übersetzungen, Gäste auf Englisch sehen ihn', async ({ page, browser }) => {
   const id = Date.now() % 1000000;
   const office = `Schriftführer ${id}`;
   const english = `Secretary ${id}`;
@@ -4895,21 +4891,12 @@ test('Sprachen: englischer Name eines Amts über „Einrichten auf“, Gäste au
       (await api(`offices/${officeId}/terms`, 'POST', { kind: 'period', start_year: 2020, holders: [{ name: `Sabine Schreiber ${id}` }] }))
         .status,
     ).toBe(201);
-    await page.goto(`/app/#/verwaltung/aemter/${officeId}`);
+    await page.goto('/app/#/einstellungen/sprachen');
     await page.reload();
-    await page.locator('.edit-lang').getByRole('button', { name: 'English' }).click();
-    const edit = page.locator('form', { hasText: 'Amt bearbeiten' });
-    const title = edit.getByLabel('Bezeichnung');
-    await expect(title).toHaveValue('');
-    await expect(title).toHaveAttribute('placeholder', office);
-    await title.fill(english);
-    await edit.getByRole('button', { name: 'Speichern' }).click();
-    await expect(page.locator('.toast')).toHaveText('Gespeichert');
-    await expect(page.locator('h2.member-name')).toHaveText(english);
-    // Auf Deutsch bleibt der deutsche Name
-    await page.locator('.edit-lang').getByRole('button', { name: 'Deutsch' }).click();
-    await expect(edit.getByLabel('Bezeichnung')).toHaveValue(office);
-    await expect(page.locator('h2.member-name')).toHaveText(office);
+    await translateName(page, 'Ämter', office, english);
+    // In der Verwaltung bleibt der deutsche Name
+    await page.goto(`/app/#/verwaltung/aemter/${officeId}`);
+    await expect(page.locator('form', { hasText: 'Amt bearbeiten' }).getByLabel('Bezeichnung')).toHaveValue(office);
 
     // Gäste auf Englisch sehen den englischen Namen im Zeitstrahl, auf Deutsch den deutschen
     const visitor = await quietPage(browser);
@@ -4950,37 +4937,22 @@ test('Sprachen: englische Namen für eine Terminart und ein Untermenü, Mitglied
   const evening = (await api('calendar', 'GET')).data.find((e) => e.title === 'Vereinsabend');
   expect((await api(`calendar/${encodeURIComponent(evening!.id!)}/kind`, 'PUT', { kinds: ['Versammlung'] })).status).toBe(200);
   try {
-    // Terminart: Einstellungen → Kalender, Einrichten auf Englisch; der deutsche Name ist Platzhalter
-    // Neu laden: Die eingeschaltete Sprache und die Arten kommen mit der Konfiguration
-    await page.goto('/app/#/einstellungen/kalender');
+    // Terminart unter Übersetzungen (neu laden: die eingeschaltete Sprache kommt mit der Konfiguration)
+    await page.goto('/app/#/einstellungen/sprachen');
     await page.reload();
-    const kinds = page.locator('.settings-section', { has: page.getByRole('heading', { name: 'Terminarten' }) });
-    await kinds.locator('.edit-lang').getByRole('button', { name: 'English' }).click();
-    const kind = kinds.getByLabel('Terminart 1', { exact: true });
-    await expect(kind).toHaveAttribute('placeholder', 'Versammlung');
-    await expect(kinds.getByRole('button', { name: '+ Terminart' })).toHaveCount(0);
-    await kind.fill('Meeting');
-    await kinds.getByRole('button', { name: 'Speichern' }).click();
-    await expect(page.locator('.toast')).toHaveText('Gespeichert');
+    await translateName(page, 'Terminarten', 'Versammlung', 'Meeting');
 
-    // Untermenü: auf Deutsch „Intern“ in „Verein“ umbenennen (eigene Navigation), dann auf Englisch „Club“
+    // Untermenü: „Intern“ in „Verein“ umbenennen (eigene Navigation), dann unter Übersetzungen „Club“
     await page.goto('/app/#/einstellungen/navigation');
     const navCard = page.locator('#einstellungen-navigation');
-    await page.locator('.edit-lang').getByRole('button', { name: 'Deutsch' }).click();
     await navCard.getByLabel('Name des Untermenüs').fill('Verein');
     await navCard.getByLabel('Platz von Termine').selectOption({ label: 'Im Untermenü „Verein“' });
     await navCard.getByRole('button', { name: 'Navigation speichern' }).click();
     await expect(page.getByText('Navigation gespeichert')).toBeVisible();
     await expect(navCard.getByText('Zurzeit gilt eure eigene Navigation.')).toBeVisible();
-    await page.locator('.edit-lang').getByRole('button', { name: 'English' }).click();
-    const menuName = navCard.getByLabel('Name des Untermenüs');
-    await expect(menuName).toHaveAttribute('placeholder', 'Verein');
-    await menuName.fill('Club');
-    const reloaded = page.waitForEvent('load');
-    await navCard.getByRole('button', { name: 'Navigation speichern' }).click();
-    await expect(page.getByText('Navigation gespeichert')).toBeVisible();
-    await reloaded;
+    await translateName(page, 'Untermenüs', 'Verein', 'Club');
     // Auf Deutsch bleibt alles beim deutschen Namen
+    await page.reload();
     await expect(page.locator('.tabbar').getByRole('button', { name: 'Verein' })).toBeVisible();
 
     // Mitglied ohne Sprache am Konto, Englisch am Gerät

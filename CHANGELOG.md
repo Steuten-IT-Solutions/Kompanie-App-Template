@@ -30,11 +30,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Sprache ein (anfangs nur Deutsch). Dann steht oben eine Flagge, mit der jede Person Deutsch oder Englisch wählt, auch
   ohne Anmeldung; unter [Meins → Konto](app:meins/konto) gibt es dieselbe Wahl. Angemeldete behalten ihre Sprache auf allen
   Geräten und bekommen Mails und Benachrichtigungen in dieser Sprache. Übersetzt sind die Texte der App und die vorgegebenen Namen
-  der Bereiche und Rollen (z. B. „Termine“ → „Events“); Für eure eigenen Namen von Bereichen und Rollen wählst du in
-  [Einstellungen → Navigation](app:einstellungen/navigation) und [Einstellungen → Rollen](app:einstellungen/rollen) oben
-  _Einrichten auf: English_ und trägst die englischen Namen ein; ohne Eintrag bleibt der deutsche. Genauso geht es bei
-  Untermenüs, den Terminarten in [Einstellungen → Kalender](app:einstellungen/kalender) und den
-  [Dienstgraden](app:verwaltung/dienstgrade) und [Ämtern](app:verwaltung/aemter) in der Verwaltung. Eigene Seiten
+  der Bereiche und Rollen (z. B. „Termine“ → „Events“). Alle eigenen Namen trägst du an einer Stelle auf Englisch ein:
+  unter [Einstellungen → Sprachen](app:einstellungen/sprachen) im Abschnitt _Übersetzungen_, je Gruppe (Bereiche der
+  Navigation, Untermenüs, Rollen, Dienstgrade, Ämter und ihre Gruppen, Terminarten) mit Zähler, Suche und „Nur fehlende
+  zeigen“; ohne Eintrag bleibt der deutsche Name. Eigene Seiten
   bekommen unter [Verwaltung → Seiten](app:verwaltung/seiten) mit _Schreiben auf: English_ eine englische Fassung, ebenso
   [News](app:news), die ihr in der App schreibt (beim Bearbeiten), und Nachrichten am [Schwarzen Brett](app:brett)
   (_Auf English schreiben_ unter dem Inhalt; Benachrichtigung und Mail gehen dann in der Sprache der Empfänger),

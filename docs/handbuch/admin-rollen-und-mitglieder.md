@@ -39,7 +39,7 @@ Oben schaltest du zwischen **Rollen** (die Liste) und **Wer sieht was** (die Üb
 2. Ändere Name, Rechte, Konten oder {bereich.points}faktor und tippe auf **Speichern**. Mit **Abbrechen** verwirfst du die Änderungen.
 3. Zum Löschen einer eigenen Rolle tippst du stattdessen auf **Löschen**. Haben noch Personen die Rolle, wählst du vorher bei **Beim Löschen bekommen die … Personen die Rolle**, welche Rolle sie stattdessen bekommen. Bestätige die Rückfrage.
 
-Den Namen einer Rolle auf Englisch (wenn eure App Englisch eingeschaltet hat) trägst du ein, indem du oben bei **Einrichten auf** die Sprache **English** wählst und die Rolle dann bearbeitest. Mehr dazu: [Sprachen](seite:admin-sprachen).
+Den Namen einer Rolle auf Englisch (wenn eure App Englisch eingeschaltet hat) trägst du unter [Sprachen](seite:admin-sprachen) im Abschnitt **Übersetzungen** ein.
 
 ### In der Übersicht festlegen, wer was sieht
 1. Tippe oben auf **Wer sieht was**.
