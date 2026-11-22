@@ -4,7 +4,7 @@ titel: "{bereich.pages}"
 Pages of {kompanie.name}’s own, for example its history, the festival programme or directions. Each page has a title and its content below: text, often with pictures, and sometimes ready-made blocks such as a countdown.
 
 ## How to open this page
-Each page is an item of its own in the navigation, with its title: tap the page’s title at the bottom. If it isn’t in the bar, you’ll find it in a submenu of the navigation, for example under **Members’ area**.
+Each page is an item of its own in the navigation, with its title: tap the page’s title at the bottom. If it isn’t in the bar, you’ll find it in a submenu of the navigation, for example under **Internal**.
 
 ## What you see here
 - The page’s title is at the top, its content below.

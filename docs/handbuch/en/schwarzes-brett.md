@@ -6,7 +6,7 @@ The **{bereich.board}** holds urgent messages, e.g. “Training cancelled today�
 ![The {bereich.board} page with current messages and running {bereich.polls}](bild:schwarzes-brett)
 
 ## How to open this page
-If you have **Members’ area** at the bottom, tap the **{bereich.board}** button there. Or tap the title of a message in the banner at the top or **Open board**. If you got a notification or an email about a new message, tapping it or **view in the app** also opens this page.
+If you have **Internal** at the bottom, tap the **{bereich.board}** button there. Or tap the title of a message in the banner at the top or **Open board**. If you got a notification or an email about a new message, tapping it or **view in the app** also opens this page.
 
 The banner only appears as long as there is a message or a running poll you haven’t answered yet.
 

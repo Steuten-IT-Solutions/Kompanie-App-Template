@@ -6,7 +6,7 @@ Under **{bereich.directory}** you see who belongs to the company: all {rolle.mem
 ![List under {bereich.directory}](bild:mitglieder)
 
 ## How to open this page
-Tap **Members’ area** in the bar at the bottom and then **{bereich.directory}**; **‹ Members’ area** takes you back. Without logging in there is no **Members’ area**: then tap **{bereich.directory}** at the bottom straight away.
+Tap **Internal** in the bar at the bottom and then **{bereich.directory}**; **‹ Internal** takes you back. Without logging in there is no **Internal**: then tap **{bereich.directory}** at the bottom straight away.
 
 ## What you see here
 - **Switch** at the top: **{bereich.directory}**, **{bereich.offices}** (if the company uses them; there is a separate handbook page for them) and **Former members**. The app remembers on this device what you chose last.

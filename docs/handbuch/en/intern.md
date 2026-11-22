@@ -1,12 +1,12 @@
 ---
-titel: "Members’ area"
+titel: "Internal"
 ---
-Under **Members’ area** you find what {kompanie.name} provides for its people: the **{bereich.directory}** list, the **{bereich.documents}**, the **{bereich.board}**, the **{bereich.ranks}** and the **{bereich.catalog}**. Each section has its own button here.
+Under **Internal** you find what {kompanie.name} provides for its people: the **{bereich.directory}** list, the **{bereich.documents}**, the **{bereich.board}**, the **{bereich.ranks}** and the **{bereich.catalog}**. Each section has its own button here.
 
-![Start page of the Members’ area with its buttons](bild:intern)
+![Start page of Internal with its buttons](bild:intern)
 
 ## How to open this page
-Tap **Members’ area** in the bar at the bottom. Everyone whose role has the **Members’ area** permission has the button, at first the {rolle.member} accounts. Those without it (e.g. when not logged in) find {bereich.directory} and {bereich.documents} as separate buttons at the bottom, as far as they may see them. This applies to the standard navigation. If an {rolle.admin} has set up the navigation under **Settings → Navigation**, the sections are wherever they were placed.
+Tap **Internal** in the bar at the bottom. Everyone whose role has the **Internal** permission has the button, at first the {rolle.member} accounts. Those without it (e.g. when not logged in) find {bereich.directory} and {bereich.documents} as separate buttons at the bottom, as far as they may see them. This applies to the standard navigation. If an {rolle.admin} has set up the navigation under **Settings → Navigation**, the sections are wherever they were placed.
 
 ## What you see here
 You see the buttons of the sections {kompanie.name} uses and that you may see. For each button an {rolle.admin} decides under **Settings → Roles** which role sees it:
@@ -18,4 +18,4 @@ You see the buttons of the sections {kompanie.name} uses and that you may see. F
 
 ## Step by step
 1. Tap the button of the section you want to open.
-2. **‹ Members’ area** at the top takes you back to this page.
+2. **‹ Internal** at the top takes you back to this page.

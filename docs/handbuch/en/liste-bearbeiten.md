@@ -32,7 +32,7 @@ There are two kinds of columns:
 ![Columns with heading, width and checkbox to tick](bild:liste-bearbeiten-spalten)
 
 ### Bring the members into the list
-1. If there are roles without the members’ area (e.g. candidates), choose under **Include in the list** who belongs in the list: **Members** and/or these roles. At least one stays ticked.
+1. If there are roles without **Internal** (e.g. candidates), choose under **Include in the list** who belongs in the list: **Members** and/or these roles. At least one stays ticked.
 2. Under **Rows**, tap **Update members**. The app saves unsaved changes first.
 3. The app shows which rows will be added and which deleted. If the list is already up to date, it just says so.
 4. Tap **Apply**. **Cancel** leaves everything as it is.
@@ -63,7 +63,7 @@ The app sorts numbers by their value, birthdays by the day in the year (January 
 
 ## Good to know
 - **View only:** without the permission to create and edit, you only see the title at the top and below it **Output** with preview, PDF, CSV and print. You then don’t change title, columns and rows.
-- **Update members** creates a row for every {rolle.member} account that doesn’t have one yet, and likewise for the roles you ticked under **Include in the list**. It deletes the rows of accounts that no longer exist or no longer belong. {rolle.guest} accounts and former members never go into the list, roles without the members’ area (e.g. candidates) only if you tick them. The app sorts new members in between the existing ones by surname.
+- **Update members** creates a row for every {rolle.member} account that doesn’t have one yet, and likewise for the roles you ticked under **Include in the list**. It deletes the rows of accounts that no longer exist or no longer belong. {rolle.guest} accounts and former members never go into the list, roles without **Internal** (e.g. candidates) only if you tick them. The app sorts new members in between the existing ones by surname.
 - Your own rows stay when updating. If you remove a member’s row, the next **Update members** creates it again.
 - If an account is deleted, its row stays without a name until you update the list. The app points this out.
 - Only data columns whose section is switched on and whose details you may see in the app anyway are offered. You only see the role, for example, if you see the admin area’s member list, {bereich.points} only if you may see them (see {bereich.points} of all members). Birthdays only appear in the list if the person has released them for others. They are written out (“9 March”), the year of birth only with the permission **See personal details** (“9 March 1990”). You only see address, mobile number and email with the permission **See personal details**.

@@ -31,7 +31,7 @@ If the candidate role is the person’s main role, they become {rolle.member}. I
 - The app sets **Candidate since** itself when someone gets the candidate role in the app (when created, when the role is changed or when a request is approved). For people who were candidates before, the date is missing; the minimum period then only applies once you add it.
 - After saving an attendance list, the app shows at the top of the admin area who newly meets the requirement as a result.
 - The requirement is set by an {rolle.admin} per candidate role under *Settings → Roles*. Conditions can be combined with **All must be met** (AND) and **One is enough** (OR), also in groups. With **One is enough**, “met since” is the day the first option was met; with **All must be met**, the day of the last.
-- Candidates see their own status: under *My area* (with the members’ area) or under *Account*, with the same list but without buttons. They don’t see other people’s status.
+- Candidates see their own status: under *My area* (with **Internal**) or under *Account*, with the same list but without buttons. They don’t see other people’s status.
 - **View only:** with the permission **See accounts** but without **Create members**, you see the overview and the status on the person’s page, but without **Save date** and **Admit as {rolle.member}**.
 
 ## See also

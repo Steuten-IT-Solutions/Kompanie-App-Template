@@ -6,7 +6,7 @@ Here you read a document directly in the app, without downloading it. This works
 ![An open PDF with title and version date](bild:dokument-ansehen)
 
 ## How to open this page
-Tap **Members’ area** at the bottom and **{bereich.documents}**, expand the category and tap **Open** next to the document.
+Tap **Internal** at the bottom and **{bereich.documents}**, expand the category and tap **Open** next to the document.
 
 ## What you see here
 - **‹ All {bereich.documents}**: takes you back to the list. The document’s category is expanded there.
