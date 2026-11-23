@@ -40,19 +40,16 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Änderungen stehen im Änderungsprotokoll als „Name über Claude“. Die eigenen Zugänge stehen unter
   [Meins → Konto](app:meins/konto). Die Anmeldung aus dem KI-Assistenten braucht schöne Adressen (WordPress: Permalinks;
   eigenständige Version: Adressen ohne `index.php?r=`).
-<<<<<<< HEAD
-- **Neuer Block: Bild** für [eigene Seiten](app:verwaltung/seiten), News in der App und das Schwarze Brett: ein eigenes
-  Bild hochladen, das nicht in der Galerie liegen muss, mit Bildunterschrift, Beschreibung für Screenreader und Größe
-  (volle Breite, mittel, klein). Es sieht, wer den Block sehen darf; Bildunterschrift und Beschreibung lassen sich
-  übersetzen. Entfernt man den Block, wird das Bild gelöscht.
-=======
 - Das [Änderungsprotokoll](app:verwaltung/aenderungen) zeigt, wenn die Benachrichtigungen einer Person auf einem Gerät
   wegfallen, mit Grund: selbst ausgeschaltet, vom Konto abgemeldet, App ohne Anmeldung geöffnet (z. B. Sitzung
   abgelaufen), anderes Konto auf dem Gerät, mehr als 10 Geräte oder der Push-Dienst kennt das Gerät nicht mehr (z. B.
   nach dem Löschen der Browserdaten). Dazu stehen dort der Push-Dienst (z. B. Google für Chrome und Android), seit wann
   die Benachrichtigungen an waren und wann zuletzt eine ankam. So lässt sich klären, warum jemand plötzlich keine
   Benachrichtigungen mehr bekommt. Das Einschalten und Ändern der Arten wird weiterhin nicht aufgezeichnet.
->>>>>>> origin/develop
+- **Neuer Block: Bild** für [eigene Seiten](app:verwaltung/seiten), News in der App und das Schwarze Brett: ein eigenes
+  Bild hochladen, das nicht in der Galerie liegen muss, mit Bildunterschrift, Beschreibung für Screenreader und Größe
+  (volle Breite, mittel, klein). Es sieht, wer den Block sehen darf; Bildunterschrift und Beschreibung lassen sich
+  übersetzen. Entfernt man den Block, wird das Bild gelöscht.
 
 ## [0.13.0] – 2026-11-22
 
