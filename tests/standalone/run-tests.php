@@ -166,7 +166,8 @@ try {
     $call = $as(null, 'POST', 'mcp', ['jsonrpc' => '2.0', 'id' => 2, 'method' => 'tools/call', 'params' => ['name' => 'whoami', 'arguments' => new \stdClass()]], $mcpHeaders + ['Mcp-Method' => 'tools/call', 'Mcp-Name' => 'whoami']);
     $c->ok($call[0] === 200 && ($call[1]['result']['structuredContent']['person']['name'] ?? null) === 'Anna Admin', 'tools/call whoami mit den Headern Mcp-Method und Mcp-Name');
     $c->ok($as(null, 'POST', 'mcp', ['jsonrpc' => '2.0', 'id' => 3, 'method' => 'tools/list'], $mcpHeaders + ['Mcp-Method' => 'tools/call'])[0] === 400, 'Header passt nicht zum Inhalt → 400');
-    $c->ok($as(null, 'POST', 'mcp', ['jsonrpc' => '2.0', 'id' => 4, 'method' => 'tools/list'], $mcpHeaders + ['Origin' => 'https://fremd.example'])[0] === 403, 'Fremde Herkunft → 403');
+    $c->ok($as(null, 'POST', 'mcp', ['jsonrpc' => '2.0', 'id' => 4, 'method' => 'tools/list'], $mcpHeaders + ['Origin' => 'https://claude.ai', 'Sec-Fetch-Site' => 'cross-site'])[0] === 200, 'Fremde Herkunft (z. B. claude.ai) mit Token → 200');
+    $c->ok($as(null, 'POST', 'mcp', ['jsonrpc' => '2.0', 'id' => 4, 'method' => 'tools/list'], ['Origin' => 'https://claude.ai'])[0] === 401, 'Fremde Herkunft ohne Token → 401');
     $noToken = $as(null, 'POST', 'mcp', ['jsonrpc' => '2.0', 'id' => 5, 'method' => 'tools/list']);
     $c->ok($noToken[0] === 401 && ($noToken[2]['www-authenticate'] ?? '') === 'Bearer', 'Ohne Token → 401 mit WWW-Authenticate');
     $c->ok($as(null, 'GET', 'mcp', null, $mcpHeaders)[0] === 405, 'GET → 405');

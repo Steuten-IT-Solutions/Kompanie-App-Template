@@ -698,18 +698,6 @@ final class Api
         }
     }
 
-    /** Gleiche Herkunft (Schema, Host, Port) wie die Adresse $url? */
-    private static function sameOrigin(string $origin, string $url): bool
-    {
-        $a = parse_url($origin);
-        $b = parse_url($url);
-        if (!is_array($a) || !is_array($b) || !isset($a['scheme'], $a['host'], $b['scheme'], $b['host'])) {
-            return false;
-        }
-        $port = static fn (array $u): int => (int) ($u['port'] ?? (strtolower((string) $u['scheme']) === 'https' ? 443 : 80));
-        return strtolower($a['scheme']) === strtolower($b['scheme']) && strtolower($a['host']) === strtolower($b['host']) && $port($a) === $port($b);
-    }
-
     /** Route mit dieser Methode und diesem Pfad (mit Platzhaltern, z. B. „/events/{id}“); null, wenn es keine gibt. */
     public function routeFor(string $method, string $path): ?Route
     {
@@ -1085,11 +1073,8 @@ final class Api
                 if (!$a->accessTokens()->enabled()) {
                     throw ApiError::notFound(I18n::t('Unbekannte Adresse.'));
                 }
-                // Streamable HTTP: Origin prüfen (Schutz vor DNS-Rebinding); Programme ohne Browser schicken keinen.
-                $origin = $r->header('origin');
-                if ($origin !== null && !self::sameOrigin($origin, $a->env->apiBase())) {
-                    throw ApiError::forbidden(I18n::t('Anfrage von einer fremden Seite abgelehnt.'));
-                }
+                // Header Origin: keine Ablehnung fremder Seiten. Der Endpunkt gilt nur mit Zugriffstoken (nie mit Cookie), den
+                // ein Browser nicht von selbst mitschickt, und KI-Assistenten können ihre eigene Herkunft mitschicken.
                 if (!$a->tokenContext()->active()) {
                     $e = new ApiError(401, self::INVALID_TOKEN, I18n::t('Bitte mit einem Zugang für KI-Assistenten verbinden.'));
                     return new Response(Response::error($e)->data, 401, ['WWW-Authenticate' => $a->oauth()->challenge(false)]);

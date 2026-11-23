@@ -643,7 +643,7 @@ paths:
       description: |
         Model Context Protocol, Transport Streamable HTTP ohne Sitzung: eine JSON-RPC-Anfrage je POST, Antwort immer
         `application/json`. Nur mit Zugriffstoken (`bearer`); ohne → 401 mit `WWW-Authenticate: Bearer` und `resource_metadata` (Verweis auf `/oauth/protected-resource`, wenn OAuth möglich ist). Ist der Zugang
-        in der App aus (`/admin/ai-access`) → 404. Ein Header `Origin` einer fremden Seite → 403.
+        in der App aus (`/admin/ai-access`) → 404. Ein Header `Origin` einer anderen Seite (z. B. claude.ai) wird nicht abgelehnt: Es gilt nur das Token, nie das Cookie.
 
         Versionen: `2026-07-28` (Version und Fähigkeiten in `params._meta` jeder Anfrage, `server/discover`) und ältere ab
         `2025-03-26` mit `initialize`. Unbekannte Version in `_meta` → 400 mit Fehler -32022 und `data.supported`.

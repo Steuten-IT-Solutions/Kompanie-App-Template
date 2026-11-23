@@ -142,9 +142,10 @@ final class McpServerTest extends TestCase
             $res = $this->post($body, $token, $headers);
             $this->assertSame([400, McpServer::HEADER_MISMATCH], [$res->status, $res->data['error']['code']], (string) json_encode($headers));
         }
-        // Origin: fremde Seite abgelehnt, eigene erlaubt (FakeEnvironment: https://example.org)
-        $this->assertSame(403, $this->post($body, $token, ['origin' => 'https://evil.example'])->status);
+        // Origin: KI-Assistenten wie claude.ai dürfen eine eigene Herkunft mitschicken; ohne Token gilt trotzdem nichts
+        $this->assertSame(200, $this->post($body, $token, ['origin' => 'https://claude.ai'])->status);
         $this->assertSame(200, $this->post($body, $token, ['origin' => 'https://example.org'])->status);
+        $this->assertSame(401, $this->post($body, null, ['origin' => 'https://claude.ai'])->status);
     }
 
     public function testToolsFollowRightsAndScope(): void

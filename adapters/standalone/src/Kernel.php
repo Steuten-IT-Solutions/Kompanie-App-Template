@@ -7,6 +7,7 @@ namespace KompanieApp\Standalone;
 use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Preview;
 use KompanieApp\Core\Config\KompanieConfig;
+use KompanieApp\Core\Http\Api;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Http\FileCache;
 use KompanieApp\Core\Http\ManifestIcons;
@@ -503,7 +504,9 @@ final class Kernel
             // Erst Herkunft, Inhaltstyp und CSRF-Token prüfen, dann den Inhalt lesen. Ausnahme: Tokens holen und Programm
             // eintragen bei der Anmeldung per OAuth (Programme ohne Cookie; Tokens kommen nach OAuth als Formular).
             $oauth = in_array($path, self::OAUTH_FORM_PATHS, true);
-            if (!$oauth) {
+            // Der MCP-Endpunkt gilt nur mit Zugriffstoken (nie mit dem Cookie); KI-Assistenten dürfen eine eigene Herkunft
+            // (Origin) mitschicken.
+            if (!$oauth && $path !== Api::MCP_PATH) {
                 $this->auth()->verifyRequest();
             }
             $body = [];
