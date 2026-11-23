@@ -163,7 +163,7 @@ final class PersonalDataExportTest extends TestCase
             'poll_votes' => 'view_poll_results', 'poll_answers' => 'view_poll_results', 'birthdays' => 'view_personal', 'join_years' => 'view_personal',
             'member_photos' => 'view_personal', 'former_members' => 'manage_former', 'member_contacts' => 'view_personal',
             'bug_reports' => 'view_personal', 'report_inbox' => 'view_personal', 'user_signatures' => 'view_personal', 'user_settings' => 'view_personal',
-            'board_mails' => 'view_mail', 'mailing_recipients' => 'view_mail', 'activity' => 'view_activity', 'activity_last' => 'view_activity',
+            'board_mails' => 'view_mail', 'notification_mails' => 'view_mail', 'mailing_recipients' => 'view_mail', 'activity' => 'view_activity', 'activity_last' => 'view_activity',
         ];
         $required = [...array_map(static fn ($c) => $c->value, \KompanieApp\Core\Domain\PersonalDataExport::OTHERS_REQUIRE), 'view_activity'];
         foreach (array_keys(UserData::tables()) as $table) {

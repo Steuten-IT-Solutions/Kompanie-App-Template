@@ -213,6 +213,7 @@ final class Subjects
             'PUT /me/join-year' => $self,
             'DELETE /me/join-year' => $self,
             'PUT /me/mail' => $self,
+            'PUT /me/mail/notifications' => $self,
             'PUT /me/signature' => $self,
             'DELETE /me/signature' => $self,
             // Rollen
@@ -699,6 +700,8 @@ final class Subjects
         $fields['Titel'] = $this->column('SELECT t.title FROM {member_titles} m JOIN {titles} t ON t.id = m.title_id WHERE m.user_id = ? ORDER BY t.sort, t.id', $id);
         $fields['Kompanien'] = $this->column('SELECT c.name FROM {member_companies} m JOIN {companies} c ON c.id = m.company_id WHERE m.user_id = ? ORDER BY c.sort, c.id', $id);
         $fields['Mails vom Brett'] = $this->app->boardMail()->wants($id);
+        $labels = $this->app->push()->types();
+        $fields['Benachrichtigungen per Mail aus'] = array_map(static fn (string $t): string => $labels[$t]['label'] ?? $t, $this->app->notificationMails()->offFor($id));
         $photo = $this->app->memberPhotos()->repository()->find($id);
         $fields['Foto'] = $photo['version'] ?? null;
         $signature = $this->app->db->scalar('SELECT content FROM {user_signatures} WHERE user_id = ?', [$id]);

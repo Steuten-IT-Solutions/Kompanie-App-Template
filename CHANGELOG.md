@@ -26,6 +26,13 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- Alle Benachrichtigungen kommen jetzt auch per E-Mail, nicht nur aufs Gerät: Termine, Erinnerungen, Umfragen,
+  Geburtstage, Punkte, Strafen, Dienstgrad, Galerie, Anfragen und Fehlermeldungen. Die Mail enthält Titel und Text der
+  Benachrichtigung und einen Link in die App. Voraussetzung ist der Mailversand unter
+  [Einstellungen → E-Mail](app:einstellungen/email). Anfangs sind alle Arten für alle Konten mit Mailadresse an; jede
+  Person schaltet einzelne Arten unter [Meins → Benachrichtigungen](app:meins/benachrichtigungen) auf der Karte
+  „Per E-Mail“ ab. Dort steht jetzt auch der Schalter für die Mails vom Brett (bisher direkt unter Konto). Die Mails
+  gehen in denselben Portionen wie die übrigen Mails raus.
 - KI-Assistenten wie Claude lassen sich mit der App verbinden. Ein Admin schaltet das unter
   [Einstellungen → KI-Assistenten](app:einstellungen/ki-zugang) ein (Vorgabe aus); dort steht auch die Adresse, die man
   im KI-Assistenten einträgt, und die Liste aller verbundenen Zugänge zum Entfernen. Beim Verbinden meldet man sich in

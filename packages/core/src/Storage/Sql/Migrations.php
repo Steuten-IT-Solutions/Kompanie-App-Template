@@ -2339,6 +2339,47 @@ WHERE title IS NULL",
                     'CREATE UNIQUE INDEX IF NOT EXISTS {oauth_grants}_code ON {oauth_grants} (code_hash)',
                 ],
             ],
+            // Benachrichtigungen per E-Mail (Domain\NotificationMailService): Warteschlange und kurzes Protokoll je Mail;
+            // die Einstellung je Konto steht in user_settings (notify_mail_off).
+            79 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {notification_mails} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  user_id bigint(20) unsigned NOT NULL,
+  type varchar(40) NOT NULL,
+  email varchar(191) NOT NULL,
+  title varchar(255) NOT NULL,
+  body text NOT NULL,
+  route varchar(255) NOT NULL,
+  status varchar(10) NOT NULL,
+  attempts int(11) NOT NULL DEFAULT 0,
+  error text DEFAULT NULL,
+  created_at datetime NOT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (id),
+  KEY user_id (user_id),
+  KEY status (status)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {notification_mails} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  type TEXT NOT NULL,
+  email TEXT NOT NULL,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  route TEXT NOT NULL,
+  status TEXT NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  error TEXT DEFAULT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+)',
+                    'CREATE INDEX IF NOT EXISTS {notification_mails}_user ON {notification_mails} (user_id)',
+                    'CREATE INDEX IF NOT EXISTS {notification_mails}_status ON {notification_mails} (status)',
+                ],
+            ],
         ];
     }
 
