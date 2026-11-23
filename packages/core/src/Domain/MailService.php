@@ -25,7 +25,8 @@ use KompanieApp\Core\Mail\PhpMailerMailer;
  * - „Verbindung prüfen“ zeigt das vom Server gemeldete Limit (SIZE); es wird in mail_server_size gemerkt und vor dem
  *   Versand gegen die fertige Mail geprüft (BoardMailService).
  * - Eine Warteschlange für alle Mails (runQueue, Aufgabe board_mail): erst die vom Schwarzen Brett, dann die aus der
- *   Verwaltung (MailingService); Portionsgröße und Pause gelten für alle zusammen.
+ *   Verwaltung (MailingService), dann die Benachrichtigungen per Mail (NotificationMailService); Portionsgröße und
+ *   Pause gelten für alle zusammen.
  */
 final class MailService
 {
@@ -117,7 +118,7 @@ final class MailService
             'configured' => $this->configured(),
             'unavailable' => $this->unavailable(),
             'server_max_size' => $this->serverMaxSize(),
-            'pending' => $this->app->boardMail()->pendingCount() + $this->app->mailings()->pendingCount(),
+            'pending' => $this->app->boardMail()->pendingCount() + $this->app->mailings()->pendingCount() + $this->app->notificationMails()->pendingCount(),
         ] + $this->batching();
     }
 
@@ -229,7 +230,7 @@ final class MailService
 
     /**
      * Versandlauf (Aufgabe board_mail): eine Portion wartender Mails im Zeitbudget, vom Brett (Bereich an) und aus der
-     * Verwaltung (Bereich an). Bleibt etwas übrig, folgt nach der Pause bzw. gleich der nächste Lauf.
+     * Verwaltung (Bereich an) und die Benachrichtigungen per Mail. Bleibt etwas übrig, folgt nach der Pause bzw. gleich der nächste Lauf.
      *
      * @return array{sent: int, failed: int, pending: int}
      */
@@ -238,8 +239,9 @@ final class MailService
         $queues = array_values(array_filter([
             $this->app->features()->enabled('board') ? $this->app->boardMail() : null,
             $this->app->features()->enabled(MailingService::FEATURE) ? $this->app->mailings() : null,
+            $this->app->notificationMails(),
         ]));
-        $pending = static fn (): int => array_sum(array_map(static fn (BoardMailService|MailingService $q): int => $q->pendingCount(), $queues));
+        $pending = static fn (): int => array_sum(array_map(static fn (BoardMailService|MailingService|NotificationMailService $q): int => $q->pendingCount(), $queues));
         $stats = ['sent' => 0, 'failed' => 0, 'pending' => 0];
         if ($queues === [] || !$this->configured()) {
             $stats['pending'] = $pending();

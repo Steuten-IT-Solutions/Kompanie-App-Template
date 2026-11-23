@@ -448,7 +448,7 @@ paths:
   /me/mail:
     get:
       tags: [Eigene Daten]
-      summary: Nachrichten vom Schwarzen Brett per E-Mail (Issue #172)
+      summary: Mails vom Schwarzen Brett (Issue #172) und Benachrichtigungen per E-Mail
       responses:
         '200':
           description: OK
@@ -478,6 +478,32 @@ paths:
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
+
+  /me/mail/notifications:
+    put:
+      tags: [Eigene Daten]
+      summary: Benachrichtigungen per E-Mail wählen (je Konto, Standard alle Arten an)
+      description: >-
+        types sind die Arten, die das Konto per Mail bekommen möchte (Schlüssel wie bei Push, ohne board und
+        board_public); alle anderen angebotenen Arten werden abgeschaltet. Unbekannte oder nicht angebotene Arten werden
+        ignoriert, eine leere Liste schaltet alle ab.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [types]
+              properties:
+                types: { type: array, items: { type: string } }
+      responses:
+        '200':
+          description: Gespeichert
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MailPreference' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
 
   /me/account:
     get:
@@ -1347,6 +1373,10 @@ paths:
     delete:
       tags: [Benachrichtigungen]
       summary: Gerät abmelden (Konto)
+      description: |
+        Das Entfernen kommt mit Grund ins Änderungsprotokoll (Benachrichtigungen auf einem Gerät entfernt), ebenso
+        wenn der Server ein Abo selbst entfernt (Push-Dienst kennt das Gerät nicht mehr, App ohne Anmeldung geöffnet,
+        anderes Konto auf dem Gerät, mehr als 10 Geräte).
       requestBody:
         required: true
         content:
@@ -1356,6 +1386,9 @@ paths:
               required: [endpoint]
               properties:
                 endpoint: { type: string }
+                logout:
+                  type: boolean
+                  description: true, wenn das Gerät beim Abmelden vom Konto entfernt wird (nur für den Grund im Protokoll)
       responses:
         '200': { $ref: '#/components/responses/Deleted' }
         '401': { $ref: '#/components/responses/Error' }
@@ -9993,11 +10026,27 @@ components:
                 updated_at: { type: [string, 'null'], format: date-time }
     MailPreference:
       type: object
-      required: [board, available, email]
+      required: [board, available, email, notifications]
       properties:
         board: { type: boolean, description: 'Mails vom Brett gewünscht (Standard true)' }
         available: { type: boolean, description: Mailversand eingerichtet und das Konto ist Empfänger des Bretts }
         email: { type: boolean, description: Mailadresse hinterlegt }
+        notifications:
+          type: object
+          description: Benachrichtigungen per E-Mail (NotificationMailService)
+          required: [available, types, selected]
+          properties:
+            available: { type: boolean, description: Mailversand eingerichtet }
+            types:
+              type: array
+              description: Arten, die das Konto per Mail bekommen kann
+              items:
+                type: object
+                required: [key, label]
+                properties:
+                  key: { type: string }
+                  label: { type: string }
+            selected: { type: array, items: { type: string }, description: 'eingeschaltete Arten (Standard: alle)' }
     MailSettings:
       type: object
       properties:

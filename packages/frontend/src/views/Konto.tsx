@@ -1,7 +1,7 @@
 import { Suspense, useEffect, useRef, useState, type FormEvent } from 'react';
 import { MyAdmission } from './Aufnahmen';
-import { api, can, config, isMember, roleLabels, type MailPreference, type OwnAccount } from '../api';
-import { boardVisible, SIGNATURE_RETURN_KEY } from '../board';
+import { api, can, config, isMember, roleLabels, type OwnAccount } from '../api';
+import { SIGNATURE_RETURN_KEY } from '../board';
 import brand from '../generated/brand';
 import { t } from '../i18n';
 import { isStandalone } from '../install';
@@ -164,38 +164,6 @@ function SignatureCard({ onToast }: { onToast: (msg: string) => void }) {
   );
 }
 
-/** Nachrichten vom Brett per E-Mail (Issue #172): Standard an, für Mitglieder und Anwärter. */
-function BoardMailToggle({ onToast }: { onToast: (msg: string) => void }) {
-  const [pref, setPref] = useState<MailPreference | null>(null);
-  useEffect(() => {
-    api.mailPreference().then(setPref, () => setPref(null));
-  }, []);
-  if (!pref || !pref.available) return null;
-  return (
-    <>
-      <label className="toggle board-mail-pref">
-        <input
-          type="checkbox"
-          checked={pref.board}
-          onChange={(e) =>
-            void api.setMailPreference(e.target.checked).then(
-              (p) => {
-                setPref(p);
-                onToast(p.board ? t('Mails vom Brett: an') : t('Mails vom Brett: aus'));
-              },
-              (err: Error) => onToast(err.message),
-            )
-          }
-        />
-        <span>{t('Nachrichten aus „{section}“ per E-Mail', { section: brand.labels.sections.board })}</span>
-      </label>
-      {pref.board && !pref.email && (
-        <p className="muted small">{t('Für dein Konto ist keine Mailadresse hinterlegt; bitte beim Admin melden.')}</p>
-      )}
-    </>
-  );
-}
-
 export default function Konto({ onToast, onLogout }: { onToast: (msg: string) => void; onLogout: () => void }) {
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
@@ -248,11 +216,10 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
 
       <div className="card account-card">
         <h3>{t('Benachrichtigungen')}</h3>
-        <p className="muted small">{t('Auf diesem Gerät benachrichtigt werden, wenn es Neues für dich gibt.')}</p>
+        <p className="muted small">{t('Auf diesem Gerät oder per E-Mail benachrichtigt werden, wenn es Neues für dich gibt.')}</p>
         <button className="btn btn-secondary btn-block push-konto" onClick={() => navigate('benachrichtigungen')}>
           {t('Benachrichtigungen einstellen')}
         </button>
-        {boardVisible() && <BoardMailToggle onToast={onToast} />}
       </div>
 
       {signatureAllowed() && <SignatureCard onToast={onToast} />}

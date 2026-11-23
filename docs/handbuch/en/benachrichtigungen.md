@@ -1,7 +1,7 @@
 ---
 titel: Notifications
 ---
-The app can notify you on your phone or computer when there is something new, even when it is closed. On this page you switch this on and choose what you get notified about.
+The app can notify you on your phone or computer when there is something new, even when it is closed. On this page you switch this on and choose what you get notified about. With an account, you also get the same notifications by email if {kompanie.name} has set up sending emails (see [By email](#by-email)).
 
 ![Notifications with the list of types, all ticked](bild:benachrichtigungen)
 
@@ -14,6 +14,7 @@ The app can notify you on your phone or computer when there is something new, ev
 - **{bereich.penalties}: show amount and reason in the message** (only with an account, if there are {bereich.penalties}): without the tick, the message only contains a note, which is good if others can see your lock screen.
 - **Switch on notifications**: switches on notifications on this device.
 - **Send test message** and **Switch off notifications**: appear as soon as notifications are on.
+- **By email** (only with an account, if sending emails is set up): a second card with a tick for each type for emails to your address.
 
 ## Step by step
 ### Switch on notifications
@@ -44,6 +45,14 @@ At least one type stays ticked. To switch off completely, use **Switch off notif
 ### Switch off notifications
 1. Open the page.
 2. Tap **Switch off notifications**. “Notifications are off” appears.
+
+## By email
+With an account, every notification also arrives as an email at your stored address if {kompanie.name} has set up sending emails. This applies to your account, not to a device: the emails arrive even if you haven’t switched on notifications on any device.
+- At first all types are ticked, including types that become available to you later.
+- On the **By email** card, untick the types you don’t want by email. The change applies straight away; “By email: off” or “By email: on” appears. Here you may also untick everything.
+- The types are the same as on the device (see below). For {rolle.member} and people with the internal calendar there is also **Messages from “{bereich.board}” by email**: this email contains the whole message with pictures and attachments. The {bereich.board} notifications themselves don’t come by email a second time.
+- The email contains the title and text of the notification and a link into the app. For {bereich.penalties} it only contains a note, without amount and reason.
+- Without a stored email address no email arrives; the card then points this out. You see and change your address under **My area → Account**.
 
 ## Which types there are
 Which types you see depends on which areas {kompanie.name} uses and whether you are logged in.
@@ -80,7 +89,7 @@ There, notifications only work in the installed app (from iOS 16.4), not in Safa
 
 ## Good to know
 - If you tap a message, the app opens exactly the entry it is about: for an event, the list under **{bereich.events}** scrolls to it, expands it and briefly highlights it. The same goes for messages on the {bereich.board} and for your {bereich.points} and {bereich.penalties}. If the entry no longer exists, you see the list.
-- The setting only applies to the device on which you make it. On other devices you switch it on there.
+- The setting only applies to the device on which you make it. On other devices you switch it on there. The ticks under **By email**, on the other hand, apply to your account.
 - With one account, at most 10 devices get notifications. If you switch them on on another device, the one set up longest ago drops out.
 - If you log out in the app, it switches off your account’s notifications on this device. If the login ends some other way (e.g. it expired), this happens as soon as the app is opened on the device again.
 - If a new type becomes available for you, e.g. because {kompanie.name} switches on an area or you get a new role, it is added automatically on your devices with notifications (within 15 minutes at the latest, immediately when you open this page). Types you have unticked yourself stay off, even if an area is switched off and on again. **{bereich.board}: public messages** is added with the first public message.

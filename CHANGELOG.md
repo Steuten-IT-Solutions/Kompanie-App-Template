@@ -26,6 +26,13 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- Alle Benachrichtigungen kommen jetzt auch per E-Mail, nicht nur aufs Gerät: Termine, Erinnerungen, Umfragen,
+  Geburtstage, Punkte, Strafen, Dienstgrad, Galerie, Anfragen und Fehlermeldungen. Die Mail enthält Titel und Text der
+  Benachrichtigung und einen Link in die App. Voraussetzung ist der Mailversand unter
+  [Einstellungen → E-Mail](app:einstellungen/email). Anfangs sind alle Arten für alle Konten mit Mailadresse an; jede
+  Person schaltet einzelne Arten unter [Meins → Benachrichtigungen](app:meins/benachrichtigungen) auf der Karte
+  „Per E-Mail“ ab. Dort steht jetzt auch der Schalter für die Mails vom Brett (bisher direkt unter Konto). Die Mails
+  gehen in denselben Portionen wie die übrigen Mails raus.
 - KI-Assistenten wie Claude lassen sich mit der App verbinden. Ein Admin schaltet das unter
   [Einstellungen → KI-Assistenten](app:einstellungen/ki-zugang) ein (Vorgabe aus); dort steht auch die Adresse, die man
   im KI-Assistenten einträgt, und die Liste aller verbundenen Zugänge zum Entfernen. Beim Verbinden meldet man sich in
@@ -33,10 +40,19 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Änderungen stehen im Änderungsprotokoll als „Name über Claude“. Die eigenen Zugänge stehen unter
   [Meins → Konto](app:meins/konto). Die Anmeldung aus dem KI-Assistenten braucht schöne Adressen (WordPress: Permalinks;
   eigenständige Version: Adressen ohne `index.php?r=`).
+<<<<<<< HEAD
 - **Neuer Block: Bild** für [eigene Seiten](app:verwaltung/seiten), News in der App und das Schwarze Brett: ein eigenes
   Bild hochladen, das nicht in der Galerie liegen muss, mit Bildunterschrift, Beschreibung für Screenreader und Größe
   (volle Breite, mittel, klein). Es sieht, wer den Block sehen darf; Bildunterschrift und Beschreibung lassen sich
   übersetzen. Entfernt man den Block, wird das Bild gelöscht.
+=======
+- Das [Änderungsprotokoll](app:verwaltung/aenderungen) zeigt, wenn die Benachrichtigungen einer Person auf einem Gerät
+  wegfallen, mit Grund: selbst ausgeschaltet, vom Konto abgemeldet, App ohne Anmeldung geöffnet (z. B. Sitzung
+  abgelaufen), anderes Konto auf dem Gerät, mehr als 10 Geräte oder der Push-Dienst kennt das Gerät nicht mehr (z. B.
+  nach dem Löschen der Browserdaten). Dazu stehen dort der Push-Dienst (z. B. Google für Chrome und Android), seit wann
+  die Benachrichtigungen an waren und wann zuletzt eine ankam. So lässt sich klären, warum jemand plötzlich keine
+  Benachrichtigungen mehr bekommt. Das Einschalten und Ändern der Arten wird weiterhin nicht aufgezeichnet.
+>>>>>>> origin/develop
 
 ## [0.13.0] – 2026-11-22
 

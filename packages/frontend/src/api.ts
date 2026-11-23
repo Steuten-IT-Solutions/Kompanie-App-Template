@@ -2023,11 +2023,19 @@ export interface Signature {
   updated_at: string | null;
 }
 
-/** Mails vom Brett: gewünscht, möglich, Adresse hinterlegt */
+/** Mails vom Brett (gewünscht, möglich, Adresse hinterlegt) und Benachrichtigungen per Mail */
 export interface MailPreference {
   board: boolean;
   available: boolean;
   email: boolean;
+  notifications: {
+    /** Mailversand eingerichtet */
+    available: boolean;
+    /** Arten, die das Konto per Mail bekommen kann (wie bei Push, ohne das Brett) */
+    types: { key: PushType; label: string }[];
+    /** davon eingeschaltet (Standard: alle) */
+    selected: PushType[];
+  };
 }
 
 /** Einstellungen → E-Mail (Kompanieadresse und SMTP) */
@@ -3217,6 +3225,7 @@ export const api = {
   deleteSignature: () => request<{ signature: null }>('DELETE', '/me/signature'),
   mailPreference: () => request<MailPreference>('GET', '/me/mail'),
   setMailPreference: (board: boolean) => request<MailPreference>('PUT', '/me/mail', { board }),
+  setNotificationMails: (types: PushType[]) => request<MailPreference>('PUT', '/me/mail/notifications', { types }),
   polls: () => request<Poll[]>('GET', '/polls'),
   poll: (id: number) => request<Poll>('GET', `/polls/${id}`),
   createPoll: (data: PollInput) => request<Poll>('POST', '/polls', data),
@@ -3598,7 +3607,9 @@ export const api = {
       )
     ).data,
   pushForget: async (device: PushDevice) =>
-    (await requestFull<{ deleted: boolean }>('DELETE', pushPath(''), { endpoint: device.endpoint }, undefined, true, true)).data,
+    // logout: nur für den Grund im Änderungsprotokoll („Vom Konto abgemeldet“)
+    (await requestFull<{ deleted: boolean }>('DELETE', pushPath(''), { endpoint: device.endpoint, logout: true }, undefined, true, true))
+      .data,
   pushTest: (device: PushDevice) =>
     request<{ sent: boolean }>('POST', pushPath('/test'), { endpoint: device.endpoint, auth: guestAuth(device) }),
   pushAdmin: () => request<PushAdmin>('GET', '/admin/push'),

@@ -182,6 +182,10 @@ final class Backup
             if (in_array('board_messages', $allowed, true)) {
                 $this->db->execute('DELETE FROM {board_mails}');
             }
+            // Benachrichtigungen per Mail gehören zu Konten dieser Installation (gleiche IDs, womöglich andere Personen).
+            if (in_array('user_settings', $allowed, true)) {
+                $this->db->execute('DELETE FROM {notification_mails}');
+            }
             // Ebenso das Protokoll der E-Mails aus der Verwaltung.
             if (in_array('mailings', $allowed, true)) {
                 $this->db->execute('DELETE FROM {mailing_recipients}');

@@ -37,7 +37,8 @@ Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **E-Mail**.
 ## Gut zu wissen
 - Das Passwort zeigt die App nie wieder an. Lässt du das Feld leer, bleibt das gespeicherte Passwort.
 - Die Mails verschickt die App im Hintergrund, jede einzeln an eine Person. Klappt eine Mail nicht, versucht sie es später noch einmal (bis zu fünfmal). Wer eine Nachricht am Brett schreibt, sieht im **Verlauf**, an wen sie ging.
-- Jede Person kann Mails vom Brett unter **Meins → Konto** abschalten. Wer keine Mailadresse hat, bekommt keine Mail.
+- Ist der Mailversand eingerichtet, kommen alle Benachrichtigungen (Termine, Erinnerungen, Umfragen, Punkte usw.) auch per Mail, anfangs für alle Arten. Jede Person kann einzelne Arten und die Mails vom Brett unter **Meins → Konto → Benachrichtigungen einstellen** auf der Karte **Per E-Mail** abschalten. Wer keine Mailadresse hat, bekommt keine Mail.
+- Bei vielen Personen können so mehr Mails zusammenkommen, z. B. bei jeder geänderten Uhrzeit eines Termins. Begrenzt euer Hoster die Mails pro Stunde, stell den Versand in Portionen ein.
 - Beim Versand in Portionen schaut die App alle 15 Minuten nach; eine Pause dauert deshalb mindestens bis zum nächsten Mal.
 - Mailserver der Empfänger können kleinere Grenzen haben als euer eigener; abgelehnte Mails kommen als Rückläufer an die Kompanieadresse.
 

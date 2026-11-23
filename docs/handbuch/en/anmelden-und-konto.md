@@ -15,7 +15,7 @@ Tap **My area** at the bottom and choose **Account** in the menu at the top. If 
 - **Contact**: your email address, mobile number and address, as {kompanie.name} has them.
 - **Birthday** (only for {rolle.member} accounts, if {kompanie.name} uses {bereich.birthdays}): your birthday and who sees it.
 - **Joining date** (only for {rolle.member} accounts, if {kompanie.name} uses the {bereich.directory} list): when you joined and who sees this on your page in the list.
-- **Set up notifications**: what the app notifies you about on this device. Below it, if {kompanie.name} has set up sending emails, the switch for board messages by email (on at first).
+- **Set up notifications**: what the app notifies you about on this device and, if {kompanie.name} has set up sending emails, by email, including board messages by email (see [Notifications](seite:benachrichtigungen)).
 - **Signature**: your sign-off for messages on the board, with text and pictures (for {rolle.member} accounts, candidates and everyone who writes on the board). More on the help page **Signature**.
 - **Appearance**: **Same as device**, **Light** or **Dark**.
 - **Language** (only if {kompanie.name} has switched on another language besides German): **Deutsch** or **English**. It applies to the app, to emails and to notifications sent to you. You have the same choice with the flag at the top of the header.

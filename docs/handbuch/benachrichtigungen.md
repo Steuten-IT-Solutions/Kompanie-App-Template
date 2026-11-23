@@ -3,7 +3,7 @@ titel: Benachrichtigungen
 reihenfolge: 25
 rechte: []
 ---
-Die App kann dich auf dem Handy oder am Computer benachrichtigen, wenn es etwas Neues gibt – auch wenn sie gerade geschlossen ist. Auf dieser Seite schaltest du das ein und wählst, worüber du benachrichtigt wirst.
+Die App kann dich auf dem Handy oder am Computer benachrichtigen, wenn es etwas Neues gibt – auch wenn sie gerade geschlossen ist. Auf dieser Seite schaltest du das ein und wählst, worüber du benachrichtigt wirst. Mit Konto bekommst du dieselben Benachrichtigungen außerdem per E-Mail, wenn die {kompanie.name} den Mailversand eingerichtet hat (siehe [Per E-Mail](#per-e-mail)).
 
 ![Benachrichtigungen mit der Liste der Arten, alle angehakt](bild:benachrichtigungen)
 
@@ -16,6 +16,7 @@ Die App kann dich auf dem Handy oder am Computer benachrichtigen, wenn es etwas 
 - **{bereich.penalties}: Betrag und Grund in der Nachricht zeigen** (nur mit Konto, wenn es {bereich.penalties} gibt): Ist der Haken weg, steht in der Nachricht nur ein Hinweis – gut, wenn andere deinen Sperrbildschirm sehen.
 - **Benachrichtigungen einschalten**: schaltet die Benachrichtigungen auf diesem Gerät ein.
 - **Testnachricht senden** und **Benachrichtigungen ausschalten**: erscheinen, sobald die Benachrichtigungen an sind.
+- **Per E-Mail** (nur mit Konto, wenn der Mailversand eingerichtet ist): eine zweite Karte mit einem Haken je Art für Mails an deine Adresse.
 
 ## So gehst du vor
 ### Benachrichtigungen einschalten
@@ -46,6 +47,14 @@ Mindestens eine Art bleibt angehakt. Ganz aus geht es mit **Benachrichtigungen a
 ### Benachrichtigungen ausschalten
 1. Öffne die Seite.
 2. Tippe auf **Benachrichtigungen ausschalten**. Es erscheint „Benachrichtigungen sind aus“.
+
+## Per E-Mail
+Mit Konto kommt jede Benachrichtigung zusätzlich als E-Mail an deine hinterlegte Adresse, wenn die {kompanie.name} den Mailversand eingerichtet hat. Das gilt für dein Konto, nicht für ein Gerät: Die Mails kommen auch, wenn du auf keinem Gerät Benachrichtigungen eingeschaltet hast.
+- Anfangs sind alle Arten angehakt, auch Arten, die später für dich dazukommen.
+- Nimm auf der Karte **Per E-Mail** die Haken weg, die du nicht per Mail möchtest. Die Änderung gilt sofort; es erscheint „Per E-Mail: aus“ bzw. „Per E-Mail: an“. Hier darf auch jeder Haken weg sein.
+- Die Arten sind dieselben wie auf dem Gerät (siehe unten). Für {rolle.member} und Personen mit dem internen Kalender steht dort außerdem **Nachrichten aus „{bereich.board}“ per E-Mail**: Diese Mail enthält die ganze Nachricht mit Bildern und Anhängen. Die Benachrichtigungen des {bereich.board} selbst kommen nicht noch einmal per Mail.
+- In der Mail stehen Titel und Text der Benachrichtigung und ein Link in die App. Bei {bereich.penalties} steht darin nur ein Hinweis, ohne Betrag und Grund.
+- Ohne hinterlegte Mailadresse kommt keine Mail; die Karte weist dann darauf hin. Deine Adresse siehst und änderst du unter **Meins → Konto**.
 
 ## Welche Arten es gibt
 Welche Arten du siehst, hängt davon ab, welche Bereiche die {kompanie.name} nutzt und ob du angemeldet bist.
@@ -82,7 +91,7 @@ Dort gibt es Benachrichtigungen nur in der installierten App (ab iOS 16.4), nich
 
 ## Gut zu wissen
 - Tippst du auf eine Nachricht, öffnet die App genau den Eintrag, um den es geht: Bei einem Termin scrollt die Liste unter **{bereich.events}** zu ihm, klappt ihn auf und hebt ihn kurz hervor. Genauso bei Nachrichten am {bereich.board}, bei deinen {bereich.points} und {bereich.penalties}. Ist der Eintrag nicht mehr da, siehst du die Liste.
-- Die Einstellung gilt nur für das Gerät, auf dem du sie vornimmst. Auf weiteren Geräten schaltest du sie dort ein.
+- Die Einstellung gilt nur für das Gerät, auf dem du sie vornimmst. Auf weiteren Geräten schaltest du sie dort ein. Die Haken unter **Per E-Mail** gelten dagegen für dein Konto.
 - Mit einem Konto bekommen höchstens 10 Geräte Benachrichtigungen. Schaltest du sie auf einem weiteren ein, fällt das am längsten eingerichtete weg.
 - Meldest du dich in der App ab, schaltet sie die Benachrichtigungen deines Kontos auf diesem Gerät aus. Endet die Anmeldung anders (z. B. abgelaufen), passiert das, sobald die App auf dem Gerät wieder geöffnet wird.
 - Gibt es für dich eine Art neu, z. B. weil die {kompanie.name} einen Bereich einschaltet oder du eine neue Rolle bekommst, kommt sie auf deinen Geräten mit Benachrichtigungen von selbst dazu (spätestens nach 15 Minuten, sofort, wenn du diese Seite öffnest). Arten, deren Haken du selbst entfernt hast, bleiben aus, auch wenn ein Bereich aus- und wieder eingeschaltet wird. **{bereich.board}: öffentliche Nachrichten** kommt bei der ersten öffentlichen Nachricht dazu.

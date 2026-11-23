@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import brand from '../generated/brand';
 import { t } from '../i18n';
-import { api, config, type PushDevice, type PushStatus, type PushType } from '../api';
+import { api, config, type MailPreference, type PushDevice, type PushStatus, type PushType } from '../api';
 import { currentDevice, disablePush, enablePush, matchesServerKey, pushSupport } from '../push';
 import { androidBrowser } from '../androidBrowser';
 import { detectPlatform, isInAppBrowser } from '../install';
@@ -10,10 +10,24 @@ import { navigate } from '../router';
 import { ErrorBox, Loading } from '../ui';
 
 /**
- * Benachrichtigungen auf diesem Gerät: für Konten (Punkte, Strafen, Termine …) und für Gäste ohne Konto
- * (nur Öffentliches). Jede Änderung wird sofort gespeichert.
+ * Benachrichtigungen auf diesem Gerät (Push) und, für Konten, zusätzlich per E-Mail. Jede Änderung wird sofort
+ * gespeichert.
  */
 export default function Benachrichtigungen({ onToast }: { onToast: (msg: string) => void }) {
+  return (
+    <div className="stack">
+      <PushCard onToast={onToast} />
+      {/* Mails gehören zum Konto, nicht zum Gerät; in der Vorschau nicht (der Server lehnt Änderungen ab). */}
+      {config?.user && !previewRole() && <MailCard onToast={onToast} />}
+    </div>
+  );
+}
+
+/**
+ * Benachrichtigungen auf diesem Gerät: für Konten (Punkte, Strafen, Termine …) und für Gäste ohne Konto
+ * (nur Öffentliches).
+ */
+function PushCard({ onToast }: { onToast: (msg: string) => void }) {
   const support = pushSupport();
   const android = detectPlatform() === 'android';
   const inAppBrowser = isInAppBrowser() || (android && androidBrowser(navigator.userAgent) === 'webview');
@@ -242,6 +256,89 @@ export default function Benachrichtigungen({ onToast }: { onToast: (msg: string)
         <button className="btn btn-block push-on" onClick={enable} disabled={busy || blocked || types.length === 0}>
           {busy ? t('Einen Moment …') : t('Benachrichtigungen einschalten')}
         </button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Benachrichtigungen per E-Mail: dieselben Arten wie auf dem Gerät (Standard alle an), dazu die Mails vom Brett mit
+ * ganzer Nachricht (eigener Schalter, nur für Mitglieder und Anwärter). Nur, wenn der Mailversand eingerichtet ist.
+ */
+function MailCard({ onToast }: { onToast: (msg: string) => void }) {
+  const [pref, setPref] = useState<MailPreference | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    api.mailPreference().then(setPref, () => setPref(null));
+  }, []);
+  if (!pref) return null;
+  const types = pref.notifications.available ? pref.notifications.types : [];
+  if (!pref.available && types.length === 0) return null;
+
+  async function save(action: () => Promise<MailPreference>, done: (p: MailPreference) => string) {
+    setBusy(true);
+    setError(null);
+    try {
+      const p = await action();
+      setPref(p);
+      onToast(done(p));
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const selected = pref.notifications.selected;
+  const toggleType = (key: PushType, on: boolean) => {
+    const next = types.map((x) => x.key).filter((k) => (k === key ? on : selected.includes(k)));
+    void save(
+      () => api.setNotificationMails(next),
+      () => (on ? t('Per E-Mail: an') : t('Per E-Mail: aus')),
+    );
+  };
+
+  return (
+    <div className="card push-card mail-notifications">
+      <h3>{t('Per E-Mail')}</h3>
+      <p className="small muted">
+        {t('Zusätzlich eine E-Mail an deine Adresse. Gilt für dein Konto, egal auf welchem Gerät du die App nutzt.')}
+      </p>
+      {!pref.email && <p className="small">{t('Für dein Konto ist keine Mailadresse hinterlegt; bitte beim Admin melden.')}</p>}
+      <div className="push-types">
+        {pref.available && (
+          <label className="toggle board-mail-pref">
+            <input
+              type="checkbox"
+              checked={pref.board}
+              disabled={busy}
+              onChange={(e) =>
+                void save(
+                  () => api.setMailPreference(e.target.checked),
+                  (p) => (p.board ? t('Mails vom Brett: an') : t('Mails vom Brett: aus')),
+                )
+              }
+            />
+            <span>{t('Nachrichten aus „{section}“ per E-Mail', { section: brand.labels.sections.board })}</span>
+          </label>
+        )}
+        {types.map((x) => (
+          <label key={x.key} className="toggle">
+            <input
+              type="checkbox"
+              checked={selected.includes(x.key)}
+              disabled={busy}
+              onChange={(e) => toggleType(x.key, e.target.checked)}
+            />
+            <span>{x.label}</span>
+          </label>
+        ))}
+      </div>
+      {error && (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
       )}
     </div>
   );

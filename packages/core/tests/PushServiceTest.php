@@ -240,6 +240,88 @@ final class PushServiceTest extends TestCase
         $this->assertFalse($sub['details'], 'Einstellungen des vorigen Kontos werden nicht übernommen');
     }
 
+    /** Entfernte Geräte von Konten kommen mit Grund ins Änderungsprotokoll (Gäste nicht). */
+    public function testRemovedDevicesAreLoggedWithReason(): void
+    {
+        $app = $this->app();
+        $p = $app->push();
+        $anna = $this->users->find($this->users->add('anna', Roles::MEMBER));
+        $max = $this->users->find($this->users->add('max', Roles::MEMBER));
+        $entries = function () use ($app): array {
+            $out = [];
+            foreach ($app->db->select('SELECT * FROM {change_log} ORDER BY id ASC') as $r) {
+                $fields = [];
+                foreach ((array) json_decode((string) $r['changes'], true) as $c) {
+                    $fields[(string) $c['f']] = $c['n'] ?? null;
+                }
+                $out[] = ['actor' => (int) $r['actor_id'], 'subject' => (int) $r['subject_user_id'], 'label' => (string) $r['label'], 'action' => (string) $r['action'], 'fields' => $fields];
+            }
+            $app->db->execute('DELETE FROM {change_log}');
+            return $out;
+        };
+
+        // Der Push-Dienst kennt das Gerät nicht mehr (410): System, mit Push-Dienst und Zeitpunkten.
+        $a = self::device('a');
+        $p->subscribe($anna, $a['endpoint'], $a['keys'], ['points'], null, '');
+        $this->assertSame([], $entries(), 'Einschalten kommt nicht ins Protokoll');
+        $app->pushTriggers()->pointsAdded([['id' => 1, 'user_id' => $anna->id, 'points' => 1, 'reason' => 'x']]);
+        $this->assertSame(1, $p->processQueue());
+        $this->clock->at = $this->clock->now()->modify('+1 hour');
+        $this->pushStatus[$a['endpoint']] = 410;
+        $app->pushTriggers()->pointsAdded([['id' => 2, 'user_id' => $anna->id, 'points' => 1, 'reason' => 'y'], ['id' => 3, 'user_id' => $anna->id, 'points' => 1, 'reason' => 'z']]);
+        $p->processQueue();
+        $log = $entries();
+        $this->assertCount(1, $log, 'ein Eintrag je Gerät, auch bei mehreren abgelehnten Nachrichten');
+        $this->assertSame(0, $log[0]['actor']);
+        $this->assertSame($anna->id, $log[0]['subject']);
+        $this->assertSame('event', $log[0]['action']);
+        $this->assertSame('Benachrichtigungen von ' . $anna->name . ' auf einem Gerät entfernt', $log[0]['label']);
+        $this->assertStringContainsString('kennt das Gerät nicht mehr (HTTP 410)', (string) $log[0]['fields']['Grund']);
+        $this->assertSame('Google (Chrome, Edge oder Android)', $log[0]['fields']['Push-Dienst']);
+        $this->assertSame('19.10.2026 10:00', $log[0]['fields']['Eingeschaltet am'], 'Ortszeit der Kompanie');
+        $this->assertSame('19.10.2026 10:00', $log[0]['fields']['Zuletzt zugestellt']);
+
+        // Selbst ausgeschaltet und beim Abmelden vom Konto: die Person selbst.
+        $b = self::device('b');
+        $p->subscribe($anna, $b['endpoint'], $b['keys'], null, null, '');
+        $this->assertTrue($p->unsubscribe($anna, $b['endpoint'], null));
+        $p->subscribe($anna, $b['endpoint'], $b['keys'], null, null, '');
+        $this->assertTrue($p->unsubscribe($anna, $b['endpoint'], null, true));
+        $log = $entries();
+        $this->assertSame([$anna->id, $anna->id], array_column($log, 'actor'));
+        $this->assertSame(['Auf dem Gerät ausgeschaltet', 'Vom Konto abgemeldet'], array_map(static fn (array $e): mixed => $e['fields']['Grund'], $log));
+        $this->assertSame('noch nie', $log[0]['fields']['Zuletzt zugestellt']);
+
+        // App ohne Anmeldung geöffnet, anderes Konto auf dem Gerät (beim Start und beim Einschalten).
+        $p->subscribe($anna, $b['endpoint'], $b['keys'], null, null, '');
+        $this->assertTrue($p->releaseForeign(null, $b['endpoint'], $b['keys']['auth']));
+        $p->subscribe($anna, $b['endpoint'], $b['keys'], null, null, '');
+        $this->assertTrue($p->releaseForeign($max, $b['endpoint'], $b['keys']['auth']));
+        $p->subscribe($anna, $b['endpoint'], $b['keys'], null, null, '');
+        $p->subscribe($max, $b['endpoint'], $b['keys'], null, null, '');
+        $log = $entries();
+        $this->assertSame([$anna->id, $anna->id, $anna->id], array_column($log, 'subject'));
+        $this->assertSame([0, 0, $max->id], array_column($log, 'actor'));
+        $this->assertStringContainsString('ohne Anmeldung', (string) $log[0]['fields']['Grund']);
+        $this->assertSame('Auf dem Gerät hat sich ein anderes Konto angemeldet', $log[1]['fields']['Grund']);
+        $this->assertSame('Auf dem Gerät hat sich ein anderes Konto angemeldet', $log[2]['fields']['Grund']);
+
+        // Zu viele Geräte: das älteste fällt weg.
+        for ($i = 0; $i <= PushService::MAX_PER_USER; $i++) {
+            $d = self::device('many' . $i);
+            $p->subscribe($anna, $d['endpoint'], $d['keys'], null, null, '');
+        }
+        $log = $entries();
+        $this->assertCount(1, $log);
+        $this->assertStringContainsString('das älteste wurde entfernt', (string) $log[0]['fields']['Grund']);
+
+        // Gäste: keine Person, kein Eintrag.
+        $g = self::device('guest');
+        $p->subscribe(null, $g['endpoint'], $g['keys'], null, null, '');
+        $this->assertTrue($p->unsubscribe(null, $g['endpoint'], $g['keys']['auth']));
+        $this->assertSame([], $entries());
+    }
+
     public function testGuestLimit(): void
     {
         $p = $this->app()->push();

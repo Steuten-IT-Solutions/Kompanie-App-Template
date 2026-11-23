@@ -396,7 +396,6 @@
   "Auf der Seite unter „{directory}“: {choice}": "On the page under “{directory}”: {choice}",
   "Auf der Seite unter „{directory}“: {choice} (wählt nur die Person selbst)": "On the page under “{directory}”: {choice} (only the person can choose this)",
   "Auf der Webseite öffnen": "Open on the website",
-  "Auf diesem Gerät benachrichtigt werden, wenn es Neues für dich gibt.": "Get notified on this device when there is something new for you.",
   "Auf diesem Server fehlt PHP die Erweiterung sodium; bitte beim Hoster nachfragen.": "PHP on this server is missing the sodium extension; please ask your hosting provider.",
   "Auf diesem Server nicht möglich, es fehlt: {missing}. Bitte beim Hoster nachfragen.": "Not possible on this server, missing: {missing}. Please ask your host.",
   "Auf eine ältere Version zurück": "Go back to an older version",
@@ -4922,5 +4921,12 @@
   "Ungültige Größe des Bilds: erlaubt sind small, medium und full.": "Invalid image size: allowed are small, medium and full.",
   "Volle Breite": "Full width",
   "Wird vorgelesen, wenn jemand das Bild nicht sehen kann.": "Read aloud when someone cannot see the image.",
-  "z. B. Gruppenfoto vor dem Rathaus": "e.g. Group photo in front of the town hall"
+  "z. B. Gruppenfoto vor dem Rathaus": "e.g. Group photo in front of the town hall",
+  "Auf diesem Gerät oder per E-Mail benachrichtigt werden, wenn es Neues für dich gibt.": "Get notified on this device or by email when there is something new for you.",
+  "Du bekommst diese Mail, weil in der App „{app}“ für dich Benachrichtigungen zu „{type}“ per E-Mail eingeschaltet sind. Abschalten kannst du das in der App unter Konto → Benachrichtigungen.": "You are receiving this email because email notifications for “{type}” are turned on for you in the app “{app}”. You can turn this off in the app under Account → Notifications.",
+  "Per E-Mail": "By email",
+  "Per E-Mail: an": "By email: on",
+  "Per E-Mail: aus": "By email: off",
+  "Zusätzlich eine E-Mail an deine Adresse. Gilt für dein Konto, egal auf welchem Gerät du die App nutzt.": "An additional email to your address. Applies to your account, whichever device you use the app on.",
+  "types muss eine Liste von Arten sein.": "types must be a list of notification types."
 }

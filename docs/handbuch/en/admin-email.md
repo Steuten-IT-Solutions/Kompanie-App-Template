@@ -35,7 +35,8 @@ Tap **Admin** at the bottom, then **Settings** and **Email**.
 ## Good to know
 - The app never shows the password again. If you leave the field empty, the saved password stays.
 - The app sends the emails in the background, each one individually to one person. If an email fails, it tries again later (up to five times). Anyone writing a message on the board sees in the **History** who it went to.
-- Each person can switch off emails from the board under **My area → Account**. Anyone without an email address gets no email.
+- Once sending emails is set up, all notifications (events, reminders, polls, points and so on) also come by email, at first for all types. Each person can switch off individual types and the emails from the board under **My area → Account → Set up notifications** on the **By email** card. Anyone without an email address gets no email.
+- With many people this can add up to more emails, e.g. for every changed time of an event. If your host limits emails per hour, set up sending in batches.
 - When sending in batches, the app checks every 15 minutes; a pause therefore lasts at least until the next time.
 - The recipients’ mail servers may have smaller limits than your own; rejected emails come back as bounces to the company address.
 
