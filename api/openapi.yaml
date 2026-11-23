@@ -1347,6 +1347,10 @@ paths:
     delete:
       tags: [Benachrichtigungen]
       summary: Gerät abmelden (Konto)
+      description: |
+        Das Entfernen kommt mit Grund ins Änderungsprotokoll (Benachrichtigungen auf einem Gerät entfernt), ebenso
+        wenn der Server ein Abo selbst entfernt (Push-Dienst kennt das Gerät nicht mehr, App ohne Anmeldung geöffnet,
+        anderes Konto auf dem Gerät, mehr als 10 Geräte).
       requestBody:
         required: true
         content:
@@ -1356,6 +1360,9 @@ paths:
               required: [endpoint]
               properties:
                 endpoint: { type: string }
+                logout:
+                  type: boolean
+                  description: true, wenn das Gerät beim Abmelden vom Konto entfernt wird (nur für den Grund im Protokoll)
       responses:
         '200': { $ref: '#/components/responses/Deleted' }
         '401': { $ref: '#/components/responses/Error' }

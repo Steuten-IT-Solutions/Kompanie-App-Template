@@ -3585,7 +3585,9 @@ export const api = {
       )
     ).data,
   pushForget: async (device: PushDevice) =>
-    (await requestFull<{ deleted: boolean }>('DELETE', pushPath(''), { endpoint: device.endpoint }, undefined, true, true)).data,
+    // logout: nur für den Grund im Änderungsprotokoll („Vom Konto abgemeldet“)
+    (await requestFull<{ deleted: boolean }>('DELETE', pushPath(''), { endpoint: device.endpoint, logout: true }, undefined, true, true))
+      .data,
   pushTest: (device: PushDevice) =>
     request<{ sent: boolean }>('POST', pushPath('/test'), { endpoint: device.endpoint, auth: guestAuth(device) }),
   pushAdmin: () => request<PushAdmin>('GET', '/admin/push'),

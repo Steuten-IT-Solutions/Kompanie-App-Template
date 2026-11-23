@@ -7,7 +7,9 @@ namespace KompanieApp\Core\Push;
 use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
+use KompanieApp\Core\ChangeLog\Item;
 use KompanieApp\Core\Domain\BoardService;
+use KompanieApp\Core\Domain\ChangeLogService;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\ExtendedHttpClient;
@@ -111,6 +113,8 @@ final class PushService
     /** Push-Dienste der Browser (wie im Projekt-Cockpit). */
     private const PUSH_HOSTS = ['/^fcm\.googleapis\.com$/', '/(^|\.)push\.services\.mozilla\.com$/', '/(^|\.)push\.apple\.com$/', '/(^|\.)notify\.windows\.com$/'];
     public const MAX_PER_USER = 10;
+    /** Grund im Änderungsprotokoll, wenn ein Abo an ein anderes Konto auf demselben Gerät geht */
+    private const REASON_OTHER_ACCOUNT = 'Auf dem Gerät hat sich ein anderes Konto angemeldet';
     private const GUEST_EXPIRY_DAYS = 180;
     public const MAX_GUESTS = 2000;
     /** Neue Gast-Abos je Gerät/Adresse und Stunde */
@@ -315,6 +319,7 @@ final class PushService
             $repo->update($existing['id'], ['user_id' => $userId, 'p256dh' => $p256dhText, 'auth' => $authText, 'types' => $types, 'offered' => $offered, 'details' => $details], $now);
             if (!$same) {
                 $repo->clearQueueFor($existing['id']); // Nachrichten für das vorige Konto nicht mehr zustellen
+                $this->noteRemoved([[$existing, self::REASON_OTHER_ACCOUNT]], $user ?? ChangeLogService::SYSTEM);
             }
         } else {
             if ($userId === 0) {
@@ -323,9 +328,12 @@ final class PushService
             $repo->insert($userId, $endpoint, $p256dhText, $authText, $types, $details, $now, $offered);
             if ($userId > 0) {
                 $subs = $repo->forUser($userId);
+                $removed = [];
                 foreach (array_slice($subs, 0, max(0, count($subs) - self::MAX_PER_USER)) as $old) {
                     $repo->delete($old['id']);
+                    $removed[] = [$old, 'Mehr als ' . self::MAX_PER_USER . ' Geräte mit Benachrichtigungen: das älteste wurde entfernt'];
                 }
+                $this->noteRemoved($removed, $user ?? ChangeLogService::SYSTEM);
             }
         }
         return $repo->byEndpoint($endpoint) ?? throw ApiError::invalid(I18n::t('Das Abo konnte nicht gespeichert werden.'));
@@ -367,7 +375,8 @@ final class PushService
         return $this->repository()->byEndpoint($sub['endpoint']) ?? $sub;
     }
 
-    public function unsubscribe(?User $user, mixed $endpoint, mixed $auth): bool
+    /** @param bool $logout beim Abmelden vom Konto (nur für den Grund im Änderungsprotokoll) */
+    public function unsubscribe(?User $user, mixed $endpoint, mixed $auth, bool $logout = false): bool
     {
         try {
             $sub = $this->own($user, $endpoint, $auth);
@@ -378,6 +387,9 @@ final class PushService
             throw $e;
         }
         $this->repository()->delete($sub['id']);
+        if ($user !== null) {
+            $this->noteRemoved([[$sub, $logout ? 'Vom Konto abgemeldet' : 'Auf dem Gerät ausgeschaltet']], $user);
+        }
         return true;
     }
 
@@ -505,6 +517,9 @@ final class PushService
             return false;
         }
         $this->repository()->delete($sub['id']);
+        $this->noteRemoved([[$sub, $user === null
+            ? 'App auf dem Gerät ohne Anmeldung geöffnet (Sitzung abgelaufen oder anderswo abgemeldet)'
+            : self::REASON_OTHER_ACCOUNT]]);
         return true;
     }
 
@@ -856,6 +871,7 @@ final class PushService
         $tokens = []; // VAPID-Token je Push-Dienst, einmal je Lauf signiert
         $rejected = 0;
         $reason = '';
+        $gone = []; // abgemeldete Abos von Konten fürs Änderungsprotokoll, je Abo einmal
         // In Teilen senden und jeden Teil gleich abschließen: Bricht der Lauf ab, kommt höchstens ein Teil doppelt.
         foreach (array_chunk($rows, $parallel ? 25 : 5) as $chunk) {
             $done = [];
@@ -895,6 +911,10 @@ final class PushService
                     $repo->delete($row['subscription_id']);
                     $rejected++;
                     $reason = self::reason($responses[$row['id']] ?? null, true);
+                    if (($row['user_id'] ?? 0) > 0) {
+                        $gone[$row['subscription_id']] = [['user_id' => (int) $row['user_id'], 'endpoint' => (string) $row['endpoint'],
+                            'created_at' => (string) $row['subscribed_at'], 'last_sent_at' => $row['last_sent_at']], self::goneReason($responses[$row['id']] ?? null)];
+                    }
                 } elseif ($status === 'retry' && $row['attempts'] < self::MAX_ATTEMPTS) {
                     $repo->retry($row['id'], gmdate('Y-m-d H:i:s', $ts + 300 * $row['attempts']));
                 } else {
@@ -906,6 +926,7 @@ final class PushService
             $repo->markSentMany($delivered, $now);
             $repo->dequeue($done);
         }
+        $this->noteRemoved(array_values($gone));
         if ($sent > 0 || $rejected > 0) {
             $this->log(static function (array $log) use ($sent, $rejected, $reason, $ts): array {
                 if ($sent > 0) {
@@ -940,6 +961,7 @@ final class PushService
         $status = self::classify($res, $sub['endpoint']);
         if ($status === 'gone') {
             $this->repository()->delete($sub['id']);
+            $this->noteRemoved([[$sub, self::goneReason($res)]]);
             throw new ApiError(410, 'push_gone', I18n::t('Der Push-Dienst kennt dieses Gerät nicht mehr. Bitte Benachrichtigungen neu aktivieren.'));
         }
         if (is_array($res) && $res['status'] === 403 && parse_url($sub['endpoint'], PHP_URL_HOST) === 'fcm.googleapis.com') {
@@ -1027,6 +1049,67 @@ final class PushService
     {
         $code = is_array($res) ? 'HTTP ' . (int) $res['status'] : 'keine Verbindung';
         return $gone ? 'Gerät beim Push-Dienst abgemeldet (' . $code . ')' : $code;
+    }
+
+    /** Grund fürs Änderungsprotokoll, wenn der Push-Dienst ein Gerät nicht mehr kennt. */
+    private static function goneReason(array|\RuntimeException|null $res): string
+    {
+        $code = is_array($res) ? 'HTTP ' . (int) $res['status'] : '';
+        return 'Der Push-Dienst kennt das Gerät nicht mehr (' . $code . '), z. B. nach dem Löschen der Browserdaten, '
+            . 'einer Neuinstallation der App oder wenn die Erlaubnis für Benachrichtigungen entzogen wurde';
+    }
+
+    /** Push-Dienst zur Adresse, damit man im Änderungsprotokoll erkennt, welches Gerät gemeint ist. */
+    private static function serviceLabel(string $endpoint): string
+    {
+        $host = strtolower((string) parse_url($endpoint, PHP_URL_HOST));
+        return match (true) {
+            $host === 'fcm.googleapis.com' => 'Google (Chrome, Edge oder Android)',
+            preg_match('/(^|\.)push\.services\.mozilla\.com$/', $host) === 1 => 'Mozilla (Firefox)',
+            preg_match('/(^|\.)push\.apple\.com$/', $host) === 1 => 'Apple (iPhone, iPad oder Mac)',
+            preg_match('/(^|\.)notify\.windows\.com$/', $host) === 1 => 'Windows (Edge)',
+            default => $host,
+        };
+    }
+
+    /**
+     * Hält im Änderungsprotokoll fest, dass die Benachrichtigungen eines Kontos auf einem Gerät entfernt wurden: mit
+     * Grund, Push-Dienst, seit wann sie an waren und wann zuletzt etwas ankam. Gäste nicht (keine Person dazu). So lässt
+     * sich nachvollziehen, warum jemand plötzlich keine Benachrichtigungen mehr bekommt.
+     *
+     * @param list<array{0: array{user_id: int, endpoint: string, created_at: string, last_sent_at: string|null}, 1: string}> $removed Abo und Grund
+     * @param User|string $actor wer es ausgelöst hat; ohne Anfrage einer Person ChangeLogService::SYSTEM
+     */
+    private function noteRemoved(array $removed, User|string $actor = ChangeLogService::SYSTEM): void
+    {
+        $removed = array_values(array_filter($removed, static fn (array $x): bool => $x[0]['user_id'] > 0));
+        if ($removed === []) {
+            return;
+        }
+        try {
+            $users = $this->app->users->findMany(array_values(array_unique(array_map(static fn (array $x): int => $x[0]['user_id'], $removed))));
+        } catch (\Throwable) {
+            $users = [];
+        }
+        $changes = [];
+        foreach ($removed as [$sub, $reason]) {
+            $name = isset($users[$sub['user_id']]) ? $users[$sub['user_id']]->name : '';
+            $label = $name === '' ? 'Benachrichtigungen auf einem Gerät entfernt' : 'Benachrichtigungen von ' . $name . ' auf einem Gerät entfernt';
+            $changes[] = ['event', null, new Item('Benachrichtigungen', '', mb_substr($label, 0, 191), [
+                'Grund' => $reason,
+                'Push-Dienst' => self::serviceLabel($sub['endpoint']),
+                'Eingeschaltet am' => $this->localTime($sub['created_at']),
+                'Zuletzt zugestellt' => $sub['last_sent_at'] === null ? 'noch nie' : $this->localTime($sub['last_sent_at']),
+            ], [], [], $sub['user_id']), true];
+        }
+        $this->app->changeLog()->recordMany($actor, 'app', $changes);
+    }
+
+    /** UTC-Zeit aus der Datenbank (JJJJ-MM-TT HH:MM:SS) als Ortszeit für das Protokoll; leer bleibt leer. */
+    private function localTime(string $utc): ?string
+    {
+        $ts = $utc === '' ? false : strtotime($utc . ' UTC');
+        return $ts === false ? null : $this->app->time()->format($ts, 'd.m.Y H:i');
     }
 
     /**
