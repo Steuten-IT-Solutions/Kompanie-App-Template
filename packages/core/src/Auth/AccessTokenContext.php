@@ -69,6 +69,13 @@ final class AccessTokenContext implements AuthContext
         return $this->resolve()[1]['id'] ?? null;
     }
 
+    /** Programm des Zugangs der laufenden Anfrage (z. B. Claude, fürs Änderungsprotokoll); null ohne gültiges Token. */
+    public function client(): ?string
+    {
+        $client = $this->resolve()[1]['client'] ?? null;
+        return $client === null ? null : ($client !== '' ? $client : 'KI-Assistent');
+    }
+
     public function currentUser(): ?User
     {
         if ($this->token === null) {

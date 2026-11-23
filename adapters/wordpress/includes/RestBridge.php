@@ -80,7 +80,7 @@ final class RestBridge
         $preview = $wp->get_header('X-Kompanie-Preview');
         // Sprache der App (Plan „Mehrsprachigkeit“); ob sie gilt, entscheidet der Kern.
         $locale = $wp->get_header(I18n::HEADER);
-        $request = new Request($wp->get_method(), $route->path, $wp->get_query_params(), is_array($body) ? $body : [], $params, $client, is_string($preview) ? $preview : null, is_string($locale) ? $locale : null, Request::bearerFrom(self::authorization($wp)));
+        $request = new Request($wp->get_method(), $route->path, $wp->get_query_params(), is_array($body) ? $body : [], $params, $client, is_string($preview) ? $preview : null, is_string($locale) ? $locale : null, Request::bearerFrom(self::authorization($wp)), Request::headersFrom(static fn (string $name): mixed => $wp->get_header($name)));
         $res = $app->api()->dispatch($route, $request);
         $out = new \WP_REST_Response($res->data, $res->status);
         foreach ($res->headers as $name => $value) {

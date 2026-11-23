@@ -528,6 +528,8 @@ export interface ChangeEntry {
   subject_user_id: number | null;
   /** Gemeinsame Kennung der Einträge einer Aktion mit mehreren Einträgen (z. B. Punkte für alle), sonst leer */
   batch: string;
+  /** Programm eines Zugangs für KI-Assistenten (MCP), über den die Änderung kam, z. B. Claude; leer in der App selbst */
+  via?: string;
   changes: ChangeField[];
 }
 

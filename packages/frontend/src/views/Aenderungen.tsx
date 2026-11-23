@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { api, can, type ChangeEntry, type ChangeLog } from '../api';
 import { CAPABILITIES } from '../capabilities';
-import { csvRows, entryTitle, fieldText, groupEntries, groupTitle } from '../changeText';
+import { actorText, csvRows, entryTitle, fieldText, groupEntries, groupTitle } from '../changeText';
 import { formatDate, todayYmd } from '../format';
 import { toCsv } from '../lists';
 import { ErrorBox, Loading, Sheet, useAsync } from '../ui';
@@ -145,7 +145,7 @@ function Entries({ log, onOpen }: { log: ChangeLog; onOpen: (group: ChangeEntry[
                   <span className="row-main">
                     <span className="row-title">{groupTitle(g)}</span>
                     <span className="row-sub">
-                      {time(g[0].at)} · {g[0].actor_name} · {g[0].area_label}
+                      {time(g[0].at)} · {actorText(g[0])} · {g[0].area_label}
                     </span>
                   </span>
                   <span className="settings-chevron" aria-hidden="true">
@@ -187,7 +187,7 @@ function Detail({ group, onClose }: { group: ChangeEntry[]; onClose: () => void 
   return (
     <Sheet title={groupTitle(group)} onClose={onClose}>
       <p className="small muted">
-        {dateTime(first.at)} · {first.actor_name} · {first.area_label}
+        {dateTime(first.at)} · {actorText(first)} · {first.area_label}
       </p>
       {group.length === 1 ? (
         <Fields entry={first} />

@@ -20,6 +20,11 @@ export function entryTitle(e: Pick<ChangeEntry, 'type' | 'label' | 'action'>): s
   return t('{type} „{label}“ {action}', { type: e.type, label: e.label, action });
 }
 
+/** Wer geändert hat; über einen Zugang für KI-Assistenten mit dem Programm („Max Muster über Claude“). */
+export function actorText(e: Pick<ChangeEntry, 'actor_name' | 'via'>): string {
+  return e.via ? t('{name} über {client}', { name: e.actor_name, client: e.via }) : e.actor_name;
+}
+
 /** Wert zum Anzeigen; Rechte mit ihren Namen, leer als „leer“. */
 export function valueText(field: string, value: string | null | undefined, capLabel: (key: string) => string): string {
   if (value === null || value === undefined || value === '') return t('leer');
@@ -50,7 +55,7 @@ export function fieldText(c: ChangeField, capLabel: (key: string) => string): st
 export function csvRows(entries: ChangeEntry[], time: (unix: number) => string, capLabel: (key: string) => string): string[][] {
   const rows: string[][] = [];
   for (const e of entries) {
-    const base = [time(e.at), e.actor_name, e.area_label, e.type, e.label, ACTION_TEXT[e.action] ?? e.action];
+    const base = [time(e.at), actorText(e), e.area_label, e.type, e.label, ACTION_TEXT[e.action] ?? e.action];
     if (e.changes.length === 0) rows.push([...base, '', '', '']);
     for (const c of e.changes) {
       const shown = !c.secret && !c.hidden;

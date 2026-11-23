@@ -35,10 +35,11 @@ info:
     **Zugang für KI-Assistenten (Plan „MCP-Server“):** Statt des Cookies kann eine Anfrage ein Zugriffstoken im Header
     `Authorization: Bearer kat_…` tragen (Sicherheitsschema `bearer`). Dann stellt die Person des Zugangs die Anfrage,
     mit ihren aktuellen Rechten, auch wenn derselbe Aufruf ein Cookie trägt; eine Vorschau gilt dann nicht. Nur Routen
-    mit `x-token: true` nehmen Tokens an, alle anderen antworten 403 `token_not_allowed`. Ein ungültiges, abgelaufenes
+    mit `x-token: true` nehmen Tokens an (`GET /me`, `POST /mcp` und die Routen, die die Werkzeuge des MCP-Endpunkts
+    aufrufen), alle anderen antworten 403 `token_not_allowed`. Ein ungültiges, abgelaufenes
     oder widerrufenes Token ergibt 401 `invalid_token` mit `WWW-Authenticate: Bearer error="invalid_token"`; ist der
     Zugang in der App ausgeschaltet (`/admin/ai-access`), gilt kein Token. Mit dem Umfang `read` lehnt der Server jede
-    Anfrage außer `GET`/`HEAD` mit 403 `token_readonly` ab. Ein Zugriffstoken gilt 1 Stunde, das Erneuern 30 Tage ab dem
+    Anfrage außer `GET`/`HEAD` (und `POST /mcp`) mit 403 `token_readonly` ab. Ein Zugriffstoken gilt 1 Stunde, das Erneuern 30 Tage ab dem
     letzten Erneuern; ein neues Passwort (eigenes oder Startpasswort) beendet alle Zugänge der Person.
 
     **Beträge** sind immer ganze Cent. **Datumsangaben** `YYYY-MM-DD`, Uhrzeiten `HH:MM`
@@ -635,6 +636,65 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
+  /mcp:
+    post:
+      tags: [Eigene Daten]
+      summary: MCP-Endpunkt für KI-Assistenten (JSON-RPC 2.0)
+      description: |
+        Model Context Protocol, Transport Streamable HTTP ohne Sitzung: eine JSON-RPC-Anfrage je POST, Antwort immer
+        `application/json`. Nur mit Zugriffstoken (`bearer`); ohne → 401 mit `WWW-Authenticate: Bearer`. Ist der Zugang
+        in der App aus (`/admin/ai-access`) → 404. Ein Header `Origin` einer fremden Seite → 403.
+
+        Versionen: `2026-07-28` (Version und Fähigkeiten in `params._meta` jeder Anfrage, `server/discover`) und ältere ab
+        `2025-03-26` mit `initialize`. Unbekannte Version in `_meta` → 400 mit Fehler -32022 und `data.supported`.
+        Header `Mcp-Method`, `MCP-Protocol-Version` und `Mcp-Name` sind freiwillig; passen sie nicht zur Anfrage → 400
+        mit -32020. Methoden: `server/discover`, `initialize`, `ping`, `tools/list`, `tools/call`; Benachrichtigungen
+        (ohne `id`) → 202 ohne Inhalt; Stapel (JSON-Array) → 400.
+
+        Werkzeuge (Mcp\Tools) rufen je eine Route dieser API auf, mit denselben Rechten, Bereichen und demselben
+        Änderungsprotokoll (Feld `via`). `tools/list` zeigt nur Werkzeuge, die die Person mit diesem Zugang nutzen darf;
+        ändernde nur mit Umfang `write`. Fehler einer Route kommen als Ergebnis mit `isError: true`. Listen höchstens
+        `limit` Einträge (Vorgabe 50, höchstens 200) mit `total` und `truncated`. Nachrichten ans Brett gehen nie per Mail.
+      x-token: true
+      security:
+        - bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [jsonrpc, method]
+              properties:
+                jsonrpc: { type: string, const: '2.0' }
+                id: { type: [string, integer] }
+                method: { type: string }
+                params: { type: object }
+      responses:
+        '200':
+          description: JSON-RPC-Antwort (result oder error)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [jsonrpc]
+                properties:
+                  jsonrpc: { type: string, const: '2.0' }
+                  id: { type: [string, integer, 'null'] }
+                  result: { type: object }
+                  error:
+                    type: object
+                    required: [code, message]
+                    properties:
+                      code: { type: integer }
+                      message: { type: string }
+                      data: {}
+        '202': { description: Benachrichtigung angenommen (ohne Inhalt) }
+        '400': { description: 'Ungültige Anfrage, unbekannte Version oder Header passen nicht (JSON-RPC-Fehler)' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { description: 'Zugang ausgeschaltet bzw. unbekannte Methode (Version 2026-07-28, JSON-RPC-Fehler -32601)' }
+
   /reports/form:
     get:
       tags: [Fehlermeldungen]
@@ -1178,6 +1238,7 @@ paths:
 
   /calendar:
     get:
+      x-token: true
       tags: [Termine]
       summary: Alle Termine des internen Kalenders (Mitglieder und Anwärter)
       description: |
@@ -1283,6 +1344,7 @@ paths:
           description: 'Kennung des Termins wie in `GET /calendar` (`id`) oder seine stabile Kennung (`responses.key`)',
         }
     get:
+      x-token: true
       tags: [Termine]
       summary: Wer zu- oder abgesagt hat und wer sich noch nicht gemeldet hat
       description: Namen und Hinweise; gezählt werden alle, die zusagen dürfen (`respond_calendar`).
@@ -1368,6 +1430,7 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
     post:
+      x-token: true
       tags: [Termine]
       summary: Internen Termin anlegen
       description: Nur mit der Quelle `app` (sonst 409 `not_in_app`). Benachrichtigt wie bei jeder Quelle über neue Termine.
@@ -1391,6 +1454,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/Id'
     patch:
+      x-token: true
       tags: [Termine]
       summary: Internen Termin ändern
       x-capability: manage_calendar
@@ -1421,6 +1485,7 @@ paths:
 
   /events:
     get:
+      x-token: true
       tags: [Termine]
       summary: Kommende öffentliche Termine
       description: |
@@ -1443,6 +1508,7 @@ paths:
                 type: array
                 items: { $ref: '#/components/schemas/PublicEvent' }
     post:
+      x-token: true
       tags: [Termine]
       summary: Öffentlichen Termin anlegen
       x-capability: manage_events
@@ -1464,6 +1530,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/Id'
     patch:
+      x-token: true
       tags: [Termine]
       summary: Öffentlichen Termin ändern
       x-capability: manage_events
@@ -2841,6 +2908,7 @@ paths:
 
   /board:
     get:
+      x-token: true
       tags: [Schwarzes Brett]
       summary: Gültige Einträge am Schwarzen Brett, neueste zuerst (Issue #5, #172)
       description: |
@@ -2874,6 +2942,7 @@ paths:
                         - $ref: '#/components/schemas/BoardPollItem'
         '403': { $ref: '#/components/responses/Error' }
     post:
+      x-token: true
       tags: [Schwarzes Brett]
       summary: Nachricht ans Schwarze Brett schreiben
       description: |
@@ -3470,6 +3539,7 @@ paths:
 
   /polls:
     get:
+      x-token: true
       tags: [Umfragen]
       summary: Alle Umfragen (laufende und beendete), neueste zuerst (Issue #4)
       description: |
@@ -3490,6 +3560,7 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
     post:
+      x-token: true
       tags: [Umfragen]
       summary: Umfrage anlegen
       description: |
@@ -3515,6 +3586,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/Id'
     get:
+      x-token: true
       tags: [Umfragen]
       summary: Eine Umfrage (wie in der Liste)
       x-capability: 'vote_polls oder view_poll_results'
@@ -3903,6 +3975,7 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
   /attendance:
     get:
+      x-token: true
       tags: [Verwaltung]
       summary: Die letzten 50 Anwesenheitslisten (Issue #21)
       x-capability: view_attendance
@@ -3916,6 +3989,7 @@ paths:
                 items: { $ref: '#/components/schemas/AttendanceSummary' }
         '403': { $ref: '#/components/responses/Error' }
     put:
+      x-token: true
       tags: [Verwaltung]
       summary: Liste anlegen oder ändern und Status setzen
       description: |
@@ -4030,6 +4104,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/Id'
     get:
+      x-token: true
       tags: [Verwaltung]
       summary: Liste mit allen Personen, Status, gebuchten Punkten und Zählern
       x-capability: view_attendance
@@ -4827,6 +4902,7 @@ paths:
 
   /directory:
     get:
+      x-token: true
       tags: [Mitgliederliste]
       summary: Mitgliederliste (Bereich directory), öffentlich
       x-capability: 'view_directory (ohne Anmeldung die Rechte der Rolle guest)'
@@ -8195,6 +8271,7 @@ paths:
 
   /admin/status:
     get:
+      x-token: true
       tags: [Wartung]
       summary: Zustand der Installation (Ampel), Updates, Statusmeldungen, Fehlerprotokoll
       x-capability: manage_settings
@@ -9986,7 +10063,7 @@ components:
               items: { $ref: '#/components/schemas/ChangeEntry' }
     ChangeEntry:
       type: object
-      required: [id, at, actor_id, actor_name, area, area_label, type, item, label, action, subject_user_id, batch, changes]
+      required: [id, at, actor_id, actor_name, area, area_label, type, item, label, action, subject_user_id, batch, via, changes]
       properties:
         id: { type: integer }
         at: { type: integer, description: Unix-Zeit }
@@ -10005,6 +10082,7 @@ components:
           }
         subject_user_id: { type: [integer, 'null'], description: 'Konto, um das es geht (Mitglieder, Punkte, Strafen)' }
         batch: { type: string, description: 'Gemeinsame Kennung der Einträge einer Aktion mit mehreren Einträgen, sonst leer' }
+        via: { type: string, description: 'Programm des Zugangs für KI-Assistenten (MCP), über den die Änderung kam, z. B. Claude; leer bei Änderungen in der App' }
         changes:
           type: array
           items:

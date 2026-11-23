@@ -154,11 +154,26 @@ try {
     $bearer = ['Authorization' => 'Bearer ' . $grant['access_token']];
     $me = $as(null, 'GET', 'me', null, $bearer);
     $c->ok($me[0] === 200 && $me[1]['name'] === 'Anna Admin', 'Token im Header Authorization gilt für /me ohne Cookie');
-    $c->ok($as(null, 'GET', 'events', null, $bearer)[1]['code'] === 'token_not_allowed', 'Routen ohne Freigabe für Tokens → 403');
+    $c->ok($as(null, 'GET', 'members', null, $bearer)[1]['code'] === 'token_not_allowed', 'Routen ohne Freigabe für Tokens → 403');
     $bad = $as(null, 'GET', 'me', null, ['Authorization' => 'Bearer kat_falsch']);
     $c->ok($bad[0] === 401 && $bad[1]['code'] === 'invalid_token' && str_contains($bad[2]['www-authenticate'] ?? '', 'invalid_token'), 'Falsches Token → 401 mit WWW-Authenticate');
+
+    $c->section('MCP-Endpunkt');
+    $mcpHeaders = $bearer + ['Accept' => 'application/json, text/event-stream'];
+    $init = $as(null, 'POST', 'mcp', ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'initialize', 'params' => ['protocolVersion' => '2025-06-18', 'capabilities' => new \stdClass(), 'clientInfo' => ['name' => 'test', 'version' => '1']]], $mcpHeaders);
+    $c->ok($init[0] === 200 && ($init[1]['result']['protocolVersion'] ?? null) === '2025-06-18' && str_starts_with($init[2]['content-type'] ?? '', 'application/json'), 'initialize ohne Cookie und CSRF-Token, Antwort als JSON');
+    $c->ok($as(null, 'POST', 'mcp', ['jsonrpc' => '2.0', 'method' => 'notifications/initialized'], $mcpHeaders)[0] === 202, 'Benachrichtigung → 202');
+    $call = $as(null, 'POST', 'mcp', ['jsonrpc' => '2.0', 'id' => 2, 'method' => 'tools/call', 'params' => ['name' => 'whoami', 'arguments' => new \stdClass()]], $mcpHeaders + ['Mcp-Method' => 'tools/call', 'Mcp-Name' => 'whoami']);
+    $c->ok($call[0] === 200 && ($call[1]['result']['structuredContent']['person']['name'] ?? null) === 'Anna Admin', 'tools/call whoami mit den Headern Mcp-Method und Mcp-Name');
+    $c->ok($as(null, 'POST', 'mcp', ['jsonrpc' => '2.0', 'id' => 3, 'method' => 'tools/list'], $mcpHeaders + ['Mcp-Method' => 'tools/call'])[0] === 400, 'Header passt nicht zum Inhalt → 400');
+    $c->ok($as(null, 'POST', 'mcp', ['jsonrpc' => '2.0', 'id' => 4, 'method' => 'tools/list'], $mcpHeaders + ['Origin' => 'https://fremd.example'])[0] === 403, 'Fremde Herkunft → 403');
+    $noToken = $as(null, 'POST', 'mcp', ['jsonrpc' => '2.0', 'id' => 5, 'method' => 'tools/list']);
+    $c->ok($noToken[0] === 401 && ($noToken[2]['www-authenticate'] ?? '') === 'Bearer', 'Ohne Token → 401 mit WWW-Authenticate');
+    $c->ok($as(null, 'GET', 'mcp', null, $mcpHeaders)[0] === 405, 'GET → 405');
+
     $kernel->app()->accessTokens()->setEnabled(false);
     $c->ok($as(null, 'GET', 'me', null, $bearer)[0] === 401, 'Schalter aus → Token gilt nicht');
+    $c->ok($as(null, 'POST', 'mcp', ['jsonrpc' => '2.0', 'id' => 6, 'method' => 'tools/list'], $mcpHeaders)[0] === 404, 'Schalter aus → MCP-Endpunkt 404');
 
     $c->section('Begrenzung fehlgeschlagener Anmeldungen');
     $fails = [];

@@ -87,8 +87,8 @@ final class AccessTokenTest extends TestCase
         // Vorschau gilt mit Token nicht (sonst wäre @public ohne Anmeldung)
         $this->assertSame(200, $this->call('GET', '/me', [], $grant['access_token'], '@public')->status);
 
-        // Routen ohne Freigabe für Tokens lehnen ab, auch lesende.
-        $res = $this->call('GET', '/events', [], $grant['access_token']);
+        // Routen ohne Freigabe für Tokens (weder Route::$token noch ein MCP-Werkzeug) lehnen ab, auch lesende.
+        $res = $this->call('GET', '/members', [], $grant['access_token']);
         $this->assertSame([403, 'token_not_allowed'], [$res->status, $res->data['code']]);
         $this->assertSame(403, $this->call('GET', '/admin/ai-access', [], $grant['access_token'])->status);
 

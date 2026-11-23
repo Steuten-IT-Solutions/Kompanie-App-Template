@@ -508,7 +508,7 @@ final class Kernel
             }
             $query = $_GET;
             unset($query['r']);
-            $res = $this->app()->api()->handle(new Request($method, $path, $query, $body, [], $this->http->clientIp(), $this->http->header(Preview::HEADER), $this->http->header(I18n::HEADER), Request::bearerFrom($this->http->header('Authorization'))));
+            $res = $this->app()->api()->handle(new Request($method, $path, $query, $body, [], $this->http->clientIp(), $this->http->header(Preview::HEADER), $this->http->header(I18n::HEADER), Request::bearerFrom($this->http->header('Authorization')), Request::headersFrom(fn (string $name): ?string => $this->http->header($name))));
         } catch (ApiError $e) {
             $res = Response::error($e);
         }
@@ -516,6 +516,10 @@ final class Kernel
         header('Content-Type: application/json; charset=utf-8');
         foreach ($res->headers as $k => $v) {
             header($k . ': ' . $v);
+        }
+        // Ohne Inhalt (z. B. 202 auf eine Benachrichtigung an den MCP-Endpunkt)
+        if ($res->status === 202 && $res->data === null) {
+            return;
         }
         echo json_encode($res->data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
     }

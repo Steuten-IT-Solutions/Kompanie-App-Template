@@ -1,7 +1,7 @@
 // Texte des Änderungsprotokolls (src/changeText.ts): Titel, Felder, CSV.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { csvRows, entryTitle, fieldText, groupEntries, groupTitle } from '../src/changeText.ts';
+import { actorText, csvRows, entryTitle, fieldText, groupEntries, groupTitle } from '../src/changeText.ts';
 import type { ChangeEntry } from '../src/api.ts';
 
 const cap = (k: string) => ({ view_personal: 'Persönliches sehen', manage_points: 'Punkte vergeben' })[k] ?? k;
@@ -73,4 +73,10 @@ test('Einträge einer Aktion als eine Gruppe, mit Titel', () => {
   assert.equal(groupTitle(groups[0]), '2 × Punkte angelegt');
   assert.equal(groupTitle(groups[1]), 'Punkte „#3“ angelegt');
   assert.equal(groupTitle(groups[3]), '2 Änderungen auf einmal');
+});
+
+test('Wer geändert hat: über einen Zugang für KI-Assistenten mit dem Programm', () => {
+  assert.equal(actorText({ actor_name: 'Max Muster', via: 'Claude' }), 'Max Muster über Claude');
+  assert.equal(actorText({ actor_name: 'Max Muster', via: '' }), 'Max Muster');
+  assert.equal(actorText({ actor_name: 'Max Muster' }), 'Max Muster');
 });
