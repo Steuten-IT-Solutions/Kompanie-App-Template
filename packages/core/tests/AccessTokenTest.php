@@ -175,6 +175,7 @@ final class AccessTokenTest extends TestCase
         $this->users->current = $this->member;
         $list = $this->call('GET', '/me/ai-access')->data;
         $this->assertTrue($list['enabled']);
+        $this->assertSame(['https://example.org/api/v1/mcp', true], [$list['mcp_url'], $list['oauth']], 'Adresse zum Eintragen im KI-Assistenten');
         $this->assertSame([[$mine['id'], 'Claude', 'write']], array_map(static fn (array $t): array => [$t['id'], $t['client'], $t['scope']], $list['tokens']), 'nur eigene');
         $this->assertArrayNotHasKey('user_name', $list['tokens'][0]);
         $this->assertSame(404, $this->call('DELETE', '/me/ai-access/' . $other['id'])->status, 'fremde nicht');

@@ -24,6 +24,16 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+### Neu
+
+- KI-Assistenten wie Claude lassen sich mit der App verbinden. Ein Admin schaltet das unter
+  [Einstellungen → KI-Assistenten](app:einstellungen/ki-zugang) ein (Vorgabe aus); dort steht auch die Adresse, die man
+  im KI-Assistenten einträgt, und die Liste aller verbundenen Zugänge zum Entfernen. Beim Verbinden meldet man sich in
+  der App an und wählt, ob der KI-Assistent nur lesen oder auch ändern darf. Er handelt mit den Rechten dieser Person;
+  Änderungen stehen im Änderungsprotokoll als „Name über Claude“. Die eigenen Zugänge stehen unter
+  [Meins → Konto](app:meins/konto). Die Anmeldung aus dem KI-Assistenten braucht schöne Adressen (WordPress: Permalinks;
+  eigenständige Version: Adressen ohne `index.php?r=`).
+
 ## [0.13.0] – 2026-11-22
 
 ### Neu

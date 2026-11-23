@@ -53,6 +53,7 @@ import { CONNECTION_CHANGED, isStale } from './connection';
 // Der Service Worker speichert alle Teile trotzdem vorab, damit sie auch offline da sind.
 const Anmelden = lazyView(() => import('./views/Anmelden'));
 const Registrieren = lazyView(() => import('./views/Registrieren'));
+const KiZugang = lazyView(() => import('./views/KiZugang'));
 const Galerie = lazyView(() => import('./views/Galerie'));
 const GalerieEinreichungen = lazyView(() => import('./views/GalerieEinreichungen'));
 const GalleryAlbums = lazyView(() => import('./views/GalerieAlben'));
@@ -118,6 +119,7 @@ type View =
   | 'installieren'
   | 'anmelden'
   | 'registrieren'
+  | 'ki-zugang'
   | 'einstellungen'
   | 'einrichtung'
   | 'hilfe';
@@ -144,6 +146,7 @@ const VIEWS: View[] = [
   'installieren',
   'anmelden',
   'registrieren',
+  'ki-zugang',
   'einstellungen',
   'einrichtung',
   'hilfe',
@@ -202,6 +205,7 @@ const titles = (): Record<View, string> => ({
   installieren: t('App installieren'),
   anmelden: t('Anmelden'),
   registrieren: t('Zugang beantragen'),
+  'ki-zugang': t('KI-Assistent verbinden'),
   einstellungen: t('Einstellungen'),
   einrichtung: t('Einrichtung'),
   hilfe: t('Hilfe'),
@@ -455,6 +459,8 @@ export default function App({ notice = null }: { notice?: string | null }) {
     anmelden: !user && config?.auth.mode === 'form',
     // Zugang beantragen (Issue #314): auch der Link aus der Mail (bestaetigen/<token>) und der Stand der Anfrage
     registrieren: !!config?.registration || path[1] === 'bestaetigen' || path[1] === 'stand',
+    // Anmeldung eines KI-Assistenten (Plan „MCP-Server“): zustimmen nur angemeldet
+    'ki-zugang': !!user && !!path[1],
     einstellungen: can('manage_settings'),
     einrichtung: can('manage_settings'),
     hilfe: true,
@@ -706,11 +712,15 @@ export default function App({ notice = null }: { notice?: string | null }) {
           {t('Schlechte Verbindung – angezeigt werden die zuletzt geladenen Daten.')}
         </div>
       )}
-      {!['installieren', 'anmelden', 'registrieren', 'einstellungen', 'einrichtung'].includes(tab) && <InstallBanner onToast={showToast} />}
-      {/* Gleich nach der Anmeldung, auf jeder Seite (auch nach einem geteilten Link): Benachrichtigungen anbieten */}
-      {user && !config.setupPending && !['anmelden', 'registrieren', 'einrichtung', 'benachrichtigungen', 'installieren'].includes(tab) && (
-        <PushHint onToast={showToast} />
+      {!['installieren', 'anmelden', 'registrieren', 'ki-zugang', 'einstellungen', 'einrichtung'].includes(tab) && (
+        <InstallBanner onToast={showToast} />
       )}
+      {/* Gleich nach der Anmeldung, auf jeder Seite (auch nach einem geteilten Link): Benachrichtigungen anbieten */}
+      {user &&
+        !config.setupPending &&
+        !['anmelden', 'registrieren', 'ki-zugang', 'einrichtung', 'benachrichtigungen', 'installieren'].includes(tab) && (
+          <PushHint onToast={showToast} />
+        )}
 
       <main className="content">
         <ErrorBoundary key={viewKey(path)}>
@@ -809,6 +819,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
             {tab === 'installieren' && <Installieren onToast={showToast} />}
             {tab === 'anmelden' && <Anmelden />}
             {tab === 'registrieren' && <Registrieren path={path.slice(1)} />}
+            {tab === 'ki-zugang' && path[1] && <KiZugang requestKey={path[1]} />}
             {tab === 'einstellungen' && <Einstellungen path={path.slice(1)} onToast={showToast} />}
             {tab === 'einrichtung' && <Einrichtung onToast={showToast} />}
             {tab === 'hilfe' && <Hilfe slug={path[1]} />}
