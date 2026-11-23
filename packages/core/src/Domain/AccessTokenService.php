@@ -71,7 +71,7 @@ final class AccessTokenService
      *
      * @return array{access_token: string, refresh_token: string, token_type: string, expires_in: int, scope: string, id: int}
      */
-    public function issue(int $userId, string $client, string $scope): array
+    public function issue(int $userId, string $client, string $scope, string $clientId = ''): array
     {
         if (!$this->enabled()) {
             throw new ApiError(403, 'ai_access_disabled', I18n::t('Der Zugang für KI-Assistenten ist in dieser App ausgeschaltet.'));
@@ -86,7 +86,7 @@ final class AccessTokenService
         $now = $this->now();
         $this->repo()->deleteExpired($now);
         [$access, $refresh] = [self::token(self::ACCESS_PREFIX), self::token(self::REFRESH_PREFIX)];
-        $id = $this->repo()->create($userId, Text::line($client, self::CLIENT_MAX), $scope, self::hash($access), self::hash($refresh), $now + self::ACCESS_TTL, $now + self::REFRESH_TTL, $now);
+        $id = $this->repo()->create($userId, Text::line($client, self::CLIENT_MAX), $scope, self::hash($access), self::hash($refresh), $now + self::ACCESS_TTL, $now + self::REFRESH_TTL, $now, $clientId);
         return self::grant($access, $refresh, $scope, $id);
     }
 
@@ -95,11 +95,13 @@ final class AccessTokenService
      *
      * @return array{access_token: string, refresh_token: string, token_type: string, expires_in: int, scope: string, id: int}
      */
-    public function refresh(string $refreshToken): array
+    public function refresh(string $refreshToken, ?string $clientId = null): array
     {
         $row = $this->enabled() && str_starts_with($refreshToken, self::REFRESH_PREFIX) ? $this->repo()->byRefreshHash(self::hash($refreshToken)) : null;
         $now = $this->now();
-        if ($row === null || $row['refresh_expires_at'] < $now || $this->userOf($row) === null) {
+        // Mit $clientId (OAuth): nur das Programm, dem der Zugang ausgestellt wurde
+        $wrongClient = $row !== null && $clientId !== null && $row['client_id'] !== '' && !hash_equals($row['client_id'], $clientId);
+        if ($row === null || $wrongClient || $row['refresh_expires_at'] < $now || $this->userOf($row) === null) {
             throw new ApiError(400, 'invalid_grant', I18n::t('Der Zugang ist abgelaufen oder wurde widerrufen. Bitte neu verbinden.'));
         }
         [$access, $refresh] = [self::token(self::ACCESS_PREFIX), self::token(self::REFRESH_PREFIX)];
@@ -176,7 +178,7 @@ final class AccessTokenService
     }
 
     /** Darf dieses Konto überhaupt einen Zugang haben? Nicht ohne Zugang, nicht als Ehemalige(r). */
-    private function mayUse(User $user): bool
+    public function mayUse(User $user): bool
     {
         return !$this->app->members()->hasNoAccess($user->id) && $this->app->formerMembers()->previousRole($user) === null;
     }

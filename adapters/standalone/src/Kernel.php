@@ -331,7 +331,12 @@ final class Kernel
             return;
         }
 
-        if (str_starts_with($path, '/api/v1/') || $path === '/api/v1') {
+        // Metadaten für die Anmeldung per OAuth unter /.well-known/ (nur wenn die App an der Wurzel der Domain liegt;
+        // sonst finden Programme sie unter der Adresse der API)
+        $wellKnown = str_starts_with($path, '/.well-known/') ? $this->app()->oauth()->wellKnownRoute(rtrim($this->http->basePath, '/') . $path) : null;
+        if ($wellKnown !== null) {
+            $this->sendApi($wellKnown);
+        } elseif (str_starts_with($path, '/api/v1/') || $path === '/api/v1') {
             $this->sendApi(substr($path, strlen('/api/v1')) ?: '/');
         } elseif ($path === '/webseite.css') {
             $this->sendWebsiteCss();
@@ -484,6 +489,9 @@ final class Kernel
         return $path === '/' ? '/' : rtrim($path, '/');
     }
 
+    /** Anfragen von Programmen bei der Anmeldung per OAuth: ohne Cookie und CSRF-Token, Tokens auch als Formular */
+    private const OAUTH_FORM_PATHS = ['/oauth/token', '/oauth/register'];
+
     private function sendApi(string $path): void
     {
         $method = $this->http->method();
@@ -492,11 +500,19 @@ final class Kernel
         header('X-Robots-Tag: noindex');
         $this->securityHeaders();
         try {
-            // Erst Herkunft, Inhaltstyp und CSRF-Token prüfen, dann den Inhalt lesen.
-            $this->auth()->verifyRequest();
+            // Erst Herkunft, Inhaltstyp und CSRF-Token prüfen, dann den Inhalt lesen. Ausnahme: Tokens holen und Programm
+            // eintragen bei der Anmeldung per OAuth (Programme ohne Cookie; Tokens kommen nach OAuth als Formular).
+            $oauth = in_array($path, self::OAUTH_FORM_PATHS, true);
+            if (!$oauth) {
+                $this->auth()->verifyRequest();
+            }
             $body = [];
             $raw = (string) file_get_contents('php://input');
-            if ($raw !== '') {
+            $type = strtolower(trim(explode(';', (string) $this->http->header('Content-Type'))[0]));
+            if ($raw !== '' && $oauth && $type === 'application/x-www-form-urlencoded') {
+                parse_str($raw, $form);
+                $body = array_filter($form, 'is_string');
+            } elseif ($raw !== '') {
                 $body = json_decode($raw, true);
                 if (!is_array($body)) {
                     throw ApiError::invalid(I18n::t('Die Anfrage enthält kein gültiges JSON.'));

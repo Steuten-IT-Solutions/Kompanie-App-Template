@@ -826,6 +826,12 @@ final class App
         return $this->service(AccessTokenService::class, fn () => new AccessTokenService($this));
     }
 
+    /** Anmeldung per OAuth für KI-Assistenten (Plan „MCP-Server“, Schritt 3) */
+    public function oauth(): \KompanieApp\Core\Domain\OAuthService
+    {
+        return $this->service(\KompanieApp\Core\Domain\OAuthService::class, fn () => new \KompanieApp\Core\Domain\OAuthService($this));
+    }
+
     /** MCP-Endpunkt für KI-Assistenten (Plan „MCP-Server“, Schritt 2) */
     public function mcp(): \KompanieApp\Core\Mcp\McpServer
     {

@@ -10,21 +10,22 @@ use KompanieApp\Core\Storage\Sql\Connection;
  * Zugänge für KI-Assistenten (Domain\AccessTokenService): je Zeile ein Zugang einer Person mit den Hashes des
  * Zugriffstokens und des Tokens zum Erneuern. Zeiten als Unix-Zeit.
  *
- * @phpstan-type AccessTokenRow array{id: int, user_id: int, client: string, scope: string, expires_at: int, refresh_expires_at: int, created_at: int, last_used_at: int|null}
+ * @phpstan-type AccessTokenRow array{id: int, user_id: int, client: string, client_id: string, scope: string, expires_at: int, refresh_expires_at: int, created_at: int, last_used_at: int|null}
  */
 final class AccessTokenRepository
 {
-    private const COLUMNS = 'id, user_id, client, scope, expires_at, refresh_expires_at, created_at, last_used_at';
+    private const COLUMNS = 'id, user_id, client, client_id, scope, expires_at, refresh_expires_at, created_at, last_used_at';
 
     public function __construct(private readonly Connection $db)
     {
     }
 
-    public function create(int $userId, string $client, string $scope, string $tokenHash, string $refreshHash, int $expiresAt, int $refreshExpiresAt, int $now): int
+    public function create(int $userId, string $client, string $scope, string $tokenHash, string $refreshHash, int $expiresAt, int $refreshExpiresAt, int $now, string $clientId = ''): int
     {
         return $this->db->insert('access_tokens', [
             'user_id' => $userId,
             'client' => $client,
+            'client_id' => $clientId,
             'scope' => $scope,
             'token_hash' => $tokenHash,
             'refresh_hash' => $refreshHash,
@@ -110,6 +111,7 @@ final class AccessTokenRepository
             'id' => (int) $r['id'],
             'user_id' => (int) $r['user_id'],
             'client' => (string) $r['client'],
+            'client_id' => (string) ($r['client_id'] ?? ''),
             'scope' => (string) $r['scope'],
             'expires_at' => (int) $r['expires_at'],
             'refresh_expires_at' => (int) $r['refresh_expires_at'],

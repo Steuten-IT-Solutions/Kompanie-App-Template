@@ -102,6 +102,8 @@ final class Plugin
         // Erst auf init: Dann hat auch das Theme seine Filter (z. B. upload_dir) gesetzt.
         add_action('init', [self::class, 'upgrade'], 1);
         add_action('rest_api_init', static fn () => RestBridge::register(self::app()));
+        // Metadaten für die Anmeldung per OAuth an der Wurzel der Domain (/.well-known/…, Plan „MCP-Server“)
+        add_action('parse_request', static fn () => RestBridge::wellKnown(self::app()), 0);
         // Nach einem Update im selben Aufruf keine weiteren Aufgaben: Im Speicher ist noch der alte Code.
         add_filter('cron_schedules', [WpScheduler::class, 'schedules']);
         // News im Editor von WordPress schreiben: Wer in der App „News schreiben“ hat, bekommt die Rechte für Beiträge.

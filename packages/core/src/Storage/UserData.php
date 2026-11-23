@@ -166,6 +166,7 @@ final class UserData
         try {
             // Zugänge für KI-Assistenten (AccessTokenService): nur Hashes, nicht in der Auskunft, aber mit dem Konto weg
             $db->execute('DELETE FROM {access_tokens} WHERE user_id = ?', [$userId]);
+            $db->execute('DELETE FROM {oauth_grants} WHERE user_id = ?', [$userId]);
         } catch (\RuntimeException) {
             // Tabelle fehlt (ältere Version auf einer anderen Seite des Netzwerks): dort gibt es auch keine Zugänge
         }

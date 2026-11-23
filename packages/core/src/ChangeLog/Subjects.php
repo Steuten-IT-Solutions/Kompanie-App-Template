@@ -42,6 +42,8 @@ final class Subjects
         'DELETE /me/ai-access/{id}',
         // MCP-Endpunkt: erfasst wird die Route, die ein Werkzeug aufruft (mit via = Programm des Zugangs)
         'POST /mcp',
+        // Anmeldung per OAuth (Programm eintragen, Tokens holen, eigenen Zugang freigeben: wie ein Gerät anmelden)
+        'POST /oauth/token', 'POST /oauth/register', 'POST /oauth/requests/{key}',
         // Abstimmen in Umfragen (absichtlich nicht, auch nicht bei offenen Umfragen)
         'PUT /polls/{id}/vote', 'DELETE /polls/{id}/vote',
         // Eigene Zu- und Absage bei einem Termin (wie Abstimmen; was die Verwaltung für andere einträgt, wird erfasst)

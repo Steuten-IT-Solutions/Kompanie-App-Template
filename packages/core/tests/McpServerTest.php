@@ -84,10 +84,10 @@ final class McpServerTest extends TestCase
         $this->app->accessTokens()->setEnabled(true);
         $res = $this->rpc('tools/list', [], null);
         $this->assertSame(401, $res->status);
-        $this->assertSame('Bearer', $res->headers['WWW-Authenticate'] ?? null);
+        $this->assertSame('Bearer resource_metadata="https://example.org/api/v1/oauth/protected-resource"', $res->headers['WWW-Authenticate'] ?? null);
         $bad = $this->rpc('tools/list', [], 'kat_falsch');
         $this->assertSame(401, $bad->status);
-        $this->assertSame('Bearer error="invalid_token"', $bad->headers['WWW-Authenticate'] ?? null);
+        $this->assertSame('Bearer error="invalid_token", resource_metadata="https://example.org/api/v1/oauth/protected-resource"', $bad->headers['WWW-Authenticate'] ?? null);
         // Mit Cookie allein nicht (kein Zugang über die Anmeldung im Browser)
         $this->users->current = $this->admin;
         $this->assertSame(401, $this->rpc('tools/list', [], null)->status);

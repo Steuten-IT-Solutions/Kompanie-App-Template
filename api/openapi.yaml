@@ -642,7 +642,7 @@ paths:
       summary: MCP-Endpunkt für KI-Assistenten (JSON-RPC 2.0)
       description: |
         Model Context Protocol, Transport Streamable HTTP ohne Sitzung: eine JSON-RPC-Anfrage je POST, Antwort immer
-        `application/json`. Nur mit Zugriffstoken (`bearer`); ohne → 401 mit `WWW-Authenticate: Bearer`. Ist der Zugang
+        `application/json`. Nur mit Zugriffstoken (`bearer`); ohne → 401 mit `WWW-Authenticate: Bearer` und `resource_metadata` (Verweis auf `/oauth/protected-resource`, wenn OAuth möglich ist). Ist der Zugang
         in der App aus (`/admin/ai-access`) → 404. Ein Header `Origin` einer fremden Seite → 403.
 
         Versionen: `2026-07-28` (Version und Fähigkeiten in `params._meta` jeder Anfrage, `server/discover`) und ältere ab
@@ -694,6 +694,228 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { description: 'Zugang ausgeschaltet bzw. unbekannte Methode (Version 2026-07-28, JSON-RPC-Fehler -32601)' }
+
+  /oauth/protected-resource:
+    get:
+      tags: [Anmeldung]
+      summary: Metadaten des MCP-Endpunkts für OAuth (RFC 9728)
+      description: |
+        Auf diese Adresse verweist `WWW-Authenticate` (`resource_metadata`) bei 401 am MCP-Endpunkt. Dieselben Daten unter
+        `/.well-known/oauth-protected-resource` (in WordPress und an der Wurzel der Domain auch mit dem Pfad des
+        Endpunkts dahinter). 404, wenn der Zugang für KI-Assistenten aus ist oder die API-Adresse ein `?` enthält
+        (eigenständige Version ohne schöne Adressen, WordPress ohne Permalinks).
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [resource, authorization_servers]
+                properties:
+                  resource: { type: string, description: Adresse des MCP-Endpunkts }
+                  authorization_servers: { type: array, items: { type: string }, description: Aussteller (Adresse der API ohne / am Ende) }
+                  scopes_supported: { type: array, items: { type: string } }
+                  bearer_methods_supported: { type: array, items: { type: string } }
+                  resource_name: { type: string }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /.well-known/oauth-protected-resource:
+    get:
+      tags: [Anmeldung]
+      summary: Metadaten des MCP-Endpunkts (gleich /oauth/protected-resource)
+      security: []
+      responses:
+        '200': { description: 'Wie /oauth/protected-resource' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /.well-known/oauth-authorization-server:
+    get:
+      tags: [Anmeldung]
+      summary: Metadaten des Anmeldedienstes (RFC 8414)
+      description: |
+        Aussteller (`issuer`) ist die Adresse der API ohne / am Ende. Programme suchen die Metadaten an der Wurzel der
+        Domain mit dem Pfad des Ausstellers dahinter (`/.well-known/oauth-authorization-server/<Pfad>`) oder unter der
+        API. PKCE nur mit `S256`, Programme ohne Geheimnis (`token_endpoint_auth_methods_supported: [none]`), Programme
+        per Metadaten-Dokument (`client_id` ist eine https-Adresse) oder Registrierung (`/oauth/register`).
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [issuer, authorization_endpoint, token_endpoint, code_challenge_methods_supported]
+                properties:
+                  issuer: { type: string }
+                  authorization_endpoint: { type: string }
+                  token_endpoint: { type: string }
+                  registration_endpoint: { type: string }
+                  scopes_supported: { type: array, items: { type: string } }
+                  response_types_supported: { type: array, items: { type: string } }
+                  grant_types_supported: { type: array, items: { type: string } }
+                  token_endpoint_auth_methods_supported: { type: array, items: { type: string } }
+                  code_challenge_methods_supported: { type: array, items: { type: string } }
+                  client_id_metadata_document_supported: { type: boolean }
+                  authorization_response_iss_parameter_supported: { type: boolean }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /.well-known/openid-configuration:
+    get:
+      tags: [Anmeldung]
+      summary: Metadaten des Anmeldedienstes (gleich /.well-known/oauth-authorization-server)
+      security: []
+      responses:
+        '200': { description: 'Wie /.well-known/oauth-authorization-server' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /oauth/authorize:
+    get:
+      tags: [Anmeldung]
+      summary: Anmeldung eines KI-Assistenten beginnen (OAuth 2.1, Code mit PKCE)
+      description: |
+        Prüft Programm, Rücksprung-Adresse, PKCE (`S256`), Umfang und `resource` (muss der MCP-Endpunkt sein, wenn
+        angegeben). Unbekanntes Programm oder fremde Rücksprung-Adresse → 400 (nie eine Weiterleitung an eine fremde
+        Adresse). Andere Fehler → 302 zur Rücksprung-Adresse mit `error` und `state`. Sonst → 302 in die App
+        (`#/ki-zugang/<Schlüssel>`), wo die angemeldete Person zustimmt (10 Minuten gültig).
+      security: []
+      parameters:
+        - { name: response_type, in: query, required: true, schema: { type: string, enum: [code] } }
+        - { name: client_id, in: query, required: true, schema: { type: string } }
+        - { name: redirect_uri, in: query, required: true, schema: { type: string } }
+        - { name: code_challenge, in: query, required: true, schema: { type: string } }
+        - { name: code_challenge_method, in: query, required: true, schema: { type: string, enum: [S256] } }
+        - { name: state, in: query, schema: { type: string } }
+        - { name: scope, in: query, schema: { type: string, description: '`read` und/oder `write`, durch Leerzeichen getrennt' } }
+        - { name: resource, in: query, schema: { type: string } }
+      responses:
+        '302': { description: Weiterleitung zur Zustimmung in der App oder mit Fehler zum Programm }
+        '400': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /oauth/requests/{key}:
+    parameters:
+      - { name: key, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [Anmeldung]
+      summary: Offene Anfrage eines KI-Assistenten für die Zustimmung zeigen
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [client, client_host, redirect_host, scope, installation]
+                properties:
+                  client: { type: string, description: Name des Programms (aus seinen Metadaten) }
+                  client_host: { type: string }
+                  redirect_host: { type: string, description: 'Wohin die Antwort geht' }
+                  scope: { type: string, enum: [read, write], description: 'Höchster erbetener Umfang' }
+                  installation: { type: string }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Anmeldung]
+      summary: Anfrage eines KI-Assistenten annehmen oder ablehnen
+      description: |
+        Beim Annehmen wählt die Person den Umfang (höchstens den erbetenen). Antwort ist die Adresse, zu der die App
+        weiterleitet: mit einmaligem Code (60 Sekunden gültig), `state` und `iss`, oder mit `error=access_denied`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [approve]
+              properties:
+                approve: { type: boolean }
+                scope: { type: string, enum: [read, write] }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [redirect]
+                properties:
+                  redirect: { type: string }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /oauth/token:
+    post:
+      tags: [Anmeldung]
+      summary: Code oder Erneuerungs-Token gegen Zugriffstoken tauschen
+      description: |
+        Als Formular (`application/x-www-form-urlencoded`) oder JSON, ohne Cookie und CSRF-Token. `authorization_code`
+        prüft `code_verifier`, `redirect_uri`, `client_id` und `resource`; ein Code gilt nur einmal (auch ein Fehlversuch
+        verbraucht ihn). `refresh_token` nur mit demselben `client_id`. Zugriffstoken gilt 1 Stunde, Erneuern bis 30 Tage.
+        Fehler nach OAuth (`error`, `error_description`), Antworten mit `Cache-Control: no-store`.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema: { $ref: '#/components/schemas/OAuthTokenRequest' }
+          application/json:
+            schema: { $ref: '#/components/schemas/OAuthTokenRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [access_token, refresh_token, token_type, expires_in, scope]
+                properties:
+                  access_token: { type: string }
+                  refresh_token: { type: string }
+                  token_type: { type: string, const: Bearer }
+                  expires_in: { type: integer }
+                  scope: { type: string }
+        '400': { $ref: '#/components/responses/OAuthError' }
+
+  /oauth/register:
+    post:
+      tags: [Anmeldung]
+      summary: Programm selbst eintragen (Dynamic Client Registration, RFC 7591)
+      description: |
+        Für Programme ohne Metadaten-Dokument. Nur öffentliche Programme (`token_endpoint_auth_method: none`), höchstens
+        10 Rücksprung-Adressen (https, http nur für localhost). Lange nicht benutzte Einträge werden entfernt.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [redirect_uris]
+              properties:
+                redirect_uris: { type: array, items: { type: string } }
+                client_name: { type: string }
+      responses:
+        '201':
+          description: Eingetragen
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [client_id, redirect_uris, token_endpoint_auth_method]
+                properties:
+                  client_id: { type: string }
+                  client_id_issued_at: { type: integer }
+                  client_name: { type: string }
+                  redirect_uris: { type: array, items: { type: string } }
+                  grant_types: { type: array, items: { type: string } }
+                  response_types: { type: array, items: { type: string } }
+                  token_endpoint_auth_method: { type: string }
+        '400': { $ref: '#/components/responses/OAuthError' }
 
   /reports/form:
     get:
@@ -9077,6 +9299,16 @@ components:
       schema: { type: integer, minimum: 1 }
 
   responses:
+    OAuthError:
+      description: 'Fehler nach OAuth 2.1 (z. B. `invalid_grant`, `invalid_request`, `unsupported_grant_type`, `invalid_client_metadata`)'
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [error]
+            properties:
+              error: { type: string }
+              error_description: { type: string }
     PreviewReadonly:
       description: 'In der Vorschau (Header `X-Kompanie-Preview` oder Parameter `vorschau`) ist nur Ansehen möglich: `code: preview_readonly`, „In der Vorschau kannst du nichts ändern.“'
       content:
@@ -9328,6 +9560,17 @@ components:
               deleted: { type: boolean }
 
   schemas:
+    OAuthTokenRequest:
+      type: object
+      required: [grant_type]
+      properties:
+        grant_type: { type: string, enum: [authorization_code, refresh_token] }
+        code: { type: string }
+        redirect_uri: { type: string }
+        client_id: { type: string }
+        code_verifier: { type: string }
+        resource: { type: string }
+        refresh_token: { type: string }
     AiAccess:
       type: object
       description: Zugang für KI-Assistenten (Plan „MCP-Server“); Zeiten als Unix-Zeit (Sekunden, UTC).
