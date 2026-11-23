@@ -40,6 +40,8 @@ final class Subjects
         'PUT /me/tiles', 'DELETE /me/tiles', 'PUT /me/locale',
         // Eigenen Zugang für KI-Assistenten widerrufen (wie ein Gerät abmelden); das Widerrufen durch Admins wird erfasst
         'DELETE /me/ai-access/{id}',
+        // MCP-Endpunkt: erfasst wird die Route, die ein Werkzeug aufruft (mit via = Programm des Zugangs)
+        'POST /mcp',
         // Abstimmen in Umfragen (absichtlich nicht, auch nicht bei offenen Umfragen)
         'PUT /polls/{id}/vote', 'DELETE /polls/{id}/vote',
         // Eigene Zu- und Absage bei einem Termin (wie Abstimmen; was die Verwaltung für andere einträgt, wird erfasst)

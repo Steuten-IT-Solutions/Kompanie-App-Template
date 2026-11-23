@@ -826,6 +826,12 @@ final class App
         return $this->service(AccessTokenService::class, fn () => new AccessTokenService($this));
     }
 
+    /** MCP-Endpunkt für KI-Assistenten (Plan „MCP-Server“, Schritt 2) */
+    public function mcp(): \KompanieApp\Core\Mcp\McpServer
+    {
+        return $this->service(\KompanieApp\Core\Mcp\McpServer::class, fn () => new \KompanieApp\Core\Mcp\McpServer($this));
+    }
+
     public function activity(): ActivityService
     {
         return $this->service(ActivityService::class, fn () => new ActivityService($this));

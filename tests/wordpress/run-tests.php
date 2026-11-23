@@ -1114,6 +1114,27 @@ wp_set_current_user($member);
 $c->ok(rest_do_request(new WP_REST_Request('GET', '/kompanie-app/v1/me'))->get_status() === 200, 'Danach wieder normal');
 wp_set_current_user(0);
 
+$c->section('MCP-Endpunkt mit Zugriffstoken');
+wp_set_current_user(0);
+$app->accessTokens()->setEnabled(true);
+$grant = $app->accessTokens()->issue($member, 'Test', 'read');
+$mcp = static function (array $body, array $headers = []) use ($grant): WP_REST_Response {
+    $req = new WP_REST_Request('POST', '/kompanie-app/v1/mcp');
+    $req->set_header('Content-Type', 'application/json');
+    $req->set_header('Authorization', 'Bearer ' . $grant['access_token']);
+    foreach ($headers as $name => $value) {
+        $req->set_header($name, $value);
+    }
+    $req->set_body((string) wp_json_encode($body));
+    return rest_ensure_response(rest_do_request($req));
+};
+$who = $mcp(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/call', 'params' => ['name' => 'whoami', 'arguments' => new stdClass()]], ['Mcp-Method' => 'tools/call', 'Mcp-Name' => 'whoami']);
+$c->ok($who->get_status() === 200 && ($who->get_data()['result']['structuredContent']['person']['id'] ?? null) === $member, 'Token im Header Authorization: whoami ohne Anmeldung bei WordPress');
+$c->ok($mcp(['jsonrpc' => '2.0', 'id' => 2, 'method' => 'tools/list'], ['Mcp-Method' => 'tools/call'])->get_status() === 400, 'Header Mcp-Method kommt beim Kern an (passt nicht → 400)');
+$c->ok($mcp(['jsonrpc' => '2.0', 'method' => 'notifications/initialized'])->get_status() === 202, 'Benachrichtigung → 202');
+$app->accessTokens()->revokeAllFor($member);
+$app->accessTokens()->setEnabled(false);
+
 $c->section('Alias-Namensraum (Übernahme einer früheren App)');
 KompanieApp\WordPress\RestBridge::register($app, 'kpwp-alt/v1');
 $res = rest_do_request(new WP_REST_Request('GET', '/kpwp-alt/v1/config'));

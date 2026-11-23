@@ -29,7 +29,41 @@ final class Request
          * Die Adapter lesen es mit bearerFrom().
          */
         public readonly ?string $bearer = null,
+        /**
+         * Weitere Header, die der Kern braucht (Namen klein geschrieben, siehe HEADERS), z. B. für den MCP-Endpunkt
+         * (Mcp\McpServer); fehlende fehlen.
+         *
+         * @var array<string, string>
+         */
+        public readonly array $headers = [],
     ) {
+    }
+
+    /** Header, die die Adapter in $headers weiterreichen */
+    public const HEADERS = ['origin', 'mcp-protocol-version', 'mcp-method', 'mcp-name'];
+
+    /**
+     * Header aus HEADERS über eine Funktion des Adapters lesen (Name → Wert oder null).
+     *
+     * @param callable(string): mixed $read
+     * @return array<string, string>
+     */
+    public static function headersFrom(callable $read): array
+    {
+        $out = [];
+        foreach (self::HEADERS as $name) {
+            $value = $read($name);
+            if (is_string($value) && $value !== '') {
+                $out[$name] = $value;
+            }
+        }
+        return $out;
+    }
+
+    /** Header aus HEADERS; null, wenn er fehlt */
+    public function header(string $name): ?string
+    {
+        return $this->headers[strtolower($name)] ?? null;
     }
 
     /** Token aus dem Wert des Headers Authorization („Bearer …“); null bei anderem oder fehlendem Header. */

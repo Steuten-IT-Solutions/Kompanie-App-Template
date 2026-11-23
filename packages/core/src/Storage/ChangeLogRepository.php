@@ -10,8 +10,9 @@ use KompanieApp\Core\Storage\Sql\Connection;
  * Änderungsprotokoll (Domain\ChangeLogService): eine Zeile je angelegtem, geändertem oder gelöschtem Eintrag. changes ist
  * JSON, eine Liste von {f: Feld, o?: alter Wert, n?: neuer Wert, p?: 1 (persönliche Angabe), s?: 1 (geheim, ohne Werte)}.
  * batch: gemeinsame Kennung der Einträge einer Aktion mit mehreren Einträgen (z. B. Punkte für alle), sonst leer.
+ * via: Programm eines Zugangs für KI-Assistenten, über den die Änderung kam (MCP); leer bei Änderungen in der App.
  *
- * @phpstan-type ChangeRow array{id: int, at: int, actor_id: int, actor_name: string, area: string, type: string, item: string, label: string, action: string, subject_user_id: int|null, personal: bool, changes: list<array<string, mixed>>, batch: string}
+ * @phpstan-type ChangeRow array{id: int, at: int, actor_id: int, actor_name: string, area: string, type: string, item: string, label: string, action: string, subject_user_id: int|null, personal: bool, changes: list<array<string, mixed>>, batch: string, via: string}
  */
 final class ChangeLogRepository
 {
@@ -20,7 +21,7 @@ final class ChangeLogRepository
     }
 
     /**
-     * @param array{at: int, actor_id: int, actor_name: string, area: string, type: string, item: string, label: string, action: string, subject_user_id: int|null, personal: bool, changes: list<array<string, mixed>>, batch?: string} $row
+     * @param array{at: int, actor_id: int, actor_name: string, area: string, type: string, item: string, label: string, action: string, subject_user_id: int|null, personal: bool, changes: list<array<string, mixed>>, batch?: string, via?: string} $row
      */
     public function insert(array $row): int
     {
@@ -30,7 +31,7 @@ final class ChangeLogRepository
     /**
      * Mehrere Einträge mit wenigen INSERTs (je 100 Zeilen), z. B. Punkte für viele Mitglieder auf einmal.
      *
-     * @param list<array{at: int, actor_id: int, actor_name: string, area: string, type: string, item: string, label: string, action: string, subject_user_id: int|null, personal: bool, changes: list<array<string, mixed>>, batch?: string}> $rows
+     * @param list<array{at: int, actor_id: int, actor_name: string, area: string, type: string, item: string, label: string, action: string, subject_user_id: int|null, personal: bool, changes: list<array<string, mixed>>, batch?: string, via?: string}> $rows
      */
     public function insertMany(array $rows): void
     {
@@ -49,7 +50,7 @@ final class ChangeLogRepository
     }
 
     /**
-     * @param array{at: int, actor_id: int, actor_name: string, area: string, type: string, item: string, label: string, action: string, subject_user_id: int|null, personal: bool, changes: list<array<string, mixed>>, batch?: string} $row
+     * @param array{at: int, actor_id: int, actor_name: string, area: string, type: string, item: string, label: string, action: string, subject_user_id: int|null, personal: bool, changes: list<array<string, mixed>>, batch?: string, via?: string} $row
      * @return array<string, int|string|null>
      */
     private static function columns(array $row): array
@@ -67,6 +68,7 @@ final class ChangeLogRepository
             'personal' => $row['personal'] ? 1 : 0,
             'changes' => self::encode($row['changes']),
             'batch' => mb_substr($row['batch'] ?? '', 0, 32),
+            'via' => mb_substr($row['via'] ?? '', 0, 100),
         ];
     }
 
@@ -160,6 +162,7 @@ final class ChangeLogRepository
             'personal' => (bool) (int) $r['personal'],
             'changes' => is_array($changes) ? array_values(array_filter($changes, 'is_array')) : [],
             'batch' => (string) ($r['batch'] ?? ''),
+            'via' => (string) ($r['via'] ?? ''),
         ];
     }
 }

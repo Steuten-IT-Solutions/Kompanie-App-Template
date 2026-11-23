@@ -2270,6 +2270,12 @@ WHERE title IS NULL",
                     'CREATE INDEX IF NOT EXISTS {access_tokens}_user ON {access_tokens} (user_id)',
                 ],
             ],
+            // Änderungsprotokoll: Änderung über einen Zugang für KI-Assistenten (MCP, Domain\AccessTokenService); via = Name des
+            // Programms des Zugangs (z. B. Claude), leer bei Änderungen in der App selbst.
+            77 => [
+                'mysql' => ['ALTER TABLE {change_log} ADD COLUMN via varchar(100) NOT NULL DEFAULT \'\''],
+                'sqlite' => ['ALTER TABLE {change_log} ADD COLUMN via TEXT NOT NULL DEFAULT \'\''],
+            ],
         ];
     }
 

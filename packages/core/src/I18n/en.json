@@ -4867,6 +4867,8 @@
   "Das geht mit einem Zugang für KI-Assistenten nicht.": "This is not possible with access for AI assistants.",
   "Der Zugang für KI-Assistenten ist in dieser App ausgeschaltet.": "Access for AI assistants is switched off in this app.",
   "Der Zugang ist abgelaufen oder wurde widerrufen. Bitte neu verbinden.": "This access has expired or was revoked. Please connect again.",
+  "Bitte mit einem Zugang für KI-Assistenten verbinden.": "Please connect with an access for AI assistants.",
+  "{name} über {client}": "{name} via {client}",
   "Diesen Zugang gibt es nicht.": "This access does not exist.",
   "Dieser Zugang darf nur lesen.": "This access may only read.",
   "Dieses Konto kann keinen Zugang für KI-Assistenten bekommen.": "This account cannot get access for AI assistants.",

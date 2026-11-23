@@ -26,6 +26,7 @@ use KompanieApp\Core\Domain\SignatureService;
 use KompanieApp\Core\Domain\StatusService;
 use KompanieApp\Core\Domain\Text;
 use KompanieApp\Core\I18n\I18n;
+use KompanieApp\Core\Mcp\Tools as McpTools;
 use KompanieApp\Core\Push\PushService;
 use KompanieApp\Core\Storage\BackupCrypto;
 use KompanieApp\Core\Storage\Sql\DatabaseException;
@@ -48,6 +49,8 @@ final class Api
     /** Der Einrichtungsassistent wurde abgeschlossen oder übersprungen. */
     public const SETUP_SETTING = 'setup_done';
     /** Bleiben im Wartungsmodus für alle erreichbar: Konfiguration (zeigt die Wartung an) und Anmeldung für Admins. */
+    /** MCP-Endpunkt (Mcp\McpServer): die Werkzeuge zählen und protokollieren je aufgerufener Route */
+    public const MCP_PATH = '/mcp';
     private const MAINTENANCE_OPEN = ['/config', '/auth/login', '/auth/logout', '/auth/csrf'];
     /** In der Vorschau (Issue #63) trotz „nur ansehen“ erlaubt: Abmelden (die App beendet dabei auch die Vorschau). */
     public const PREVIEW_OPEN = ['/auth/logout'];
@@ -56,7 +59,7 @@ final class Api
      * Formular zum Fehlermelden) oder ist Technik des Geräts (Push-Abo an- und abmelden, auch beim Abmelden vom Konto). Die
      * Anmeldung erfasst ihre Route selbst (Aktion login), die Abmeldung gar nicht.
      */
-    private const NOT_TRACKED = ['/config', '/auth/csrf', '/auth/login', '/auth/logout', '/push/status', '/me/push/status', '/push', '/me/push', '/reports/form', '/registration/form'];
+    private const NOT_TRACKED = ['/config', '/auth/csrf', '/auth/login', '/auth/logout', '/push/status', '/me/push/status', '/push', '/me/push', '/reports/form', '/registration/form', self::MCP_PATH];
 
     /** @var Route[]|null */
     private ?array $routes = null;
@@ -679,14 +682,56 @@ final class Api
     private function authorizeToken(Route $route, Request $request): void
     {
         $tokens = $this->app->tokenContext();
+        // Ausgeschaltet: den MCP-Endpunkt gibt es nicht (Plan: 404), andere Routen lehnen das Token ab (401).
+        if ($route->path === self::MCP_PATH && !$this->app->accessTokens()->enabled()) {
+            throw ApiError::notFound(I18n::t('Unbekannte Adresse.'));
+        }
         if ($tokens->currentUser() === null) {
             throw new ApiError(401, self::INVALID_TOKEN, I18n::t('Der Zugang ist abgelaufen oder wurde widerrufen. Bitte neu verbinden.'));
         }
-        if (!$route->token) {
+        if (!$route->token && !McpTools::covers($route->method, $route->path)) {
             throw new ApiError(403, 'token_not_allowed', I18n::t('Das geht mit einem Zugang für KI-Assistenten nicht.'));
         }
-        if ($tokens->scope() !== AccessTokenService::WRITE && !in_array($request->method, ['GET', 'HEAD'], true)) {
+        // Der MCP-Endpunkt nimmt jede Anfrage per POST an; ob ein Werkzeug ändern darf, prüft die Route, die es aufruft.
+        if ($route->path !== self::MCP_PATH && $tokens->scope() !== AccessTokenService::WRITE && !in_array($request->method, ['GET', 'HEAD'], true)) {
             throw new ApiError(403, 'token_readonly', I18n::t('Dieser Zugang darf nur lesen.'));
+        }
+    }
+
+    /** Gleiche Herkunft (Schema, Host, Port) wie die Adresse $url? */
+    private static function sameOrigin(string $origin, string $url): bool
+    {
+        $a = parse_url($origin);
+        $b = parse_url($url);
+        if (!is_array($a) || !is_array($b) || !isset($a['scheme'], $a['host'], $b['scheme'], $b['host'])) {
+            return false;
+        }
+        $port = static fn (array $u): int => (int) ($u['port'] ?? (strtolower((string) $u['scheme']) === 'https' ? 443 : 80));
+        return strtolower($a['scheme']) === strtolower($b['scheme']) && strtolower($a['host']) === strtolower($b['host']) && $port($a) === $port($b);
+    }
+
+    /** Route mit dieser Methode und diesem Pfad (mit Platzhaltern, z. B. „/events/{id}“); null, wenn es keine gibt. */
+    public function routeFor(string $method, string $path): ?Route
+    {
+        foreach ($this->routes() as $route) {
+            if ($route->method === $method && $route->path === $path) {
+                return $route;
+            }
+        }
+        return null;
+    }
+
+    /** Dürfte die laufende Anfrage die Route aufrufen (Bereich an und Recht vorhanden)? Wie run() und authorize(), ohne Fehler. */
+    public function permits(Route $route): bool
+    {
+        if ($route->feature !== null && !$this->app->features()->enabled($route->feature)) {
+            return false;
+        }
+        try {
+            $this->authorize($route);
+            return true;
+        } catch (ApiError) {
+            return false;
         }
     }
 
@@ -1018,6 +1063,22 @@ final class Api
                 $a->accessTokens()->revoke($r->id(), $this->user()->id);
                 return ['deleted' => true];
             }),
+            // MCP-Endpunkt für KI-Assistenten (Mcp\McpServer): nur mit Zugriffstoken; ohne → 401 mit WWW-Authenticate
+            new Route('POST', self::MCP_PATH, $P, function (Request $r) use ($a) {
+                if (!$a->accessTokens()->enabled()) {
+                    throw ApiError::notFound(I18n::t('Unbekannte Adresse.'));
+                }
+                // Streamable HTTP: Origin prüfen (Schutz vor DNS-Rebinding); Programme ohne Browser schicken keinen.
+                $origin = $r->header('origin');
+                if ($origin !== null && !self::sameOrigin($origin, $a->env->apiBase())) {
+                    throw ApiError::forbidden(I18n::t('Anfrage von einer fremden Seite abgelehnt.'));
+                }
+                if (!$a->tokenContext()->active()) {
+                    $e = new ApiError(401, self::INVALID_TOKEN, I18n::t('Bitte mit einem Zugang für KI-Assistenten verbinden.'));
+                    return new Response(Response::error($e)->data, 401, ['WWW-Authenticate' => 'Bearer']);
+                }
+                return $a->mcp()->handle($r);
+            }, null, null, true),
             // Web Push (Issue #19): Konten über /me/push, Gäste über /push (Ändern und Löschen nur mit dem auth-Geheimnis).
             // Fehlermeldungen (Issue #64): auch ohne Anmeldung; Zeitfalle, Honeypot und Begrenzung im Dienst
             new Route('GET', '/reports/form', $P, fn () => $a->bugReports()->form($a->authContext->currentUser())),

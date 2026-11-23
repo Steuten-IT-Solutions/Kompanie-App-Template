@@ -155,6 +155,8 @@ final class ChangeLogService
                 return;
             }
             $now = $this->app->time()->timestamp();
+            // Über einen Zugang für KI-Assistenten (MCP): das Programm des Zugangs, sonst leer
+            $via = $this->app->tokenContext()->client() ?? '';
             $area = preg_match('/^[a-z_]{1,20}$/', $area) === 1 ? $area : 'app';
             $rows = [];
             foreach ($changes as [$action, $before, $after, $event]) {
@@ -178,6 +180,7 @@ final class ChangeLogService
                     'subject_user_id' => $item->subject,
                     'personal' => false,
                     'changes' => $diff,
+                    'via' => $via,
                 ];
             }
             if ($rows === []) {
@@ -348,7 +351,7 @@ final class ChangeLogService
     }
 
     /**
-     * @param array{id: int, at: int, actor_id: int, actor_name: string, area: string, type: string, item: string, label: string, action: string, subject_user_id: int|null, personal: bool, changes: list<array<string, mixed>>, batch: string} $r
+     * @param array{id: int, at: int, actor_id: int, actor_name: string, area: string, type: string, item: string, label: string, action: string, subject_user_id: int|null, personal: bool, changes: list<array<string, mixed>>, batch: string, via: string} $r
      * @return array<string, mixed>
      */
     private function present(array $r, bool $personal): array
@@ -386,6 +389,7 @@ final class ChangeLogService
             'action' => $r['action'],
             'subject_user_id' => $r['subject_user_id'],
             'batch' => $r['batch'],
+            'via' => $r['via'],
             'changes' => $changes,
         ];
     }
