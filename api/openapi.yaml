@@ -4270,7 +4270,8 @@ paths:
                 title: { type: string, maxLength: 191 }
                 date: { type: string, format: date }
                 kinds: { type: array, maxItems: 30, items: { type: string, maxLength: 40 }, description: Terminarten (leer = keine) }
-                kind: { type: [string, 'null'], maxLength: 40, description: 'Ältere Oberflächen: eine Terminart statt `kinds` (leer = keine)' }
+                kind:
+                  { type: [string, 'null'], maxLength: 40, description: 'Ältere Oberflächen: eine Terminart statt `kinds` (leer = keine)' }
                 entries:
                   type: object
                   description: Benutzer-ID → Status
@@ -7714,16 +7715,62 @@ paths:
                       type: object
                       required: [kind, items]
                       properties:
-                        kind: { type: string, enum: [nav, role, rank, office, office_group, event_kind, menu, event, calendar_entry, poll, document, document_category, album, page, board] }
+                        kind:
+                          {
+                            type: string,
+                            enum:
+                              [
+                                nav,
+                                role,
+                                rank,
+                                office,
+                                office_group,
+                                event_kind,
+                                menu,
+                                event,
+                                calendar_entry,
+                                poll,
+                                document,
+                                document_category,
+                                album,
+                                page,
+                                board,
+                              ],
+                          }
                         items:
                           type: array
                           items:
                             type: object
                             required: [kind, ref, field, source, text, fallback, max]
                             properties:
-                              kind: { type: string, enum: [nav, role, rank, office, office_group, event_kind, menu, event, calendar_entry, poll, document, document_category, album, page, board] }
+                              kind:
+                                {
+                                  type: string,
+                                  enum:
+                                    [
+                                      nav,
+                                      role,
+                                      rank,
+                                      office,
+                                      office_group,
+                                      event_kind,
+                                      menu,
+                                      event,
+                                      calendar_entry,
+                                      poll,
+                                      document,
+                                      document_category,
+                                      album,
+                                      page,
+                                      board,
+                                    ],
+                                }
                               ref: { type: string }
-                              field: { type: string, description: '`label` bei Namen; bei Inhalten title, location, description oder option:<n>' }
+                              field:
+                                {
+                                  type: string,
+                                  description: '`label` bei Namen; bei Inhalten title, location, description oder option:<n>',
+                                }
                               source: { type: string }
                               text: { type: string }
                               fallback: { type: string }
@@ -10156,9 +10203,16 @@ components:
                   text: { type: string }
                   name: { type: string, description: Nur bei namentlichen Umfragen }
         untranslated:
-          { type: string, enum: [all, some], description: 'In einer weiteren Sprache (X-Kompanie-Lang), wenn dort etwas fehlt (dann deutsch)' }
+          {
+            type: string,
+            enum: [all, some],
+            description: 'In einer weiteren Sprache (X-Kompanie-Lang), wenn dort etwas fehlt (dann deutsch)',
+          }
         source:
-          { $ref: '#/components/schemas/PollTranslation', description: 'Nur mit manage_polls in einer weiteren Sprache: die deutsche Fassung zum Bearbeiten' }
+          {
+            $ref: '#/components/schemas/PollTranslation',
+            description: 'Nur mit manage_polls in einer weiteren Sprache: die deutsche Fassung zum Bearbeiten',
+          }
         translations:
           type: object
           description: 'Nur mit manage_polls, wenn eine weitere Sprache an ist: Fassungen je weiterer Sprache (leere Möglichkeit = deutsch)'
@@ -10376,7 +10430,11 @@ components:
           }
         subject_user_id: { type: [integer, 'null'], description: 'Konto, um das es geht (Mitglieder, Punkte, Strafen)' }
         batch: { type: string, description: 'Gemeinsame Kennung der Einträge einer Aktion mit mehreren Einträgen, sonst leer' }
-        via: { type: string, description: 'Programm des Zugangs für KI-Assistenten (MCP), über den die Änderung kam, z. B. Claude; leer bei Änderungen in der App' }
+        via:
+          {
+            type: string,
+            description: 'Programm des Zugangs für KI-Assistenten (MCP), über den die Änderung kam, z. B. Claude; leer bei Änderungen in der App',
+          }
         changes:
           type: array
           items:
@@ -10676,7 +10734,7 @@ components:
         drive_photos: { type: integer, description: Anzahl Bilder aus Drive }
         translations:
           type: object
-          description: 'Mit weiteren Sprachen, zum Bearbeiten: Titel je Sprache (alle eingeschalteten, '''' = deutsch)'
+          description: "Mit weiteren Sprachen, zum Bearbeiten: Titel je Sprache (alle eingeschalteten, '' = deutsch)"
           additionalProperties: { type: object, properties: { title: { type: string } } }
     GalleryAdminAlbumDetail:
       type: object
@@ -10688,7 +10746,7 @@ components:
         source: { type: string, enum: [app, drive] }
         translations:
           type: object
-          description: 'Mit weiteren Sprachen, zum Bearbeiten: Titel je Sprache (alle eingeschalteten, '''' = deutsch)'
+          description: "Mit weiteren Sprachen, zum Bearbeiten: Titel je Sprache (alle eingeschalteten, '' = deutsch)"
           additionalProperties: { type: object, properties: { title: { type: string } } }
         uploads:
           type: array
@@ -10949,7 +11007,11 @@ components:
               }
             deletable: { type: boolean, description: 'false für guest, member und admin' }
             admission_extra: { type: boolean, description: 'Anwärter-Rolle (als Grund- oder Zusatzrolle, auch mit Mitgliederbereich)' }
-            admission_kind: { type: [string, 'null'], description: 'Frühere Form (Teilnahmen einer Art UND Dauer); null/0, wenn admission_rule mehr ausdrückt' }
+            admission_kind:
+              {
+                type: [string, 'null'],
+                description: 'Frühere Form (Teilnahmen einer Art UND Dauer); null/0, wenn admission_rule mehr ausdrückt',
+              }
             admission_count: { type: integer }
             admission_months: { type: integer }
             admission_rule: { $ref: '#/components/schemas/AdmissionRule' }
@@ -11120,7 +11182,11 @@ components:
         months_on: { type: [string, 'null'], description: Tag, ab dem die erste Mindestdauer erfüllt ist }
         fulfilled_on: { type: [string, 'null'], description: Tag, an dem alles erfüllt war }
         status: { type: string, enum: [fulfilled, open, none], description: 'none: Rolle ohne Voraussetzung' }
-        soon: { type: boolean, description: 'Noch nicht erfüllt, aber kurz davor (status open, result.soon); unter „Bald erfüllt“ und im zweiten Kreis der Kachel' }
+        soon:
+          {
+            type: boolean,
+            description: 'Noch nicht erfüllt, aber kurz davor (status open, result.soon); unter „Bald erfüllt“ und im zweiten Kreis der Kachel',
+          }
         result:
           description: Ausgewertete Voraussetzung; null ohne Voraussetzung
           oneOf:
@@ -11137,8 +11203,7 @@ components:
         level: { $ref: '#/components/schemas/Level' }
         extra_roles: { $ref: '#/components/schemas/ExtraRoles' }
         photo_url: { $ref: '#/components/schemas/PhotoUrl' }
-        locale:
-          { type: [string, 'null'], enum: [de, en, null], description: 'Sprache am Konto (PUT /me/locale); null = nichts gewählt' }
+        locale: { type: [string, 'null'], enum: [de, en, null], description: 'Sprache am Konto (PUT /me/locale); null = nichts gewählt' }
         create_roles:
           type: array
           items: { $ref: '#/components/schemas/Level' }
@@ -11241,8 +11306,13 @@ components:
         majorVersion: { type: string }
         withdrawn: { type: boolean, description: Die installierte Version wurde zurückgezogen }
         fallback: { type: [string, 'null'], description: 'Bei withdrawn: Ziel des automatischen Wechsels; null = keins vorhanden' }
-        maintenance: { type: [string, 'null'], description: 'Wartungsabo laut Update-Liste: letzter Tag (JJJJ-MM-TT, UTC) oder „unbefristet“; null = keine Angabe' }
-        maintenanceEnded: { type: boolean, description: 'Das Wartungsabo ist abgelaufen; neue Versionen gibt es erst nach einer Verlängerung' }
+        maintenance:
+          {
+            type: [string, 'null'],
+            description: 'Wartungsabo laut Update-Liste: letzter Tag (JJJJ-MM-TT, UTC) oder „unbefristet“; null = keine Angabe',
+          }
+        maintenanceEnded:
+          { type: boolean, description: 'Das Wartungsabo ist abgelaufen; neue Versionen gibt es erst nach einer Verlängerung' }
         skipped: { type: boolean, description: 'latest wird nach dem Zurückrollen nicht automatisch eingespielt' }
         autoAllowed: { type: boolean, description: 'Automatische Updates sind hier erlaubt (WordPress kann sie sperren)' }
         problems: { type: array, items: { type: string }, description: Gründe, warum die neue Version hier nicht läuft }
@@ -11415,7 +11485,8 @@ components:
             properties:
               id: { type: integer }
               title: { type: string }
-              title_i18n: { type: object, additionalProperties: { type: string }, description: 'Titel je weiterer Sprache, soweit eingetragen' }
+              title_i18n:
+                { type: object, additionalProperties: { type: string }, description: 'Titel je weiterer Sprache, soweit eingetragen' }
         birthdays:
           type: [object, 'null']
           description: 'Geburtstage (Issue #1): Vorlauf der Karte „Anstehende Geburtstage“ in Tagen (Einstellungen → Geburtstage); null ohne den Bereich'
@@ -11622,7 +11693,11 @@ components:
         respond_until:
           { type: [string, 'null'], format: date, description: 'Nur Termine des internen Kalenders (`/calendar/entries`): Anmeldeschluss' }
         untranslated:
-          { type: string, enum: [all, some], description: 'In einer weiteren Sprache, wenn dort Titel, Ort oder Beschreibung fehlt (dann deutsch)' }
+          {
+            type: string,
+            enum: [all, some],
+            description: 'In einer weiteren Sprache, wenn dort Titel, Ort oder Beschreibung fehlt (dann deutsch)',
+          }
         translations:
           type: object
           description: 'Nur zum Bearbeiten (`?source=1`, `/calendar/entries`, Antwort auf POST und PATCH, mit weiterer Sprache): deutsche Fassung oben, hier die Fassungen je weiterer Sprache'
@@ -11681,7 +11756,11 @@ components:
             description: 'Nur Einzelansicht, WordPress mit Quelle site, mit manage_news: Adresse des Beitrags im Editor von WordPress',
           }
         untranslated:
-          { type: string, enum: [all, some], description: 'In einer weiteren Sprache (X-Kompanie-Lang), wenn dort etwas fehlt (dann deutsch). Quelle app: nur Einzelansicht. Beiträge der WordPress-Seite: all ohne veröffentlichte Übersetzung in Polylang (ohne Polylang immer). Andere Webseite oder RSS: immer all' }
+          {
+            type: string,
+            enum: [all, some],
+            description: 'In einer weiteren Sprache (X-Kompanie-Lang), wenn dort etwas fehlt (dann deutsch). Quelle app: nur Einzelansicht. Beiträge der WordPress-Seite: all ohne veröffentlichte Übersetzung in Polylang (ohne Polylang immer). Andere Webseite oder RSS: immer all',
+          }
         translations:
           type: object
           description: 'Nur mit source bzw. nach PATCH mit translations: Fassungen je weiterer Sprache'
@@ -13015,7 +13094,7 @@ components:
         title: { type: string, description: 'Höchstens so lang wie auf Deutsch erlaubt (Seiten 100, News 150 Zeichen, Brett 1000)' }
         blocks:
           type: object
-          description: 'Kennung des Blocks => übersetzte Felder (text: html; countdown: title, running_text, after_text; button: label; events, contacts, sponsors, map: title; notice: title, text; schedule, facts: title, items mit so vielen Einträgen wie auf Deutsch)'
+          description: 'Kennung des Blocks => übersetzte Felder (text: html; countdown: title, running_text, after_text; button: label; events, contacts, sponsors, map: title; notice: title, text; image: alt, caption; schedule, facts: title, items mit so vielen Einträgen wie auf Deutsch)'
           additionalProperties: { type: object }
     PageDetail:
       allOf:
@@ -13062,6 +13141,7 @@ components:
         - $ref: '#/components/schemas/BlockDocument'
         - $ref: '#/components/schemas/BlockSponsors'
         - $ref: '#/components/schemas/BlockMap'
+        - $ref: '#/components/schemas/BlockImage'
       discriminator:
         propertyName: type
         mapping:
@@ -13079,6 +13159,7 @@ components:
           document: '#/components/schemas/BlockDocument'
           sponsors: '#/components/schemas/BlockSponsors'
           map: '#/components/schemas/BlockMap'
+          image: '#/components/schemas/BlockImage'
     BlockBase:
       type: object
       required: [type]
@@ -13396,6 +13477,27 @@ components:
             title: { type: string, maxLength: 100 }
             place:
               { type: string, minLength: 1, maxLength: 200, description: 'Ort oder Adresse als freier Text, wie der Ort eines Termins' }
+    BlockImage:
+      description: 'Eigenes Bild, nicht aus der Galerie: vorher mit POST /rich-images hochladen (Entwurf) und die Kennung angeben; beim Speichern gehört es dem Inhalt (wie Bilder in Textblöcken, aus anderen Inhalten kopiert). Sichtbar wie der Block (members: nur Mitglieder). Fehlt das Bild, fällt der Block weg; mit Recht zum Pflegen kommt er mit url null.'
+      allOf:
+        - $ref: '#/components/schemas/BlockBase'
+        - type: object
+          required: [image]
+          properties:
+            type: { type: string, const: image }
+            image: { type: string, pattern: '^[a-f0-9]{32}$', description: 'Kennung aus POST /rich-images' }
+            alt: { type: string, maxLength: 200, description: 'Beschreibung für Screenreader (übersetzbar)' }
+            caption: { type: string, maxLength: 200, description: 'Bildunterschrift (übersetzbar)' }
+            size:
+              {
+                type: string,
+                enum: [small, medium, full],
+                default: full,
+                description: 'Breite: klein, mittel oder volle Breite (nie größer als das Bild)',
+              }
+            url: { type: [string, 'null'], readOnly: true, description: 'Nur in Antworten: Adresse des Bilds' }
+            width: { type: integer, readOnly: true, description: 'Nur in Antworten: Breite in Pixeln (0, wenn das Bild fehlt)' }
+            height: { type: integer, readOnly: true, description: 'Nur in Antworten: Höhe in Pixeln (0, wenn das Bild fehlt)' }
 
     Title:
       type: object
@@ -13423,7 +13525,7 @@ components:
         sort: { type: integer }
         translations:
           type: object
-          description: 'Mit weiteren Sprachen, zum Bearbeiten: Titel je Sprache (alle eingeschalteten, '''' = deutsch)'
+          description: "Mit weiteren Sprachen, zum Bearbeiten: Titel je Sprache (alle eingeschalteten, '' = deutsch)"
           additionalProperties: { type: object, properties: { title: { type: string } } }
 
     TitleTranslationsInput:
@@ -13448,7 +13550,7 @@ components:
         updated_at: { type: string }
         translations:
           type: object
-          description: 'Mit weiteren Sprachen, zum Bearbeiten: Titel je Sprache (alle eingeschalteten, '''' = deutsch)'
+          description: "Mit weiteren Sprachen, zum Bearbeiten: Titel je Sprache (alle eingeschalteten, '' = deutsch)"
           additionalProperties: { type: object, properties: { title: { type: string } } }
 
     DocumentFile:
@@ -13529,7 +13631,8 @@ components:
                     enum: ['yes', 'no', null]
                     description: Zu- oder Absage zum Termin (nur Listen aus dem Kalender, solange es den Termin gibt)
                   response_note: { type: string, description: Hinweis zur Zu- oder Absage }
-                  response_late: { type: boolean, description: 'Zu- oder Absage nachträglich übertragen (vor der Frist getippt, danach angekommen)' }
+                  response_late:
+                    { type: boolean, description: 'Zu- oder Absage nachträglich übertragen (vor der Frist getippt, danach angekommen)' }
                   may_respond: { type: boolean, description: Darf bei Terminen zu- und absagen (nur dann lässt sich etwas eintragen) }
             counts_by_group:
               type: object
@@ -13595,7 +13698,8 @@ components:
         id: { type: integer, description: 'Für PATCH /members/{id}/rank-history/{entry}' }
         from: { type: [string, 'null'] }
         to: { type: [string, 'null'] }
-        from_rank_id: { type: [integer, 'null'], description: 'Dienstgrad vorher (null ohne); from/to sind die deutschen Bezeichnungen von damals' }
+        from_rank_id:
+          { type: [integer, 'null'], description: 'Dienstgrad vorher (null ohne); from/to sind die deutschen Bezeichnungen von damals' }
         to_rank_id: { type: [integer, 'null'], description: 'Dienstgrad nachher (null ohne), für seinen Namen in einer weiteren Sprache' }
         to_badge_url:
           description: Heutiges Abzeichen des neuen Dienstgrads (der Verlauf speichert nur Bezeichnungen); null ohne

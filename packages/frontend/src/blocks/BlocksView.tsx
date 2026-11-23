@@ -6,6 +6,7 @@ import type {
   DocumentBlock,
   EventsBlock,
   FactsBlock,
+  ImageBlock,
   MapBlock,
   NoticeBlock,
   PollBlock,
@@ -74,6 +75,9 @@ export default function BlocksView({ blocks, manager, textClassName }: { blocks:
             break;
           case 'map':
             view = <MapPlace block={b} />;
+            break;
+          case 'image':
+            view = <OwnImage block={b} manager={manager} />;
             break;
           case 'divider':
             view = b.style === 'space' ? <div className="block-space" aria-hidden="true" /> : <hr className="block-divider" />;
@@ -333,5 +337,16 @@ function MapPlace({ block }: { block: MapBlock }) {
         </a>
       )}
     </section>
+  );
+}
+
+/** Eigenes Bild mit Bildunterschrift; klein und mittel schmaler und mittig, nie größer als das Bild. */
+function OwnImage({ block, manager }: { block: ImageBlock; manager?: boolean }) {
+  if (!block.url) return manager ? <p className="muted small">{t('Das Bild fehlt. Bitte ein neues hochladen.')}</p> : null;
+  return (
+    <figure className={`block-image block-image-${block.size}`}>
+      <img src={block.url} alt={block.alt} loading="lazy" width={block.width || undefined} height={block.height || undefined} />
+      {block.caption && <figcaption>{block.caption}</figcaption>}
+    </figure>
   );
 }

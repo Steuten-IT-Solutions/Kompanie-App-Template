@@ -46,6 +46,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   nach dem Löschen der Browserdaten). Dazu stehen dort der Push-Dienst (z. B. Google für Chrome und Android), seit wann
   die Benachrichtigungen an waren und wann zuletzt eine ankam. So lässt sich klären, warum jemand plötzlich keine
   Benachrichtigungen mehr bekommt. Das Einschalten und Ändern der Arten wird weiterhin nicht aufgezeichnet.
+- **Neuer Block: Bild** für [eigene Seiten](app:verwaltung/seiten), News in der App und das Schwarze Brett: ein eigenes
+  Bild hochladen, das nicht in der Galerie liegen muss, mit Bildunterschrift, Beschreibung für Screenreader und Größe
+  (volle Breite, mittel, klein). Es sieht, wer den Block sehen darf; Bildunterschrift und Beschreibung lassen sich
+  übersetzen. Entfernt man den Block, wird das Bild gelöscht.
 
 ## [0.13.0] – 2026-11-22
 

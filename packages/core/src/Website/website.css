@@ -270,6 +270,28 @@ hr {
   max-width: 160px;
   width: auto;
 }
+.block-image {
+  margin: 0;
+  text-align: center;
+}
+.block-image img {
+  display: block;
+  margin: 0 auto;
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+.block-image-small img {
+  max-width: min(100%, 240px);
+}
+.block-image-medium img {
+  max-width: min(100%, 480px);
+}
+.block-image figcaption {
+  margin-top: 6px;
+  font-size: 0.95rem;
+  color: #5d6168;
+}
 .site-footer {
   border-top: 1px solid #dcdfd9;
   background: #fff;

@@ -7768,6 +7768,40 @@ fieldset.block-source legend {
 .block-map-place {
   white-space: pre-line;
 }
+.block-image {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.block-image img,
+.block-image-preview {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+.block-image-small img {
+  max-width: min(100%, 240px);
+}
+.block-image-medium img {
+  max-width: min(100%, 480px);
+}
+.block-image figcaption {
+  color: var(--muted);
+  font-size: 0.9rem;
+  text-align: center;
+}
+.block-image-preview {
+  max-height: 240px;
+  width: auto;
+}
+.block-image-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 .block-rows {
   display: flex;
   flex-direction: column;

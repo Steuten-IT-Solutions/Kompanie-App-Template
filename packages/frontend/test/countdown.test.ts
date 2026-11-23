@@ -225,3 +225,32 @@ test('Karte zur Anfahrt: neuer Block mit leerem Ort, unverändert zum Speichern'
   const drafts = draftsFrom([{ id: 'm1', type: 'map', audience: 'all', title: 'Anfahrt', place: 'Am Markt 1' }], '');
   assert.deepEqual(blocksInput(drafts), [{ id: 'm1', type: 'map', audience: 'all', title: 'Anfahrt', place: 'Am Markt 1' }]);
 });
+
+test('Bild: neuer Block ohne Bild, zum Speichern ohne die Felder vom Server', () => {
+  assert.deepEqual(
+    { ...newBlock('image'), id: '' },
+    { id: '', type: 'image', audience: 'all', image: '', alt: '', caption: '', size: 'full', url: null, width: 0, height: 0 },
+  );
+  const uid = 'a'.repeat(32);
+  const drafts = draftsFrom(
+    [
+      {
+        id: 'i1',
+        type: 'image',
+        audience: 'members',
+        image: uid,
+        alt: 'Foto',
+        caption: 'Fest',
+        size: 'small',
+        url: '/bild/x',
+        width: 40,
+        height: 30,
+      },
+    ],
+    '',
+  );
+  assert.equal(drafts[0].type === 'image' && drafts[0].url, '/bild/x', 'Vorschau beim Bearbeiten');
+  assert.deepEqual(blocksInput(drafts), [
+    { id: 'i1', type: 'image', audience: 'members', image: uid, alt: 'Foto', caption: 'Fest', size: 'small' },
+  ]);
+});

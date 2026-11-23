@@ -41,6 +41,7 @@ final class Blocks
         'facts' => ['title', 'items'],
         'sponsors' => ['title'],
         'map' => ['title'],
+        'image' => ['alt', 'caption'],
     ];
 
     /** @var array<string, BlockType>|null */
@@ -55,7 +56,7 @@ final class Blocks
     {
         if ($this->types === null) {
             $this->types = [];
-            foreach ([new TextBlock($this->app), new CountdownBlock($this->app), new ButtonBlock($this->app), new EventsBlock($this->app), new ContactsBlock($this->app), new NoticeBlock(), new DividerBlock(), new ScheduleBlock(), new FactsBlock(), new PollBlock($this->app), new AlbumBlock($this->app), new DocumentBlock($this->app), new SponsorsBlock($this->app), new MapBlock()] as $type) {
+            foreach ([new TextBlock($this->app), new CountdownBlock($this->app), new ButtonBlock($this->app), new EventsBlock($this->app), new ContactsBlock($this->app), new NoticeBlock(), new DividerBlock(), new ScheduleBlock(), new FactsBlock(), new PollBlock($this->app), new AlbumBlock($this->app), new DocumentBlock($this->app), new SponsorsBlock($this->app), new MapBlock(), new ImageBlock($this->app)] as $type) {
                 $this->types[$type->type()] = $type;
             }
         }
@@ -201,9 +202,9 @@ final class Blocks
     }
 
     /**
-     * Bilder der Textblöcke gehören danach $ownerType/$ownerId (RichImageService::claim je Block); Bilder des Besitzers,
-     * die in keinem Block mehr stehen, werden gelöscht (außer ohne $prune; $keep: Bilder, die woanders stehen, z. B. in
-     * der Fassung einer weiteren Sprache).
+     * Bilder der Textblöcke und Bild-Blöcke gehören danach $ownerType/$ownerId (RichImageService::claim je Block); Bilder
+     * des Besitzers, die in keinem Block mehr stehen, werden gelöscht (außer ohne $prune; $keep: Bilder, die woanders
+     * stehen, z. B. in der Fassung einer weiteren Sprache).
      *
      * @param list<array<string, mixed>> $blocks
      * @param list<string> $keep
@@ -212,6 +213,16 @@ final class Blocks
     public function claim(array $blocks, User $actor, string $ownerType, int $ownerId, bool $prune = true, array $keep = []): array
     {
         foreach ($blocks as $i => $b) {
+            if (($b['type'] ?? '') === ImageBlock::TYPE) {
+                // Eigene Entwürfe umhängen, Bilder anderer Inhalte kopieren (wie im Text); fremde, nicht sichtbare fallen weg.
+                $claimed = RichText::imageUids($this->app->richImages()->claim($actor, '<img data-image="' . (string) ($b['image'] ?? '') . '">', $ownerType, $ownerId));
+                if ($claimed === []) {
+                    throw ApiError::invalid(I18n::t('Das Bild wurde nicht gefunden. Bitte noch einmal hochladen.'));
+                }
+                $blocks[$i]['image'] = $claimed[0];
+                $keep[] = $claimed[0];
+                continue;
+            }
             if (($b['type'] ?? '') !== TextBlock::TYPE || ($b['html'] ?? '') === '') {
                 continue;
             }
@@ -294,6 +305,8 @@ final class Blocks
             }
             if ($type instanceof TextBlock) {
                 $part = (string) ($b['html'] ?? '');
+            } elseif ($type instanceof ImageBlock) {
+                $part = $type->html($b);
             } else {
                 $text = trim($type->plain($b, $viewer));
                 $part = $text === '' ? '' : '<p>' . nl2br(htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'), false) . '</p>';
@@ -325,6 +338,34 @@ final class Blocks
     }
 
     /**
+     * Bilder aller Blöcke (Textblöcke und Bild-Blöcke), z. B. zum Aufräumen nicht mehr verwendeter.
+     *
+     * @param list<array<string, mixed>> $blocks
+     * @return list<string>
+     */
+    public static function imageUids(array $blocks): array
+    {
+        $uids = [];
+        foreach ($blocks as $b) {
+            array_push($uids, ...self::blockImageUids($b));
+        }
+        return $uids;
+    }
+
+    /**
+     * @param array<string, mixed> $b
+     * @return list<string>
+     */
+    private static function blockImageUids(array $b): array
+    {
+        return match ($b['type'] ?? '') {
+            TextBlock::TYPE => RichText::imageUids((string) ($b['html'] ?? '')),
+            ImageBlock::TYPE => is_string($b['image'] ?? null) && preg_match(RichText::IMAGE_UID, $b['image']) === 1 ? [$b['image']] : [],
+            default => [],
+        };
+    }
+
+    /**
      * Steht das Bild nur in Blöcken für Mitglieder? (Dann sehen es andere nicht, auch wenn der Inhalt öffentlich ist.)
      *
      * @param list<array<string, mixed>> $blocks
@@ -333,7 +374,7 @@ final class Blocks
     {
         $found = false;
         foreach ($blocks as $b) {
-            if (($b['type'] ?? '') !== TextBlock::TYPE || !in_array($uid, RichText::imageUids((string) ($b['html'] ?? '')), true)) {
+            if (!in_array($uid, self::blockImageUids($b), true)) {
                 continue;
             }
             if (($b['audience'] ?? 'all') !== 'members') {

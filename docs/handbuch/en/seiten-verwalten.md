@@ -28,7 +28,7 @@ Tap **Admin** at the bottom, then **Setup** and the **{bereich.pages}** button. 
 If someone else saved the page while you were editing it, the app doesn’t save your version and says who changed it. Then copy your changes, tap **Reload** and enter them again. Reloading discards your changes.
 
 ### Insert, move and remove blocks
-- Tap **+ Insert block**. The window lists each type of block with an icon and a short explanation; tap the one you want: **Text**, **Countdown**, **Button with link**, **Upcoming events**, **Contacts**, **Notice box**, **Divider**, **Schedule**, **Facts and figures**, **Poll**, **Album**, **Document**, **{bereich.sponsors}** or **Map for directions**. With **+ Insert block below** the new block goes directly below an existing one.
+- Tap **+ Insert block**. The window lists each type of block with an icon and a short explanation; tap the one you want: **Text**, **Image**, **Countdown**, **Button with link**, **Upcoming events**, **Contacts**, **Notice box**, **Divider**, **Schedule**, **Facts and figures**, **Poll**, **Album**, **Document**, **{bereich.sponsors}** or **Map for directions**. With **+ Insert block below** the new block goes directly below an existing one.
 - With **↑** and **↓** you move a block up or down, with **Remove** you take it out.
 - For each block you choose who it is for: **For everyone who sees the page** or **Members only**. This way a public page can contain individual parts only for members, for example an internal meeting point. Without logging in and for guests, these blocks and their pictures are missing.
 - Changes only take effect with **Save** (or **Create**).
@@ -82,6 +82,17 @@ The block shows who currently holds the office, with a photo as in the offices. 
 ### Insert a map for directions
 Optionally enter a **Heading** and the **Place or address** (e.g. “Am Markt 1, 12345 Musterstadt”). The block shows the place with the **Map** button. As for an event’s location, it opens the place in the device’s maps app: on Android with a choice of maps app, on iPhone and Mac in Apple Maps, otherwise in Google Maps. No map from another provider is embedded, so the page loads nothing from third parties.
 
+### Insert your own image
+With the **Image** block you show your own image that does not have to be in the {bereich.gallery}, for example a poster or a photo for this page.
+1. Under **+ Insert block** choose **Image**.
+2. Tap **Choose image** and pick an image (JPG, PNG or WebP). The App shows it right away as a preview. With **Replace image** you swap it.
+3. Optionally enter a **Caption**. It appears below the image.
+4. Optionally enter a **Description for screen readers**, e.g. “Group photo in front of the town hall”. It is read aloud when someone cannot see the image.
+5. Under **Size** choose **Full width**, **Medium** or **Small**. An image is never shown larger than it is.
+6. Tap **Save**.
+
+The image then belongs to the page: whoever may see the block sees it. If the block is set to **Members only**, guests and visitors without logging in do not see the image. If you remove the block, the App deletes the image when you save. As with images in text, the App shrinks very large images to at most 2048 pixels on the longer side and removes details such as where the photo was taken. Images for several pages or whole series of photos are better placed in the {bereich.gallery}; you show them with the **Album** block.
+
 ### Change the order
 Hold an entry by the handle on the left, drag it to the place you want and let go. The order is saved straight away. On a computer it also works with the keyboard: select the handle with the Tab key, then arrow up or down. The order applies in the standard navigation; with your own navigation, that decides the place of each page.
 
@@ -92,7 +103,7 @@ If English is switched on in the app, an admin translates the pages under **Sett
 3. Enter the English title and the texts of the blocks. Empty fields show the German text in grey; for the text block, **German text** expands it.
 4. Tap **Save**.
 
-In English you only write texts. Which blocks there are, their order, **For whom?** and settings such as date, link or events you change here in German; they apply to both languages. A block you keep in German also keeps its English version.
+In English you only write texts. Which blocks there are, their order, **For whom?** and settings such as date, link, events or the image itself you change here in German; they apply to both languages. A block you keep in German also keeps its English version.
 
 ### Delete a page
 Tap **Delete** and confirm. The page’s pictures are then gone too, and the page disappears from the navigation.

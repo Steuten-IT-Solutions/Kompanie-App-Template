@@ -10,6 +10,7 @@ import type {
   DocumentBlock,
   EventsBlock,
   FactsBlock,
+  ImageBlock,
   MapBlock,
   NoticeBlock,
   PollBlock,
@@ -34,6 +35,7 @@ export type AlbumDraft = Omit<AlbumBlock, 'album'> & { album_title?: string };
 export type DocumentDraft = Omit<DocumentBlock, 'document'> & { document_title?: string };
 export type SponsorsDraft = Omit<SponsorsBlock, 'sponsors'>;
 export type MapDraft = MapBlock;
+export type ImageDraft = ImageBlock;
 export type BlockDraft =
   | TextDraft
   | CountdownDraft
@@ -48,12 +50,14 @@ export type BlockDraft =
   | AlbumDraft
   | DocumentDraft
   | SponsorsDraft
-  | MapDraft;
+  | MapDraft
+  | ImageDraft;
 export type BlockKind = BlockDraft['type'];
 
 /** Blöcke, die man einfügen kann, mit Bezeichnung und Erklärung (Reihenfolge der Auswahl). */
 export const BLOCK_KINDS: { type: BlockKind; label: string; hint: string }[] = [
   { type: 'text', label: t('Text'), hint: t('Formatierter Text mit Bildern') },
+  { type: 'image', label: t('Bild'), hint: t('Eigenes Bild hochladen, mit Bildunterschrift') },
   { type: 'countdown', label: t('Countdown'), hint: t('Zählt bis zu einem Datum oder Termin herunter') },
   { type: 'button', label: t('Knopf mit Link'), hint: t('Führt zu einer Webseite, Mail, Telefonnummer oder Seite der App') },
   { type: 'events', label: t('Nächste Termine'), hint: t('Was als Nächstes ansteht, immer aktuell') },
@@ -106,6 +110,7 @@ export function newBlock(type: BlockKind, audience: BlockAudience = 'all'): Bloc
   if (type === 'document') return { id, type, audience, document_id: 0 };
   if (type === 'sponsors') return { id, type, audience, title: '' };
   if (type === 'map') return { id, type, audience, title: '', place: '' };
+  if (type === 'image') return { id, type, audience, image: '', alt: '', caption: '', size: 'full', url: null, width: 0, height: 0 };
   return { id, type: 'text', audience, html: '' };
 }
 
@@ -156,6 +161,10 @@ export function blocksInput(drafts: BlockDraft[]): BlockInput[] {
     }
     if (b.type === 'document') {
       const { document_title: _t, ...rest } = b;
+      return rest;
+    }
+    if (b.type === 'image') {
+      const { url: _u, width: _w, height: _h, ...rest } = b;
       return rest;
     }
     if (b.type !== 'countdown') return b;

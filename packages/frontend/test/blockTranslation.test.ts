@@ -45,3 +45,22 @@ test('leere Felder fallen weg, Listen werden mit den deutschen Teilen ergänzt',
   assert.equal(missingCount(german, {}), 3);
   assert.equal(missingCount(german, { a1: { html: '<p>Hello</p>' }, a2: { text: 'Park' } }), 1);
 });
+
+test('Bild: Beschreibung und Bildunterschrift sind übersetzbar, das Bild selbst nicht', () => {
+  const image = {
+    id: 'i1',
+    type: 'image',
+    audience: 'all',
+    image: 'a'.repeat(32),
+    alt: 'Foto',
+    caption: '',
+    size: 'full',
+    url: null,
+    width: 0,
+    height: 0,
+  } as BlockDraft;
+  assert.deepEqual(translatableFields(image), ['alt']);
+  assert.deepEqual(translationInput([image], { i1: { alt: 'Photo', image: 'b'.repeat(32), caption: 'x' } }), {
+    i1: { alt: 'Photo', caption: 'x' },
+  });
+});
