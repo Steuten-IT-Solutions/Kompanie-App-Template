@@ -12,6 +12,7 @@ use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\ChangeLog\Item;
 use KompanieApp\Core\ChangeLog\Subject;
 use KompanieApp\Core\ChangeLog\Subjects;
+use KompanieApp\Core\Domain\AccessTokenService;
 use KompanieApp\Core\Domain\TranslationOverview;
 use KompanieApp\Core\Domain\TranslationService;
 use KompanieApp\Core\Domain\AdmissionService;
@@ -97,8 +98,11 @@ final class Api
      */
     public function dispatch(Route $route, Request $request): Response
     {
+        // Zugang für KI-Assistenten: Mit Token stellt die Person des Zugangs die Anfrage; eine Vorschau gilt dann nicht.
+        $tokens = $this->app->tokenContext();
+        $tokenState = $tokens->begin($request->bearer);
         $preview = $this->app->preview();
-        $before = $preview->begin(Preview::valueFrom($request->preview, $request->query[Preview::QUERY] ?? null));
+        $before = $preview->begin($tokens->active() ? null : Preview::valueFrom($request->preview, $request->query[Preview::QUERY] ?? null));
         // Sprache der Antwort (Meldungen): die der App, sonst die am Konto (LanguageService::resolve)
         $locale = I18n::locale();
         I18n::setLocale($this->app->languages()->resolve($request->locale, $this->app->authContext->currentUser()));
@@ -106,6 +110,7 @@ final class Api
             return $this->run($route, $request);
         } finally {
             $preview->begin($before);
+            $tokens->restore($tokenState);
             I18n::setLocale($locale);
         }
     }
@@ -113,6 +118,9 @@ final class Api
     private function run(Route $route, Request $request): Response
     {
         try {
+            if ($this->app->tokenContext()->active()) {
+                $this->authorizeToken($route, $request);
+            }
             // Vorschau: nur ansehen, auf dem Server erzwungen – auch bei ungültiger Vorschau oder ohne Admin.
             if ($this->app->preview()->requested() && !in_array($request->method, ['GET', 'HEAD'], true) && !in_array($route->path, self::PREVIEW_OPEN, true)) {
                 throw Preview::readOnlyError();
@@ -141,7 +149,9 @@ final class Api
             }
             return $response;
         } catch (ApiError $e) {
-            return Response::error($e);
+            $res = Response::error($e);
+            // RFC 6750: ungültiges oder abgelaufenes Zugriffstoken
+            return $e->errorCode === self::INVALID_TOKEN ? new Response($res->data, $res->status, ['WWW-Authenticate' => 'Bearer error="invalid_token"']) : $res;
         } catch (\Throwable $e) {
             error_log('Kompanie-App: ' . $e::class . ': ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
             // In der Statusmeldung nur Code und Ursache (Art des Fehlers und Route), der Text nur im Fehlerprotokoll.
@@ -659,6 +669,27 @@ final class Api
         return $this->app->features()->enabled('titles') && $this->can(Cap::ViewTitles);
     }
 
+    /** Fehlercode für ein ungültiges, abgelaufenes oder widerrufenes Zugriffstoken (401 mit WWW-Authenticate) */
+    public const INVALID_TOKEN = 'invalid_token';
+
+    /**
+     * Anfrage mit Zugriffstoken für KI-Assistenten (Domain\AccessTokenService): Das Token muss gelten, die Route muss
+     * Tokens annehmen (Route::$token), und mit dem Umfang read sind nur lesende Anfragen erlaubt (wie bei der Vorschau).
+     */
+    private function authorizeToken(Route $route, Request $request): void
+    {
+        $tokens = $this->app->tokenContext();
+        if ($tokens->currentUser() === null) {
+            throw new ApiError(401, self::INVALID_TOKEN, I18n::t('Der Zugang ist abgelaufen oder wurde widerrufen. Bitte neu verbinden.'));
+        }
+        if (!$route->token) {
+            throw new ApiError(403, 'token_not_allowed', I18n::t('Das geht mit einem Zugang für KI-Assistenten nicht.'));
+        }
+        if ($tokens->scope() !== AccessTokenService::WRITE && !in_array($request->method, ['GET', 'HEAD'], true)) {
+            throw new ApiError(403, 'token_readonly', I18n::t('Dieser Zugang darf nur lesen.'));
+        }
+    }
+
     private function authorize(Route $route): void
     {
         if ($route->access === Route::PUBLIC) {
@@ -937,7 +968,7 @@ final class Api
             new Route('GET', '/me/data', $L, fn () => $this->personalData($this->user()->id)),
             new Route('GET', '/me', $L, fn () => $a->members()->me($this->user())
                 + ($a->features()->enabled('ranks') && $this->user()->isMember() && $this->can(Cap::ViewOwnRank) ? ['rank' => $a->ranks()->current($this->user()->id)] : [])
-                + ($a->features()->enabled('titles') && $this->user()->isMember() && $this->can(Cap::ViewOwnRank) ? ['titles' => $a->titles()->of($this->user()->id)] : [])),
+                + ($a->features()->enabled('titles') && $this->user()->isMember() && $this->can(Cap::ViewOwnRank) ? ['titles' => $a->titles()->of($this->user()->id)] : []), token: true),
             // Dienstgrade (Issue #9): eigener Stand und Verlauf, die Liste mit Schwellen (mit Punkten)
             new Route('GET', '/me/rank', Cap::ViewOwnRank, fn () => $a->ranks()->status($this->user()->id)
                 + ['ranks' => $a->ranks()->list(false), 'history' => $a->ranks()->history($this->user()->id)], 'ranks', $denyMember),
@@ -977,7 +1008,15 @@ final class Api
             }),
             new Route('POST', '/me/password', $L, function (Request $r) use ($a) {
                 $a->members()->changeOwnPassword($this->user(), $r->input('current_password'), $r->input('new_password'));
+                // Ein neues Passwort beendet auch die Zugänge für KI-Assistenten (wie die anderen Sitzungen).
+                $a->accessTokens()->revokeAllFor($this->user()->id);
                 return ['changed' => true];
+            }),
+            // Zugänge für KI-Assistenten (Plan „MCP-Server“): eigene ansehen und widerrufen
+            new Route('GET', '/me/ai-access', $L, fn () => ['enabled' => $a->accessTokens()->enabled(), 'tokens' => $a->accessTokens()->list($this->user()->id)]),
+            new Route('DELETE', '/me/ai-access/{id}', $L, function (Request $r) use ($a) {
+                $a->accessTokens()->revoke($r->id(), $this->user()->id);
+                return ['deleted' => true];
             }),
             // Web Push (Issue #19): Konten über /me/push, Gäste über /push (Ändern und Löschen nur mit dem auth-Geheimnis).
             // Fehlermeldungen (Issue #64): auch ohne Anmeldung; Zeitfalle, Honeypot und Begrenzung im Dienst
@@ -1600,7 +1639,12 @@ final class Api
             // Fotos: wer Mitglieder anlegt; bei Ehemaligen auch, wer sie verwaltet (MemberPhotoService::guard)
             new Route('PUT', '/members/{id}/photo', [Cap::CreateUsers, Cap::ManageFormer], fn (Request $r) => $a->memberPhotos()->upload($this->user(), $r->id(), $r->input('file')), null, $denyUsers),
             new Route('DELETE', '/members/{id}/photo', [Cap::CreateUsers, Cap::ManageFormer], fn (Request $r) => $a->memberPhotos()->remove($this->user(), $r->id()), null, $denyUsers),
-            new Route('POST', '/members/{id}/password', Cap::CreateUsers, fn (Request $r) => $a->members()->resetPassword($this->user(), $r->id()), null, $denyUsers),
+            new Route('POST', '/members/{id}/password', Cap::CreateUsers, function (Request $r) use ($a) {
+                $result = $a->members()->resetPassword($this->user(), $r->id());
+                // Startpasswort: Zugänge für KI-Assistenten der Person enden wie ihre Sitzungen.
+                $a->accessTokens()->revokeAllFor($r->id());
+                return $result;
+            }, null, $denyUsers),
             new Route('POST', '/users', Cap::CreateUsers, function (Request $r) use ($a) {
                 // Anfangspunkte und Dienstgrad: alles prüfen, bevor das Konto entsteht.
                 $initial = $a->ranks()->prepareInitial($this->user(), $r->body);
@@ -1870,6 +1914,13 @@ final class Api
             new Route('DELETE', '/admin/backup/encryption', Cap::ManageSettings, fn () => $a->backupEncryption()->remove(), null, $denySettings),
             new Route('POST', '/admin/backup/encryption/verify', Cap::ManageSettings, fn (Request $r) => ['ok' => $a->backupEncryption()->verify($r->input('passphrase'))], null, $denySettings),
             // Aufbewahrungsfrist für Ehemalige (Standard aus): Stand mit Vorschau, einstellen
+            // Zugang für KI-Assistenten (Plan „MCP-Server“): Schalter (Vorgabe aus), alle Zugänge mit Person, widerrufen
+            new Route('GET', '/admin/ai-access', Cap::ManageSettings, fn () => ['enabled' => $a->accessTokens()->enabled(), 'tokens' => $a->accessTokens()->list(null)], null, $denySettings),
+            new Route('PUT', '/admin/ai-access', Cap::ManageSettings, fn (Request $r) => ['enabled' => $a->accessTokens()->setEnabled($r->input('enabled'))], null, $denySettings),
+            new Route('DELETE', '/admin/ai-access/{id}', Cap::ManageSettings, function (Request $r) use ($a) {
+                $a->accessTokens()->revoke($r->id());
+                return ['deleted' => true];
+            }, null, $denySettings),
             new Route('GET', '/admin/former/retention', Cap::ManageSettings, fn () => $a->formerMembers()->retentionStatus(), null, $denySettings),
             new Route('PUT', '/admin/former/retention', Cap::ManageSettings, fn (Request $r) => $a->formerMembers()->setRetention($r->body, Input::bool($r->input('preview'))), null, $denySettings),
             new Route('GET', '/admin/backup/drive', Cap::ManageSettings, fn () => $a->backupUpload()->status(), null, $denySettings),

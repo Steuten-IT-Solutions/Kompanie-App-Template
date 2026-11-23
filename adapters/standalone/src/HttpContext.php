@@ -33,6 +33,11 @@ final class HttpContext
     {
         $key = 'HTTP_' . strtoupper(str_replace('-', '_', $name));
         $v = $this->server[$key] ?? ($name === 'Content-Type' ? ($this->server['CONTENT_TYPE'] ?? null) : null);
+        // Authorization (Zugang für KI-Assistenten): Apache mit CGI/FPM gibt ihn nur über die Umgebungsvariable aus der
+        // .htaccess weiter, nach der internen Weiterleitung auf index.php als REDIRECT_HTTP_AUTHORIZATION.
+        if ($v === null && $key === 'HTTP_AUTHORIZATION') {
+            $v = $this->server['REDIRECT_HTTP_AUTHORIZATION'] ?? null;
+        }
         return is_string($v) ? $v : null;
     }
 

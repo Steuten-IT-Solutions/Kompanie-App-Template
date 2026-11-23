@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core;
 
+use KompanieApp\Core\Auth\AccessTokenContext;
 use KompanieApp\Core\Auth\Preview;
 use KompanieApp\Core\Auth\PreviewEnvironment;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Config\KompanieConfig;
+use KompanieApp\Core\Domain\AccessTokenService;
 use KompanieApp\Core\Domain\ActivityService;
 use KompanieApp\Core\Domain\LanguageService;
 use KompanieApp\Core\Domain\ChangeLogService;
@@ -166,6 +168,9 @@ final class App
 
     private readonly Preview $preview;
 
+    /** Zugriffstoken für KI-Assistenten der laufenden Anfrage (Auth\AccessTokenContext); liegt unter der Vorschau. */
+    private readonly AccessTokenContext $tokenContext;
+
     public function __construct(
         public readonly Connection $db,
         public readonly Settings $settings,
@@ -195,7 +200,9 @@ final class App
         // über die Vorschau – so gilt sie überall gleich, ohne dass Dienste oder Adapter sie kennen müssen.
         // Basissprache der Kompanie: Sprache der Inhalte und Vorgabe, bis die Anfrage ihre Sprache setzt (Http\Api)
         I18n::setBase($config->language());
-        $this->preview = new Preview($authContext, fn (): RoleService => $this->roles(), fn (): UserDirectory => $this->users);
+        // Zugang für KI-Assistenten: Trägt die Anfrage ein Token, stellt sie die Person des Zugangs (AccessTokenService).
+        $this->tokenContext = new AccessTokenContext($authContext, fn (): AccessTokenService => $this->accessTokens());
+        $this->preview = new Preview($this->tokenContext, fn (): RoleService => $this->roles(), fn (): UserDirectory => $this->users);
         $this->authContext = $this->preview;
         $this->env = new PreviewEnvironment($env, $this->preview);
         // Eigene Bereichsnamen der Installation (Issue #362) gehen überall vor kompanie.json.
@@ -807,6 +814,18 @@ final class App
     }
 
     /** Nutzungsauswertung (Issue #175) */
+    /** Zugriffstoken der laufenden Anfrage (Zugang für KI-Assistenten) */
+    public function tokenContext(): AccessTokenContext
+    {
+        return $this->tokenContext;
+    }
+
+    /** Zugänge für KI-Assistenten (Plan „MCP-Server“) */
+    public function accessTokens(): AccessTokenService
+    {
+        return $this->service(AccessTokenService::class, fn () => new AccessTokenService($this));
+    }
+
     public function activity(): ActivityService
     {
         return $this->service(ActivityService::class, fn () => new ActivityService($this));

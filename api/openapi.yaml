@@ -32,6 +32,15 @@ info:
     `GET`/`HEAD` ist, lehnt der Server mit 403 `preview_readonly` ab (Antwort `PreviewReadonly`), außer
     `POST /auth/logout`.
 
+    **Zugang für KI-Assistenten (Plan „MCP-Server“):** Statt des Cookies kann eine Anfrage ein Zugriffstoken im Header
+    `Authorization: Bearer kat_…` tragen (Sicherheitsschema `bearer`). Dann stellt die Person des Zugangs die Anfrage,
+    mit ihren aktuellen Rechten, auch wenn derselbe Aufruf ein Cookie trägt; eine Vorschau gilt dann nicht. Nur Routen
+    mit `x-token: true` nehmen Tokens an, alle anderen antworten 403 `token_not_allowed`. Ein ungültiges, abgelaufenes
+    oder widerrufenes Token ergibt 401 `invalid_token` mit `WWW-Authenticate: Bearer error="invalid_token"`; ist der
+    Zugang in der App ausgeschaltet (`/admin/ai-access`), gilt kein Token. Mit dem Umfang `read` lehnt der Server jede
+    Anfrage außer `GET`/`HEAD` mit 403 `token_readonly` ab. Ein Zugriffstoken gilt 1 Stunde, das Erneuern 30 Tage ab dem
+    letzten Erneuern; ein neues Passwort (eigenes oder Startpasswort) beendet alle Zugänge der Person.
+
     **Beträge** sind immer ganze Cent. **Datumsangaben** `YYYY-MM-DD`, Uhrzeiten `HH:MM`
     in der Zeitzone der Kompanie.
 servers:
@@ -143,6 +152,11 @@ paths:
     get:
       tags: [Eigene Daten]
       summary: Eigene Übersicht
+      description: Auch mit Zugriffstoken für KI-Assistenten (zeigt, als wer der Zugang handelt).
+      x-token: true
+      security:
+        - session: []
+        - bearer: []
       responses:
         '200':
           description: OK
@@ -572,7 +586,9 @@ paths:
     post:
       tags: [Eigene Daten]
       summary: Eigenes Passwort ändern
-      description: Meldet alle anderen Geräte ab. Dieses Gerät bekommt eine neue Sitzung; danach ein neues CSRF-Token holen.
+      description: |
+        Meldet alle anderen Geräte ab und beendet alle Zugänge für KI-Assistenten. Dieses Gerät bekommt eine neue
+        Sitzung; danach ein neues CSRF-Token holen.
       requestBody:
         required: true
         content:
@@ -594,6 +610,30 @@ paths:
                   changed: { type: boolean }
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
+
+  /me/ai-access:
+    get:
+      tags: [Eigene Daten]
+      summary: Eigene Zugänge für KI-Assistenten
+      description: Ob der Zugang in der App an ist, und die eigenen Zugänge, neueste zuerst.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AiAccess' }
+        '401': { $ref: '#/components/responses/Error' }
+
+  /me/ai-access/{id}:
+    delete:
+      tags: [Eigene Daten]
+      summary: Eigenen Zugang für KI-Assistenten widerrufen
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
 
   /reports/form:
     get:
@@ -8665,6 +8705,60 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Error' }
 
+  /admin/ai-access:
+    get:
+      tags: [Verwaltung]
+      summary: Zugang für KI-Assistenten – Schalter und alle Zugänge
+      description: Alle Zugänge aller Personen (mit `user_id` und `user_name`), neueste zuerst.
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AiAccess' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Verwaltung]
+      summary: Zugang für KI-Assistenten ein- oder ausschalten (Vorgabe aus)
+      description: Aus heißt, kein Zugang gilt und es wird keiner ausgestellt; die Zugänge bleiben und gelten nach dem Einschalten wieder.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              properties:
+                enabled: { type: boolean }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enabled: { type: boolean }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /admin/ai-access/{id}:
+    delete:
+      tags: [Verwaltung]
+      summary: Zugang für KI-Assistenten einer Person widerrufen
+      x-capability: manage_settings
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
   /admin/former/retention:
     get:
       tags: [Verwaltung]
@@ -8872,6 +8966,10 @@ components:
       in: cookie
       name: session
       description: Name und Inhalt des Cookies hängen vom Adapter ab (WordPress-Anmelde-Cookie bzw. eigene Sitzung).
+    bearer:
+      type: http
+      scheme: bearer
+      description: 'Zugriffstoken für KI-Assistenten (`kat_…`), nur für Routen mit `x-token` = true.'
 
   parameters:
     Preview:
@@ -9153,6 +9251,26 @@ components:
               deleted: { type: boolean }
 
   schemas:
+    AiAccess:
+      type: object
+      description: Zugang für KI-Assistenten (Plan „MCP-Server“); Zeiten als Unix-Zeit (Sekunden, UTC).
+      properties:
+        enabled: { type: boolean, description: 'Zugang in der App eingeschaltet (Vorgabe aus)' }
+        tokens:
+          type: array
+          items:
+            type: object
+            required: [id, client, scope, created_at, last_used_at, valid_until, expired]
+            properties:
+              id: { type: integer }
+              client: { type: string, description: 'Name des Programms, z. B. Claude' }
+              scope: { type: string, enum: [read, write] }
+              created_at: { type: integer }
+              last_used_at: { type: [integer, 'null'] }
+              valid_until: { type: integer, description: 'Bis dahin lässt sich der Zugang ohne neue Freigabe erneuern' }
+              expired: { type: boolean }
+              user_id: { type: integer, description: 'Nur in /admin/ai-access' }
+              user_name: { type: string, description: 'Nur in /admin/ai-access' }
     NameTranslations:
       type: object
       description: 'Eigene Namen je weiterer eingeschalteter Sprache: Sprache => Art (nav, role) => Kennung => Feld => Text. Ohne weitere Sprache leer.'
