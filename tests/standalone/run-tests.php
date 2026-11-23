@@ -171,6 +171,13 @@ try {
     $c->ok($noToken[0] === 401 && ($noToken[2]['www-authenticate'] ?? '') === 'Bearer', 'Ohne Token → 401 mit WWW-Authenticate');
     $c->ok($as(null, 'GET', 'mcp', null, $mcpHeaders)[0] === 405, 'GET → 405');
 
+    $c->section('Anmeldung per OAuth');
+    // Ohne schöne Adressen (index.php?r=…) hat die API ein „?“ in der Adresse: OAuth geht dann nicht, Tokens bleiben
+    $form = $d->send('POST', $base . 'index.php?r=/api/v1/oauth/token', ['Content-Type' => 'application/x-www-form-urlencoded', 'Accept' => 'application/json'], 'grant_type=refresh_token&refresh_token=' . $grant['refresh_token']);
+    $c->ok($form[0] === 400 && ($form[1]['error'] ?? null) === 'invalid_grant' && ($form[2]['cache-control'] ?? '') === 'no-store', 'Token-Anfrage als Formular ohne Cookie und CSRF-Token → OAuth-Fehler als JSON');
+    $c->ok($as(null, 'GET', 'oauth/protected-resource')[0] === 404, 'Ohne schöne Adressen keine Metadaten für OAuth');
+    $c->ok(($noToken[2]['www-authenticate'] ?? '') === 'Bearer', 'Ohne schöne Adressen kein Verweis auf Metadaten im WWW-Authenticate');
+
     $kernel->app()->accessTokens()->setEnabled(false);
     $c->ok($as(null, 'GET', 'me', null, $bearer)[0] === 401, 'Schalter aus → Token gilt nicht');
     $c->ok($as(null, 'POST', 'mcp', ['jsonrpc' => '2.0', 'id' => 6, 'method' => 'tools/list'], $mcpHeaders)[0] === 404, 'Schalter aus → MCP-Endpunkt 404');

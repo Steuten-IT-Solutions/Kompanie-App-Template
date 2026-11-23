@@ -105,7 +105,7 @@ final class AccessTokenTest extends TestCase
         foreach (['kat_falsch', 'irgendwas', $grant['refresh_token']] as $token) {
             $res = $this->call('GET', '/me', [], $token);
             $this->assertSame([401, 'invalid_token'], [$res->status, $res->data['code']], $token);
-            $this->assertSame('Bearer error="invalid_token"', $res->headers['WWW-Authenticate']);
+            $this->assertSame('Bearer error="invalid_token", resource_metadata="https://example.org/api/v1/oauth/protected-resource"', $res->headers['WWW-Authenticate']);
         }
 
         $this->app->accessTokens()->setEnabled(false);

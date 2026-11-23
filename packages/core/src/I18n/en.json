@@ -4872,5 +4872,10 @@
   "Diesen Zugang gibt es nicht.": "This access does not exist.",
   "Dieser Zugang darf nur lesen.": "This access may only read.",
   "Dieses Konto kann keinen Zugang für KI-Assistenten bekommen.": "This account cannot get access for AI assistants.",
+  "Unbekanntes Programm. Bitte die Verbindung im KI-Assistenten neu einrichten.": "Unknown program. Please set up the connection again in the AI assistant.",
+  "Die Rücksprung-Adresse passt nicht zum Programm.": "The return address does not match the program.",
+  "Bitte zustimmen oder ablehnen.": "Please approve or decline.",
+  "Bitte wählen, ob der Zugang nur lesen oder auch ändern darf.": "Please choose whether the access may only read or also make changes.",
+  "Diese Anfrage ist abgelaufen. Bitte im KI-Assistenten neu verbinden.": "This request has expired. Please connect again in the AI assistant.",
   "Unbekannter Umfang des Zugangs.": "Unknown scope of access."
 }

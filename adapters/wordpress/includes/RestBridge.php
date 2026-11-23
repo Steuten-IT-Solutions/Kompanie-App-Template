@@ -56,6 +56,30 @@ final class RestBridge
         return is_string($value) && $value !== '' ? $value : null;
     }
 
+    /**
+     * Metadaten für die Anmeldung per OAuth unter /.well-known/ an der Wurzel der Domain (RFC 8414, RFC 9728): Dort suchen
+     * Programme wie Claude zuerst. Antwortet und beendet die Anfrage, wenn die Adresse dazu passt (Domain\OAuthService).
+     */
+    public static function wellKnown(App $app): void
+    {
+        $uri = isset($_SERVER['REQUEST_URI']) && is_string($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '';
+        $path = rawurldecode((string) parse_url($uri, PHP_URL_PATH));
+        if (!str_starts_with($path, '/.well-known/') && !str_contains($path, '/.well-known/')) {
+            return;
+        }
+        $route = $app->oauth()->wellKnownRoute($path);
+        if ($route === null) {
+            return;
+        }
+        $res = $app->api()->handle(new Request('GET', $route));
+        status_header($res->status);
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        header('Access-Control-Allow-Origin: *');
+        echo wp_json_encode($res->data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     /** '/events/{id}' → '/events/(?P<id>\d+)' */
     public static function wpPattern(string $path): string
     {

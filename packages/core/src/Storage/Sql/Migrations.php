@@ -2276,6 +2276,69 @@ WHERE title IS NULL",
                 'mysql' => ['ALTER TABLE {change_log} ADD COLUMN via varchar(100) NOT NULL DEFAULT \'\''],
                 'sqlite' => ['ALTER TABLE {change_log} ADD COLUMN via TEXT NOT NULL DEFAULT \'\''],
             ],
+            // Anmeldung per OAuth für KI-Assistenten (Domain\OAuthService, Plan „MCP-Server“, Schritt 3): Programme (selbst
+            // registriert per DCR oder Metadaten-Dokument unter ihrer Adresse, CIMD), Freigaben im Gang (Anfrage, danach
+            // einmaliger Code; nur Hashes) und je Zugang die Kennung des Programms, das ihn erneuern darf.
+            78 => [
+                'mysql' => [
+                    'ALTER TABLE {access_tokens} ADD COLUMN client_id varchar(255) NOT NULL DEFAULT \'\'',
+                    'CREATE TABLE IF NOT EXISTS {oauth_clients} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  client_id varchar(255) NOT NULL,
+  kind varchar(10) NOT NULL,
+  name varchar(100) NOT NULL DEFAULT \'\',
+  redirect_uris text NOT NULL,
+  created_at bigint(20) NOT NULL,
+  fetched_at bigint(20) DEFAULT NULL,
+  last_used_at bigint(20) DEFAULT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY client_id (client_id(191))
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {oauth_grants} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  request_hash char(64) NOT NULL,
+  code_hash char(64) DEFAULT NULL,
+  client_id varchar(255) NOT NULL,
+  redirect_uri text NOT NULL,
+  code_challenge varchar(128) NOT NULL,
+  state text NOT NULL,
+  scope varchar(20) NOT NULL DEFAULT \'\',
+  user_id bigint(20) unsigned DEFAULT NULL,
+  expires_at bigint(20) NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY request_hash (request_hash),
+  UNIQUE KEY code_hash (code_hash)
+) {options}',
+                ],
+                'sqlite' => [
+                    'ALTER TABLE {access_tokens} ADD COLUMN client_id TEXT NOT NULL DEFAULT \'\'',
+                    'CREATE TABLE IF NOT EXISTS {oauth_clients} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  client_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  name TEXT NOT NULL DEFAULT \'\',
+  redirect_uris TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  fetched_at INTEGER DEFAULT NULL,
+  last_used_at INTEGER DEFAULT NULL
+)',
+                    'CREATE UNIQUE INDEX IF NOT EXISTS {oauth_clients}_client ON {oauth_clients} (client_id)',
+                    'CREATE TABLE IF NOT EXISTS {oauth_grants} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  request_hash TEXT NOT NULL,
+  code_hash TEXT DEFAULT NULL,
+  client_id TEXT NOT NULL,
+  redirect_uri TEXT NOT NULL,
+  code_challenge TEXT NOT NULL,
+  state TEXT NOT NULL,
+  scope TEXT NOT NULL DEFAULT \'\',
+  user_id INTEGER DEFAULT NULL,
+  expires_at INTEGER NOT NULL
+)',
+                    'CREATE UNIQUE INDEX IF NOT EXISTS {oauth_grants}_request ON {oauth_grants} (request_hash)',
+                    'CREATE UNIQUE INDEX IF NOT EXISTS {oauth_grants}_code ON {oauth_grants} (code_hash)',
+                ],
+            ],
         ];
     }
 

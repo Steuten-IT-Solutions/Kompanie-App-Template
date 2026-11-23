@@ -59,7 +59,7 @@ final class Api
      * Formular zum Fehlermelden) oder ist Technik des Geräts (Push-Abo an- und abmelden, auch beim Abmelden vom Konto). Die
      * Anmeldung erfasst ihre Route selbst (Aktion login), die Abmeldung gar nicht.
      */
-    private const NOT_TRACKED = ['/config', '/auth/csrf', '/auth/login', '/auth/logout', '/push/status', '/me/push/status', '/push', '/me/push', '/reports/form', '/registration/form', self::MCP_PATH];
+    private const NOT_TRACKED = ['/config', '/auth/csrf', '/auth/login', '/auth/logout', '/push/status', '/me/push/status', '/push', '/me/push', '/reports/form', '/registration/form', self::MCP_PATH, '/oauth/protected-resource', '/.well-known/oauth-protected-resource', '/.well-known/oauth-authorization-server', '/.well-known/openid-configuration', '/oauth/authorize', '/oauth/token', '/oauth/register', '/oauth/requests/{key}'];
 
     /** @var Route[]|null */
     private ?array $routes = null;
@@ -154,7 +154,7 @@ final class Api
         } catch (ApiError $e) {
             $res = Response::error($e);
             // RFC 6750: ungültiges oder abgelaufenes Zugriffstoken
-            return $e->errorCode === self::INVALID_TOKEN ? new Response($res->data, $res->status, ['WWW-Authenticate' => 'Bearer error="invalid_token"']) : $res;
+            return $e->errorCode === self::INVALID_TOKEN ? new Response($res->data, $res->status, ['WWW-Authenticate' => $this->app->oauth()->challenge(true)]) : $res;
         } catch (\Throwable $e) {
             error_log('Kompanie-App: ' . $e::class . ': ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
             // In der Statusmeldung nur Code und Ursache (Art des Fehlers und Route), der Text nur im Fehlerprotokoll.
@@ -1075,10 +1075,21 @@ final class Api
                 }
                 if (!$a->tokenContext()->active()) {
                     $e = new ApiError(401, self::INVALID_TOKEN, I18n::t('Bitte mit einem Zugang für KI-Assistenten verbinden.'));
-                    return new Response(Response::error($e)->data, 401, ['WWW-Authenticate' => 'Bearer']);
+                    return new Response(Response::error($e)->data, 401, ['WWW-Authenticate' => $a->oauth()->challenge(false)]);
                 }
                 return $a->mcp()->handle($r);
             }, null, null, true),
+            // Anmeldung per OAuth für KI-Assistenten (Domain\OAuthService): Metadaten (auch unter .well-known an der Adresse der
+            // API, wo Programme danach suchen), Weiterleitung zur Zustimmung, Tokens, Registrierung; Zustimmen in der App
+            new Route('GET', '/oauth/protected-resource', $P, fn () => $a->oauth()->protectedResource()),
+            new Route('GET', '/.well-known/oauth-protected-resource', $P, fn () => $a->oauth()->protectedResource()),
+            new Route('GET', '/.well-known/oauth-authorization-server', $P, fn () => $a->oauth()->serverMetadata()),
+            new Route('GET', '/.well-known/openid-configuration', $P, fn () => $a->oauth()->serverMetadata()),
+            new Route('GET', '/oauth/authorize', $P, fn (Request $r) => $a->oauth()->authorize($r->query)),
+            new Route('POST', '/oauth/token', $P, fn (Request $r) => $a->oauth()->token($r->body)),
+            new Route('POST', '/oauth/register', $P, fn (Request $r) => $a->oauth()->register($r->body)),
+            new Route('GET', '/oauth/requests/{key}', $L, fn (Request $r) => $a->oauth()->pending((string) $r->params['key'], $this->user())),
+            new Route('POST', '/oauth/requests/{key}', $L, fn (Request $r) => $a->oauth()->decide((string) $r->params['key'], $this->user(), $r->input('approve'), $r->input('scope'))),
             // Web Push (Issue #19): Konten über /me/push, Gäste über /push (Ändern und Löschen nur mit dem auth-Geheimnis).
             // Fehlermeldungen (Issue #64): auch ohne Anmeldung; Zeitfalle, Honeypot und Begrenzung im Dienst
             new Route('GET', '/reports/form', $P, fn () => $a->bugReports()->form($a->authContext->currentUser())),
