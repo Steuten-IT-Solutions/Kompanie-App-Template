@@ -6699,7 +6699,7 @@ test('Block einfügen: Fenster mit allen Blockarten, Zurück und Esc schließen 
   const open = form.getByRole('button', { name: '+ Block einfügen', exact: true });
   const dialog = page.getByRole('dialog', { name: 'Block einfügen' });
   await open.click();
-  await expect(dialog.locator('.block-kind')).toHaveCount(14);
+  await expect(dialog.locator('.block-kind')).toHaveCount(15);
   await expect(dialog.locator('.block-kind[data-kind="countdown"]')).toContainText('Zählt bis zu einem Datum');
   await shot(page, 'seiten-block-einfuegen');
   // „Zurück“ schließt nur das Fenster, die Seite bleibt
