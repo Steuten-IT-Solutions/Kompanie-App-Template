@@ -25,13 +25,19 @@ Tippe unten auf **Verwaltung** und dann auf **Änderungen**.
 - **Unter WordPress** auch die Einstellungsseite der App im Backend und die Benutzerverwaltung: Benutzer anlegen, bearbeiten, ihre Rolle ändern und löschen.
 - **Alles in den Bereichen**, was angelegt, geändert oder gelöscht wird, z. B. Termine, News, Seiten, Punkte, Strafen, Dienstgrade, Titel, Ämter und Amtszeiten, Listen, Anwesenheit, Dokumente, Nachrichten am Brett, Umfragen, Inventar, E-Mails und Mailgruppen, Bilder, Alben und Einreichungen der Galerie. Auch die Reihenfolge, z. B. der Dienstgrade.
 - **Fehlermeldungen**: wer eine Meldung geschlossen oder an die Betreuer weitergeleitet hat.
+- **Benachrichtigungen auf einem Gerät entfernt**: wenn die Benachrichtigungen einer Person auf einem Gerät wegfallen, mit **Grund**, **Push-Dienst** (z. B. Google für Chrome und Android, Apple für iPhone), **Eingeschaltet am** und **Zuletzt zugestellt**. Gründe sind: auf dem Gerät ausgeschaltet, vom Konto abgemeldet, App ohne Anmeldung geöffnet (z. B. Sitzung abgelaufen), ein anderes Konto hat sich auf dem Gerät angemeldet, mehr als 10 Geräte (das älteste fällt weg) oder der Push-Dienst kennt das Gerät nicht mehr (z. B. nach dem Löschen der Browserdaten, einer Neuinstallation der App oder wenn die Erlaubnis für Benachrichtigungen entzogen wurde). Was die App selbst entfernt, steht mit **System (automatisch)** da.
 
-Nicht aufgezeichnet werden das Anmelden, Abstimmungen in Umfragen, das An- und Abmelden der Benachrichtigungen auf einem Gerät, Tests (z. B. Test-Mail), der Abgleich der Galerie mit Google Drive und das regelmäßige Aufräumen nach festen Fristen (z. B. abgelaufene Nachrichten am Brett, alte E-Mails und Anfragen).
+Nicht aufgezeichnet werden das Anmelden, Abstimmungen in Umfragen, das Einschalten der Benachrichtigungen und das Ändern ihrer Arten auf einem Gerät, Tests (z. B. Test-Mail), der Abgleich der Galerie mit Google Drive und das regelmäßige Aufräumen nach festen Fristen (z. B. abgelaufene Nachrichten am Brett, alte E-Mails und Anfragen).
 
 ## So gehst du vor
 ### Herausfinden, was jemand gelöscht hat
 1. Wähle bei **Auswahl** den Zeitraum und bei **Wer** die Person.
 2. Suche den Eintrag mit **gelöscht** und tippe darauf. Du siehst, was der Eintrag vor dem Löschen enthielt.
+
+### Herausfinden, warum jemand keine Benachrichtigungen mehr bekommt
+1. Wähle bei **Auswahl** einen Zeitraum, der den Tag enthält, an dem es aufgefallen ist. Bei **Wer** bleibt **alle** stehen, weil vieles **System (automatisch)** auslöst.
+2. Suche den Eintrag **Benachrichtigungen von … auf einem Gerät entfernt** und tippe darauf. Unter **Grund** steht, warum.
+3. Danach muss die Person die Benachrichtigungen auf dem Gerät neu einschalten: unter **Meins → Benachrichtigungen**.
 
 ### Das Protokoll ausschalten oder die Frist ändern
 1. Ganz unten bei **Einstellungen** nimmst du das Häkchen bei **Änderungen protokollieren** heraus und bestätigst die Rückfrage. Alle bisherigen Einträge werden sofort gelöscht.

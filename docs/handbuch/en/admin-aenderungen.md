@@ -25,13 +25,19 @@ The log records the type of entry, the field names and texts such as **System (a
 - **Under WordPress** also the app’s settings page in the back end and user management: creating and editing users, changing their role and deleting them.
 - **Everything in the areas** that is created, changed or deleted, e.g. events, news, pages, points, penalties, ranks, titles, offices and terms of office, lists, attendance, documents, messages on the board, polls, inventory, emails and mail groups, photos, albums and submissions of the gallery. Also the order, e.g. of the ranks.
 - **Bug reports**: who closed a report or forwarded it to the maintainers.
+- **Notifications removed from a device** (Benachrichtigungen auf einem Gerät entfernt): when a person’s notifications on a device stop, with **Grund** (reason), **Push-Dienst** (push service, e.g. Google for Chrome and Android, Apple for iPhone), **Eingeschaltet am** (turned on) and **Zuletzt zugestellt** (last delivered). Reasons are: turned off on the device, logged out of the account, app opened without being logged in (e.g. the session expired), another account logged in on the device, more than 10 devices (the oldest is dropped) or the push service no longer knows the device (e.g. after clearing the browser data, reinstalling the app or withdrawing the permission for notifications). What the app removes by itself is shown with **System (automatisch)**.
 
-Not recorded are logging in, votes in polls, turning notifications on and off on a device, tests (e.g. a test email), syncing the gallery with Google Drive and the regular clean-up after fixed periods (e.g. expired messages on the board, old emails and requests).
+Not recorded are logging in, votes in polls, turning notifications on and changing their kinds on a device, tests (e.g. a test email), syncing the gallery with Google Drive and the regular clean-up after fixed periods (e.g. expired messages on the board, old emails and requests).
 
 ## Step by step
 ### Find out what someone deleted
 1. In **Filter**, choose the period and, under **Who**, the person.
 2. Look for the entry with **deleted** and tap it. You see what the entry contained before it was deleted.
+
+### Find out why someone no longer gets notifications
+1. In **Filter**, choose a period that includes the day it was noticed. Leave **Who** at **all**, because much of this is triggered by **System (automatisch)**.
+2. Look for the entry **Benachrichtigungen von … auf einem Gerät entfernt** and tap it. **Grund** shows the reason.
+3. The person then has to turn notifications on again on the device: under **My area → Notifications**.
 
 ### Turn the log off or change the period
 1. Right at the bottom under **Settings**, untick **Log changes** and confirm the question. All existing entries are deleted immediately.

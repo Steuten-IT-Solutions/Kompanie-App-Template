@@ -9,9 +9,10 @@ use KompanieApp\Core\Storage\Sql\Connection;
 /**
  * Abos für Web Push (user_id 0 = Gast) und die Warteschlange für den Versand (Issue #19).
  *
- * @phpstan-type Subscription array{id: int, user_id: int, endpoint: string, p256dh: string, auth: string, types: list<string>, offered: list<string>|null, details: bool, updated_at: string}
+ * @phpstan-type Subscription array{id: int, user_id: int, endpoint: string, p256dh: string, auth: string, types: list<string>, offered: list<string>|null, details: bool, updated_at: string,
+ *     created_at: string, last_sent_at: string|null}
  * @phpstan-type QueueItem array{id: int, subscription_id: int, payload: string, urgency: string, ttl: int, attempts: int,
- *     created_at: string, endpoint: ?string, p256dh: ?string, auth: ?string}
+ *     created_at: string, endpoint: ?string, p256dh: ?string, auth: ?string, user_id: ?int, subscribed_at: ?string, last_sent_at: ?string}
  */
 final class PushRepository
 {
@@ -194,7 +195,8 @@ final class PushRepository
             return [];
         }
         $rows = $this->db->select(
-            'SELECT q.id, q.subscription_id, q.payload, q.urgency, q.ttl, q.attempts, q.created_at, s.endpoint, s.p256dh, s.auth
+            'SELECT q.id, q.subscription_id, q.payload, q.urgency, q.ttl, q.attempts, q.created_at, s.endpoint, s.p256dh, s.auth,
+                s.user_id, s.created_at AS subscribed_at, s.last_sent_at
              FROM {push_queue} q LEFT JOIN {push_subscriptions} s ON s.id = q.subscription_id
              WHERE q.id IN (' . implode(', ', array_fill(0, count($won), '?')) . ') ORDER BY q.id ASC',
             $won,
@@ -210,6 +212,9 @@ final class PushRepository
             'endpoint' => isset($r['endpoint']) ? (string) $r['endpoint'] : null,
             'p256dh' => isset($r['p256dh']) ? (string) $r['p256dh'] : null,
             'auth' => isset($r['auth']) ? (string) $r['auth'] : null,
+            'user_id' => isset($r['user_id']) ? (int) $r['user_id'] : null,
+            'subscribed_at' => isset($r['subscribed_at']) ? (string) $r['subscribed_at'] : null,
+            'last_sent_at' => isset($r['last_sent_at']) ? (string) $r['last_sent_at'] : null,
         ], $rows));
     }
 
@@ -250,6 +255,8 @@ final class PushRepository
             'offered' => $offered === null ? null : ($offered === '' ? [] : explode(',', $offered)),
             'details' => (bool) $r['details'],
             'updated_at' => (string) ($r['updated_at'] ?? ''),
+            'created_at' => (string) ($r['created_at'] ?? ''),
+            'last_sent_at' => isset($r['last_sent_at']) && $r['last_sent_at'] !== '' ? (string) $r['last_sent_at'] : null,
         ];
     }
 }

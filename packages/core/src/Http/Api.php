@@ -1118,7 +1118,7 @@ final class Api
             ))),
             new Route('PUT', '/me/push', $L, fn (Request $r) => PushService::formatSubscription($a->push()->update($this->user(), $r->input('endpoint'), null, $r->input('types'), $r->input('details')))),
             new Route('PUT', '/push', $P, fn (Request $r) => PushService::formatSubscription($a->push()->update(null, $r->input('endpoint'), $r->input('auth'), $r->input('types'), null))),
-            new Route('DELETE', '/me/push', $L, fn (Request $r) => ['deleted' => $a->push()->unsubscribe($this->user(), $r->input('endpoint'), null)]),
+            new Route('DELETE', '/me/push', $L, fn (Request $r) => ['deleted' => $a->push()->unsubscribe($this->user(), $r->input('endpoint'), null, $r->input('logout') === true)]),
             new Route('DELETE', '/push', $P, fn (Request $r) => ['deleted' => $a->push()->unsubscribe(null, $r->input('endpoint'), $r->input('auth'))]),
             new Route('POST', '/me/push/test', $L, function (Request $r) use ($a) {
                 $a->push()->sendTest($a->push()->own($this->user(), $r->input('endpoint'), null));
