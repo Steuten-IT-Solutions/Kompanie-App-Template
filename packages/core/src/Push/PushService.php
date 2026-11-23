@@ -325,11 +325,19 @@ final class PushService
                 $repo->clearQueueFor($existing['id']); // Nachrichten für das vorige Konto nicht mehr zustellen
                 $this->noteRemoved([[$existing, self::REASON_OTHER_ACCOUNT]], $user ?? ChangeLogService::SYSTEM);
             }
+            $after = $repo->byEndpoint($endpoint);
+            if ($user !== null && $after !== null) {
+                $this->noteChanged([[$same ? $existing : null, $after]], $user);
+            }
         } else {
             if ($userId === 0) {
                 $this->guestLimit($client);
             }
             $repo->insert($userId, $endpoint, $p256dhText, $authText, $types, $details, $now, $offered);
+            $after = $repo->byEndpoint($endpoint);
+            if ($user !== null && $after !== null) {
+                $this->noteChanged([[null, $after]], $user);
+            }
             if ($userId > 0) {
                 $subs = $repo->forUser($userId);
                 $removed = [];
@@ -376,7 +384,11 @@ final class PushService
             $values['details'] = (bool) $details;
         }
         $this->repository()->update($sub['id'], $values, $this->app->time()->nowUtc());
-        return $this->repository()->byEndpoint($sub['endpoint']) ?? $sub;
+        $after = $this->repository()->byEndpoint($sub['endpoint']) ?? $sub;
+        if ($user !== null) {
+            $this->noteChanged([[$sub, $after]], $user);
+        }
+        return $after;
     }
 
     /** @param bool $logout beim Abmelden vom Konto (nur für den Grund im Änderungsprotokoll) */
@@ -767,15 +779,20 @@ final class PushService
         $accounts = $this->accountsOf($subs);
         $available = [];
         $count = 0;
+        $changed = [];
         foreach ($subs as $sub) {
             $uid = $sub['user_id'];
             if ($uid > 0 && !isset($accounts[$uid])) {
                 continue; // Konto gibt es nicht mehr; das Abo räumt das Löschen des Kontos auf.
             }
             $available[$uid] ??= $this->availableTypes($uid > 0 ? $accounts[$uid] : null);
-            $before = $sub['types'];
-            $count += $this->applyNewTypes($sub, $available[$uid])['types'] !== $before ? 1 : 0;
+            $after = $this->applyNewTypes($sub, $available[$uid]);
+            if ($after['types'] !== $sub['types']) {
+                $count++;
+                $changed[] = [$sub, $after];
+            }
         }
+        $this->noteChanged($changed);
         return $count;
     }
 
@@ -787,7 +804,11 @@ final class PushService
      */
     public function addNewTypesTo(array $sub, ?User $user): array
     {
-        return $this->applyNewTypes($sub, $this->availableTypes($user));
+        $after = $this->applyNewTypes($sub, $this->availableTypes($user));
+        if ($after['types'] !== $sub['types']) {
+            $this->noteChanged([[$sub, $after]]);
+        }
+        return $after;
     }
 
     /**
@@ -934,7 +955,7 @@ final class PushService
                     $reason = self::reason($responses[$row['id']] ?? null, true);
                     if (($row['user_id'] ?? 0) > 0) {
                         $gone[$row['subscription_id']] = [['user_id' => (int) $row['user_id'], 'endpoint' => (string) $row['endpoint'],
-                            'created_at' => (string) $row['subscribed_at'], 'last_sent_at' => $row['last_sent_at']], self::goneReason($responses[$row['id']] ?? null)];
+                            'created_at' => (string) $row['subscribed_at'], 'last_sent_at' => $row['last_sent_at'], 'types' => $row['types']], self::goneReason($responses[$row['id']] ?? null)];
                     }
                 } elseif ($status === 'retry' && $row['attempts'] < self::MAX_ATTEMPTS) {
                     $repo->retry($row['id'], gmdate('Y-m-d H:i:s', $ts + 300 * $row['attempts']));
@@ -1098,7 +1119,7 @@ final class PushService
      * Grund, Push-Dienst, seit wann sie an waren und wann zuletzt etwas ankam. Gäste nicht (keine Person dazu). So lässt
      * sich nachvollziehen, warum jemand plötzlich keine Benachrichtigungen mehr bekommt.
      *
-     * @param list<array{0: array{user_id: int, endpoint: string, created_at: string, last_sent_at: string|null}, 1: string}> $removed Abo und Grund
+     * @param list<array{0: array{user_id: int, endpoint: string, created_at: string, last_sent_at: string|null, types?: list<string>}, 1: string}> $removed Abo und Grund
      * @param User|string $actor wer es ausgelöst hat; ohne Anfrage einer Person ChangeLogService::SYSTEM
      */
     private function noteRemoved(array $removed, User|string $actor = ChangeLogService::SYSTEM): void
@@ -1118,12 +1139,56 @@ final class PushService
             $label = $name === '' ? 'Benachrichtigungen auf einem Gerät entfernt' : 'Benachrichtigungen von ' . $name . ' auf einem Gerät entfernt';
             $changes[] = ['event', null, new Item('Benachrichtigungen', '', mb_substr($label, 0, 191), [
                 'Grund' => $reason,
+                'Arten' => $this->typeLabels($sub['types'] ?? []),
                 'Push-Dienst' => self::serviceLabel($sub['endpoint']),
                 'Eingeschaltet am' => $this->localTime($sub['created_at']),
                 'Zuletzt zugestellt' => $sub['last_sent_at'] === null ? 'noch nie' : $this->localTime($sub['last_sent_at']),
             ], [], [], $sub['user_id']), true];
         }
         $this->app->changeLog()->recordMany($actor, 'app', $changes);
+    }
+
+    /**
+     * Hält Einschalten (ohne Stand davor) und Ändern der Benachrichtigungen eines Kontos auf einem Gerät mit altem und
+     * neuem Wert im Änderungsprotokoll fest: welche Arten an sind und ob Betrag und Grund in der Nachricht stehen.
+     * Gäste nicht. Ohne Unterschied entsteht kein Eintrag (ChangeLogService::recordMany).
+     *
+     * @param list<array{0: Subscription|null, 1: Subscription}> $changes Stand davor (null = neu eingeschaltet) und danach
+     * @param User|string $actor die Person selbst; neu angebotene Arten, die die App von selbst einschaltet: SYSTEM
+     */
+    private function noteChanged(array $changes, User|string $actor = ChangeLogService::SYSTEM): void
+    {
+        $changes = array_values(array_filter($changes, static fn (array $x): bool => $x[1]['user_id'] > 0));
+        if ($changes === []) {
+            return;
+        }
+        $ids = array_values(array_unique(array_map(static fn (array $x): int => $x[1]['user_id'], $changes)));
+        try {
+            $users = $actor instanceof User && $ids === [$actor->id] ? [$actor->id => $actor] : $this->app->users->findMany($ids);
+        } catch (\Throwable) {
+            $users = [];
+        }
+        $rows = [];
+        foreach ($changes as [$before, $after]) {
+            $name = isset($users[$after['user_id']]) ? $users[$after['user_id']]->name : '';
+            $label = mb_substr(($name === '' ? '' : $name . ', ') . self::serviceLabel($after['endpoint']), 0, 191);
+            $item = fn (array $sub): Item => new Item('Benachrichtigungen', (string) $sub['id'], $label, [
+                'Arten' => $this->typeLabels($sub['types']),
+                'Betrag und Grund zeigen' => $sub['details'],
+            ], [], [], $sub['user_id']);
+            $rows[] = [$before === null ? 'create' : 'update', $before === null ? null : $item($before), $item($after), false];
+        }
+        $this->app->changeLog()->recordMany($actor, 'app', $rows);
+    }
+
+    /**
+     * @param list<string> $types
+     * @return list<string> Bezeichnungen der Arten in der üblichen Reihenfolge (unbekannte mit ihrem Schlüssel)
+     */
+    private function typeLabels(array $types): array
+    {
+        $labels = $this->types();
+        return array_map(static fn (string $t): string => $labels[$t]['label'] ?? $t, $this->sorted($types));
     }
 
     /** UTC-Zeit aus der Datenbank (JJJJ-MM-TT HH:MM:SS) als Ortszeit für das Protokoll; leer bleibt leer. */

@@ -175,7 +175,11 @@ final class PushServiceTest extends TestCase
         $this->assertSame(0, $p->addNewTypes(), 'ohne Änderung nichts zu tun');
 
         $this->users->setRole($id, Roles::MEMBER);
+        $app->db->execute('DELETE FROM {change_log}');
         $this->assertSame(1, $p->addNewTypes());
+        $row = $app->db->selectOne('SELECT actor_id, action, changes FROM {change_log}');
+        $this->assertSame([0, 'update'], [(int) ($row['actor_id'] ?? -1), (string) ($row['action'] ?? '')], 'neue Arten von selbst an: System, alt → neu');
+        $this->assertStringContainsString('"f":"Arten"', (string) ($row['changes'] ?? ''));
         $sub = $p->repository()->byEndpoint($d['endpoint']);
         $this->assertNotNull($sub);
         $this->assertSame(['board', 'board_public', 'polls', 'birthdays', 'penalties', 'points', 'ranks', 'titles', 'events', 'reminder'], $sub['types'], 'neue Arten der Rolle an, News bleibt aus');
@@ -249,7 +253,7 @@ final class PushServiceTest extends TestCase
         $max = $this->users->find($this->users->add('max', Roles::MEMBER));
         $entries = function () use ($app): array {
             $out = [];
-            foreach ($app->db->select('SELECT * FROM {change_log} ORDER BY id ASC') as $r) {
+            foreach ($app->db->select("SELECT * FROM {change_log} WHERE action = 'event' ORDER BY id ASC") as $r) {
                 $fields = [];
                 foreach ((array) json_decode((string) $r['changes'], true) as $c) {
                     $fields[(string) $c['f']] = $c['n'] ?? null;
@@ -263,7 +267,7 @@ final class PushServiceTest extends TestCase
         // Der Push-Dienst kennt das Gerät nicht mehr (410): System, mit Push-Dienst und Zeitpunkten.
         $a = self::device('a');
         $p->subscribe($anna, $a['endpoint'], $a['keys'], ['points'], null, '');
-        $this->assertSame([], $entries(), 'Einschalten kommt nicht ins Protokoll');
+        $this->assertSame([], $entries(), 'Einschalten ist kein Entfernen');
         $app->pushTriggers()->pointsAdded([['id' => 1, 'user_id' => $anna->id, 'points' => 1, 'reason' => 'x']]);
         $this->assertSame(1, $p->processQueue());
         $this->clock->at = $this->clock->now()->modify('+1 hour');
@@ -280,6 +284,7 @@ final class PushServiceTest extends TestCase
         $this->assertSame('Google (Chrome, Edge oder Android)', $log[0]['fields']['Push-Dienst']);
         $this->assertSame('19.10.2026 10:00', $log[0]['fields']['Eingeschaltet am'], 'Ortszeit der Kompanie');
         $this->assertSame('19.10.2026 10:00', $log[0]['fields']['Zuletzt zugestellt']);
+        $this->assertSame($p->types()['points']['label'], $log[0]['fields']['Arten'], 'was an war');
 
         // Selbst ausgeschaltet und beim Abmelden vom Konto: die Person selbst.
         $b = self::device('b');
@@ -319,6 +324,49 @@ final class PushServiceTest extends TestCase
         $g = self::device('guest');
         $p->subscribe(null, $g['endpoint'], $g['keys'], null, null, '');
         $this->assertTrue($p->unsubscribe(null, $g['endpoint'], $g['keys']['auth']));
+        $this->assertSame([], $entries());
+    }
+
+    /** Einschalten und Ändern der Benachrichtigungen eines Kontos mit altem und neuem Wert (Gäste nicht). */
+    public function testTurningOnAndChangingIsLoggedWithOldAndNewValues(): void
+    {
+        $app = $this->app();
+        $p = $app->push();
+        $labels = $p->types();
+        $anna = $this->users->find($this->users->add('anna', Roles::MEMBER));
+        $entries = function () use ($app): array {
+            $out = [];
+            foreach ($app->db->select("SELECT * FROM {change_log} WHERE action <> 'event' ORDER BY id ASC") as $r) {
+                $fields = [];
+                foreach ((array) json_decode((string) $r['changes'], true) as $c) {
+                    $fields[(string) $c['f']] = [$c['o'] ?? null, $c['n'] ?? null];
+                }
+                $out[] = ['actor' => (int) $r['actor_id'], 'subject' => (int) $r['subject_user_id'], 'type' => (string) $r['type'], 'label' => (string) $r['label'], 'action' => (string) $r['action'], 'fields' => $fields];
+            }
+            $app->db->execute('DELETE FROM {change_log}');
+            return $out;
+        };
+        $a = self::device('a');
+        $p->subscribe($anna, $a['endpoint'], $a['keys'], ['penalties', 'points'], false, '');
+        $log = $entries();
+        $this->assertCount(1, $log);
+        $this->assertSame(['actor' => $anna->id, 'subject' => $anna->id, 'type' => 'Benachrichtigungen', 'label' => $anna->name . ', Google (Chrome, Edge oder Android)', 'action' => 'create'], array_diff_key($log[0], ['fields' => 1]));
+        $this->assertSame([null, $labels['penalties']['label'] . ', ' . $labels['points']['label']], $log[0]['fields']['Arten']);
+
+        // Arten und Betrag/Grund ändern: alt → neu; dasselbe noch einmal: kein Eintrag.
+        $p->update($anna, $a['endpoint'], null, ['points'], true);
+        $p->update($anna, $a['endpoint'], null, ['points'], true);
+        $p->subscribe($anna, $a['endpoint'], $a['keys'], null, null, '');
+        $log = $entries();
+        $this->assertCount(1, $log);
+        $this->assertSame('update', $log[0]['action']);
+        $this->assertSame([$labels['penalties']['label'] . ', ' . $labels['points']['label'], $labels['points']['label']], $log[0]['fields']['Arten']);
+        $this->assertSame(['nein', 'ja'], $log[0]['fields']['Betrag und Grund zeigen']);
+
+        // Gäste: kein Eintrag.
+        $g = self::device('g');
+        $p->subscribe(null, $g['endpoint'], $g['keys'], null, null, '');
+        $p->update(null, $g['endpoint'], $g['keys']['auth'], ['events'], null);
         $this->assertSame([], $entries());
     }
 

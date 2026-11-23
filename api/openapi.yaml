@@ -1374,7 +1374,8 @@ paths:
       tags: [Benachrichtigungen]
       summary: Gerät abmelden (Konto)
       description: |
-        Das Entfernen kommt mit Grund ins Änderungsprotokoll (Benachrichtigungen auf einem Gerät entfernt), ebenso
+        Einschalten und Ändern (POST/PUT /me/push) kommen mit altem und neuem Wert ins Änderungsprotokoll, das Entfernen
+        mit Grund (Benachrichtigungen auf einem Gerät entfernt), ebenso
         wenn der Server ein Abo selbst entfernt (Push-Dienst kennt das Gerät nicht mehr, App ohne Anmeldung geöffnet,
         anderes Konto auf dem Gerät, mehr als 10 Geräte).
       requestBody:

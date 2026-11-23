@@ -33,7 +33,8 @@ final class Subjects
     public const NOT_RECORDED = [
         // Anmelden, Abmelden; Anfragen und Meldungen ohne Konto oder an die Admins (die Bearbeitung wird erfasst)
         'POST /auth/login', 'POST /auth/logout', 'POST /registration', 'POST /registration/confirm', 'POST /registration/status', 'POST /reports',
-        // Benachrichtigungen auf einem Gerät (zählen auch nicht als Nutzung)
+        // Benachrichtigungen auf einem Gerät: Einschalten, Ändern und Entfernen hält PushService selbst fest (mit altem und neuem
+        // Wert, ohne Gäste); zählen auch nicht als Nutzung
         'POST /me/push/status', 'POST /push/status', 'POST /me/push', 'POST /push', 'PUT /me/push', 'PUT /push', 'DELETE /me/push', 'DELETE /push',
         'POST /me/push/test', 'POST /push/test',
         // Persönliche Anordnung der Kacheln: eine Vorliebe der Person, keine Daten des Vereins

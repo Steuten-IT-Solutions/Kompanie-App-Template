@@ -45,7 +45,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   abgelaufen), anderes Konto auf dem Gerät, mehr als 10 Geräte oder der Push-Dienst kennt das Gerät nicht mehr (z. B.
   nach dem Löschen der Browserdaten). Dazu stehen dort der Push-Dienst (z. B. Google für Chrome und Android), seit wann
   die Benachrichtigungen an waren und wann zuletzt eine ankam. So lässt sich klären, warum jemand plötzlich keine
-  Benachrichtigungen mehr bekommt. Das Einschalten und Ändern der Arten wird weiterhin nicht aufgezeichnet.
+  Benachrichtigungen mehr bekommt. Auch das Einschalten und Ändern auf einem Gerät steht dort, mit altem und neuem
+  Wert: welche Arten an sind und ob Betrag und Grund in der Nachricht stehen. Neue Arten, die die App von selbst
+  einschaltet, stehen mit „System (automatisch)“ da. Benachrichtigungen von Gästen ohne Konto werden nicht aufgezeichnet.
 
 ## [0.13.0] – 2026-11-22
 

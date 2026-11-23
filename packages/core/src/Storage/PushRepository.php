@@ -12,7 +12,7 @@ use KompanieApp\Core\Storage\Sql\Connection;
  * @phpstan-type Subscription array{id: int, user_id: int, endpoint: string, p256dh: string, auth: string, types: list<string>, offered: list<string>|null, details: bool, updated_at: string,
  *     created_at: string, last_sent_at: string|null}
  * @phpstan-type QueueItem array{id: int, subscription_id: int, payload: string, urgency: string, ttl: int, attempts: int,
- *     created_at: string, endpoint: ?string, p256dh: ?string, auth: ?string, user_id: ?int, subscribed_at: ?string, last_sent_at: ?string}
+ *     created_at: string, endpoint: ?string, p256dh: ?string, auth: ?string, user_id: ?int, subscribed_at: ?string, last_sent_at: ?string, types: list<string>}
  */
 final class PushRepository
 {
@@ -196,7 +196,7 @@ final class PushRepository
         }
         $rows = $this->db->select(
             'SELECT q.id, q.subscription_id, q.payload, q.urgency, q.ttl, q.attempts, q.created_at, s.endpoint, s.p256dh, s.auth,
-                s.user_id, s.created_at AS subscribed_at, s.last_sent_at
+                s.user_id, s.created_at AS subscribed_at, s.last_sent_at, s.types
              FROM {push_queue} q LEFT JOIN {push_subscriptions} s ON s.id = q.subscription_id
              WHERE q.id IN (' . implode(', ', array_fill(0, count($won), '?')) . ') ORDER BY q.id ASC',
             $won,
@@ -215,6 +215,7 @@ final class PushRepository
             'user_id' => isset($r['user_id']) ? (int) $r['user_id'] : null,
             'subscribed_at' => isset($r['subscribed_at']) ? (string) $r['subscribed_at'] : null,
             'last_sent_at' => isset($r['last_sent_at']) ? (string) $r['last_sent_at'] : null,
+            'types' => isset($r['types']) && $r['types'] !== '' ? explode(',', (string) $r['types']) : [],
         ], $rows));
     }
 
