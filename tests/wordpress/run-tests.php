@@ -1148,7 +1148,7 @@ $noToken = rest_ensure_response(rest_do_request((static function (): WP_REST_Req
 $c->ok($noToken->get_status() === 401 && str_contains((string) ($noToken->get_headers()['WWW-Authenticate'] ?? ''), 'resource_metadata="' . rest_url('kompanie-app/v1/oauth/protected-resource') . '"'), 'Ohne Token: WWW-Authenticate verweist auf die Metadaten');
 $form = new WP_REST_Request('POST', '/kompanie-app/v1/oauth/token');
 $form->set_header('Content-Type', 'application/x-www-form-urlencoded');
-$form->set_body_params(['grant_type' => 'refresh_token', 'refresh_token' => $grant['refresh_token'], 'client_id' => '']);
+$form->set_body_params(['grant_type' => 'refresh_token', 'refresh_token' => $grant['refresh_token'], 'client_id' => 'https://client.example/meta.json']);
 $renewed = rest_ensure_response(rest_do_request($form));
 $c->ok($renewed->get_status() === 200 && str_starts_with((string) ($renewed->get_data()['access_token'] ?? ''), 'kat_'), 'Token-Anfrage als Formular ohne Anmeldung bei WordPress');
 $app->accessTokens()->revokeAllFor($member);
