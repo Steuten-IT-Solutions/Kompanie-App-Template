@@ -35,6 +35,7 @@ Tippe unten auf **{bereich.news}**. Oben steht der Knopf **Neuer Beitrag**. Zum 
 - **Album**: Wähle bei **Album** eines aus der {bereich.gallery} und **Wie viele Bilder** (1 bis 12). Jeder sieht nur die Bilder, die er auch in der {bereich.gallery} sehen darf.
 - **Dokument**: Wähle bei **Dokument** eine Datei aus den {bereich.documents}. Der Block zeigt sie mit **Öffnen** (PDF und Bilder) und **Herunterladen**, aber nur für alle, die sie in den {bereich.documents} sehen dürfen.
 - **{bereich.sponsors}**: zeigt alle {bereich.sponsors} mit Logo und Link, optional mit einer **Überschrift**.
+- **Bild**: Tippe auf **Bild wählen** und wähle ein eigenes Bild (JPG, PNG oder WebP), das nicht in der {bereich.gallery} liegen muss. Optional kommen eine **Bildunterschrift** und eine **Beschreibung für Screenreader** dazu; bei **Größe** wählst du **Volle Breite**, **Mittel** oder **Klein**.
 - **Karte zur Anfahrt**: Trage einen **Ort oder eine Adresse** ein. Der Block zeigt den Ort mit dem Knopf **Karte**, der ihn in der Karten-App des Geräts öffnet, wie beim Ort eines Termins.
 
 ### Einen Countdown einfügen

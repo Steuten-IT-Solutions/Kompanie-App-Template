@@ -382,7 +382,19 @@ export type Block =
   | AlbumBlock
   | DocumentBlock
   | SponsorsBlock
-  | MapBlock;
+  | MapBlock
+  | ImageBlock;
+/** Eigenes Bild (nicht aus der Galerie), hochgeladen über POST /rich-images; url null nur für die Pflege, wenn es fehlt */
+export interface ImageBlock extends BlockBase {
+  type: 'image';
+  image: string;
+  alt: string;
+  caption: string;
+  size: 'small' | 'medium' | 'full';
+  url: string | null;
+  width: number;
+  height: number;
+}
 /** Karte zur Anfahrt: Ort als Text, die App öffnet ihn in der Karten-App des Geräts */
 export interface MapBlock extends BlockBase {
   type: 'map';
@@ -435,7 +447,8 @@ export type BlockInput =
   | (Omit<AlbumBlock, 'id' | 'album'> & { id?: string })
   | (Omit<DocumentBlock, 'id' | 'document'> & { id?: string })
   | (Omit<SponsorsBlock, 'id' | 'sponsors'> & { id?: string })
-  | (Omit<MapBlock, 'id'> & { id?: string });
+  | (Omit<MapBlock, 'id'> & { id?: string })
+  | (Omit<ImageBlock, 'id' | 'url' | 'width' | 'height'> & { id?: string });
 
 /** Einstellungen → Navigation (Issue #277): gespeicherte Navigation und was der Server erlaubt. */
 export interface NavigationAdmin {

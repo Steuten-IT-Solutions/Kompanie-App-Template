@@ -33,6 +33,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Änderungen stehen im Änderungsprotokoll als „Name über Claude“. Die eigenen Zugänge stehen unter
   [Meins → Konto](app:meins/konto). Die Anmeldung aus dem KI-Assistenten braucht schöne Adressen (WordPress: Permalinks;
   eigenständige Version: Adressen ohne `index.php?r=`).
+- **Neuer Block: Bild** für [eigene Seiten](app:verwaltung/seiten), News in der App und das Schwarze Brett: ein eigenes
+  Bild hochladen, das nicht in der Galerie liegen muss, mit Bildunterschrift, Beschreibung für Screenreader und Größe
+  (volle Breite, mittel, klein). Es sieht, wer den Block sehen darf; Bildunterschrift und Beschreibung lassen sich
+  übersetzen. Entfernt man den Block, wird das Bild gelöscht.
 
 ## [0.13.0] – 2026-11-22
 

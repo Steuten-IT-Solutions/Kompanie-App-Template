@@ -50,6 +50,13 @@ const BLOCK_ICONS: Record<BlockKind, ReactNode> = {
       <path d="M5.5 6.5l1 1 1.5-2M12 6.5h8M12 17.5h8" />
     </>
   ),
+  image: (
+    <>
+      <path d="M14 4.5H4.5A1.5 1.5 0 0 0 3 6v12a1.5 1.5 0 0 0 1.5 1.5h15A1.5 1.5 0 0 0 21 18v-7" />
+      <circle cx="8.5" cy="10" r="1.5" />
+      <path d="M3 17l5-4.5 4 3.5 3-2.5 6 5M19 2.5v6M16 5.5h6" />
+    </>
+  ),
   album: (
     <>
       <rect x="3" y="4.5" width="18" height="15" rx="1.5" />
