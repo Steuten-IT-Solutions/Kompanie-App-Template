@@ -63,6 +63,12 @@ final class BoardMailTest extends TestCase
         return $this->app->api()->handle(new Request($method, $path, [], $body));
     }
 
+    /** Nur die Angaben zu den Mails vom Brett (ohne die Benachrichtigungen per Mail) */
+    private function boardPref(Response $res): array
+    {
+        return array_intersect_key($res->data, ['board' => 1, 'available' => 1, 'email' => 1]);
+    }
+
     private function as(?int $user): self
     {
         $this->users->current = $user;
@@ -123,12 +129,12 @@ final class BoardMailTest extends TestCase
     {
         $this->configure();
         $this->as($this->optOut);
-        $this->assertSame(['board' => true, 'available' => true, 'email' => true], $this->call('PUT', '/me/mail', ['board' => true])->data);
-        $this->assertSame(['board' => false, 'available' => true, 'email' => true], $this->call('PUT', '/me/mail', ['board' => false])->data);
-        $this->assertSame(['board' => true, 'available' => true, 'email' => true], $this->as($this->m)->call('GET', '/me/mail')->data, 'Standard an');
+        $this->assertSame(['board' => true, 'available' => true, 'email' => true], $this->boardPref($this->call('PUT', '/me/mail', ['board' => true])));
+        $this->assertSame(['board' => false, 'available' => true, 'email' => true], $this->boardPref($this->call('PUT', '/me/mail', ['board' => false])));
+        $this->assertSame(['board' => true, 'available' => true, 'email' => true], $this->boardPref($this->as($this->m)->call('GET', '/me/mail')), 'Standard an');
         $this->assertSame(400, $this->call('PUT', '/me/mail', ['board' => 'nein'])->status);
         $this->assertSame(403, $this->as($this->guest)->call('PUT', '/me/mail', ['board' => true])->status, 'Gäste bekommen keine Mails vom Brett');
-        $this->assertSame(['board' => true, 'available' => true, 'email' => false], $this->as($this->noMail)->call('GET', '/me/mail')->data, 'ohne Adresse: die App weist darauf hin');
+        $this->assertSame(['board' => true, 'available' => true, 'email' => false], $this->boardPref($this->as($this->noMail)->call('GET', '/me/mail')), 'ohne Adresse: die App weist darauf hin');
 
         $this->as($this->admin);
         $this->assertSame(3, $this->call('GET', '/board/mail')->data['recipients'], 'Verfasser, Mitglied und Anwärter; ohne Gäste, Konten ohne Adresse und Abgemeldete');

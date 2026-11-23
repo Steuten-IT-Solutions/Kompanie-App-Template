@@ -35,6 +35,10 @@ use KompanieApp\Core\Storage\PushRepository;
  *   bekam (offered); kommt später eine Art dazu (neue Rolle, Bereich eingeschaltet), schaltet addNewTypes sie ein.
  *   Arten, die jemand selbst abgeschaltet hat, bleiben aus.
  *
+ * Zusätzlich per E-Mail (NotificationMailService): notifyUsers, notifyAll und notifyAudience reihen für alle Konten, die
+ * die Art per Mail bekommen, auch eine Mail ein, unabhängig von Geräten und davon, ob der Server Push kann; das
+ * Schwarze Brett nicht (dafür BoardMailService).
+ *
  * Die Nachricht enthält Titel, Text, Ziel in der App (route) und tag; das Symbol setzt der Service Worker. Optional
  * image: vollständige Adresse eines Bildes (Abzeichen bei Beförderungen, Issue #17), das der Service Worker als Bild
  * und Symbol der Benachrichtigung zeigt.
@@ -538,6 +542,9 @@ final class PushService
      */
     public function notifyUsers(string $type, array $messages): int
     {
+        if ($messages !== [] && $this->typeActive($type)) {
+            $this->app->notificationMails()->toUsers($type, $messages);
+        }
         if ($messages === [] || !$this->typeEnabled($type)) {
             return 0;
         }
@@ -575,6 +582,10 @@ final class PushService
      */
     public function notifyAll(string $type, array $message, ?bool $calendar = null, ?\Closure $include = null): int
     {
+        if ($this->typeActive($type)) {
+            $this->app->notificationMails()->toAudience($type, $message, fn (User $u): bool => ($include === null || $include($u->id))
+                && ($calendar === null || $this->usesCalendar($u) === $calendar));
+        }
         if (!$this->typeEnabled($type)) {
             return 0;
         }
@@ -656,6 +667,10 @@ final class PushService
      */
     public function notifyAudience(string $type, array $message, \Closure $include, string $urgency = self::URGENCY, int $ttl = self::TTL, int $maxTtl = self::TTL): int
     {
+        // Mails nur, wenn die Nachricht noch gilt; der Empfängerkreis steckt in den angebotenen Arten des Kontos.
+        if ($ttl > 0 && $this->typeActive($type)) {
+            $this->app->notificationMails()->toAudience($type, $message, static fn (User $u): bool => $include($u->id));
+        }
         if (!$this->typeEnabled($type) || $ttl <= 0) {
             return 0;
         }
@@ -802,8 +817,14 @@ final class PushService
 
     private function typeEnabled(string $type): bool
     {
+        return $this->supported() && $this->typeActive($type);
+    }
+
+    /** Art bekannt und ihr Bereich an (auch ohne Push auf diesem Server: für die Benachrichtigungen per Mail). */
+    private function typeActive(string $type): bool
+    {
         $t = $this->types()[$type] ?? null;
-        return $t !== null && $this->supported() && $this->active($t);
+        return $t !== null && $this->active($t);
     }
 
     /** @param list<array{subscription_id: int, payload: string}> $items */

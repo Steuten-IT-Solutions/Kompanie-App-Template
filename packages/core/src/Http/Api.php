@@ -756,7 +756,11 @@ final class Api
         return null;
     }
 
-    /** @return array{board: bool, available: bool, email: bool} Mails vom Brett: gewünscht, möglich, Adresse hinterlegt */
+    /**
+     * Mails vom Brett (gewünscht, möglich, Adresse hinterlegt) und Benachrichtigungen per Mail (Arten, gewählte).
+     *
+     * @return array{board: bool, available: bool, email: bool, notifications: array{available: bool, types: list<array{key: string, label: string}>, selected: list<string>}}
+     */
     private function mailSettings(): array
     {
         $user = $this->user();
@@ -765,6 +769,7 @@ final class Api
             'board' => $recipient && $this->app->boardMail()->wants($user->id),
             'available' => $recipient && $this->app->boardMail()->available(),
             'email' => trim((string) ($this->app->users->profile($user->id)['email'] ?? '')) !== '',
+            'notifications' => $this->app->notificationMails()->settings($user),
         ];
     }
 
@@ -1485,6 +1490,11 @@ final class Api
                     throw ApiError::forbidden(I18n::t('Mails vom Brett bekommen nur Mitglieder und Anwärter.'));
                 }
                 $a->boardMail()->setWants($this->user()->id, $r->input('board'));
+                return $this->mailSettings();
+            }),
+            // Benachrichtigungen per E-Mail: Arten wie bei Push, je Konto; Standard alle an
+            new Route('PUT', '/me/mail/notifications', $L, function (Request $r) use ($a) {
+                $a->notificationMails()->choose($this->user(), $r->input('types'));
                 return $this->mailSettings();
             }),
 

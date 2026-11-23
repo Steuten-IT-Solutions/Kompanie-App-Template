@@ -54,6 +54,8 @@ final class UserData
         'user_signatures' => 'user_id',
         'user_settings' => 'user_id',
         'board_mails' => 'user_id',
+        // Benachrichtigungen per E-Mail: Warteschlange und Protokoll (mit Adresse)
+        'notification_mails' => 'user_id',
         // E-Mails aus der Verwaltung: Protokoll der Mails an sie (mit Adresse); die Mails selbst bleiben.
         'mailing_recipients' => 'user_id',
         // Nutzungsauswertung (Issue #175): Einträge je Person und „zuletzt aktiv“ (das Pseudonym löscht ActivityService).
