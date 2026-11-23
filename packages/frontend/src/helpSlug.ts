@@ -88,6 +88,8 @@ export function helpSlug(path: string[], ctx: HelpContext): string | null {
       return 'anmelden';
     case 'registrieren':
       return 'zugang-beantragen';
+    case 'ki-zugang':
+      return 'ki-assistent-verbinden';
     case 'benachrichtigungen':
       return 'benachrichtigungen';
     case 'installieren':
@@ -103,6 +105,7 @@ export function helpSlug(path: string[], ctx: HelpContext): string | null {
           sprachen: 'admin-sprachen',
           rollen: 'admin-rollen-und-mitglieder',
           zugang: 'admin-zugang',
+          'ki-zugang': 'admin-ki-assistenten',
           benachrichtigungen: 'admin-benachrichtigungen',
           geburtstage: 'admin-geburtstage',
           email: 'admin-email',

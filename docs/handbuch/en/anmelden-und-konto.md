@@ -78,5 +78,6 @@ The new password must be at least 8 characters long, differ from the old one and
 
 ## See also
 - [Log in](seite:anmelden)
+- [Connect an AI assistant](seite:ki-assistent-verbinden)
 - [Notifications](seite:benachrichtigungen)
 - [Get the app on your phone](seite:app-installieren)

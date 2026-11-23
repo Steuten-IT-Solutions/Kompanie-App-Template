@@ -21,6 +21,7 @@ import { previewRole } from '../preview';
 import { saveTheme, THEME_LABELS, useTheme, type ThemeChoice } from '../theme';
 import { sources } from '../viewData';
 import { confirmAsk } from '../ask';
+import { AiTokenList, McpUrl } from '../aiAccess';
 
 const MIN_LENGTH = 8;
 
@@ -277,6 +278,8 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
 
       <LanguageCard />
 
+      {!previewRole() && <AiAccessCard onToast={onToast} />}
+
       {!isStandalone() && (
         <div className="card account-card">
           <h3>{t('App aufs Handy holen')}</h3>
@@ -326,6 +329,34 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
       </button>
       <LegalLinks className="account-legal" />
     </div>
+  );
+}
+
+/**
+ * KI-Assistenten (Plan „MCP-Server“): Adresse zum Eintragen und die eigenen Zugänge zum Entfernen; nur, wenn der Zugang in
+ * der App an ist oder es noch Zugänge gibt.
+ */
+function AiAccessCard({ onToast }: { onToast: (msg: string) => void }) {
+  const { data, setData } = useAsync(() => api.myAiAccess(), [], 'me/ai-access');
+  if (!data || (!data.enabled && data.tokens.length === 0)) return null;
+  return (
+    <section className="card account-card ai-access-card stack">
+      <h3>{t('KI-Assistenten')}</h3>
+      <p className="muted small">
+        {data.enabled
+          ? t('Verbinde z. B. Claude mit der App. Der KI-Assistent handelt dann mit deinen Rechten.')
+          : t('Der Zugang für KI-Assistenten ist in dieser App ausgeschaltet.')}
+      </p>
+      {data.enabled && <McpUrl access={data} onToast={onToast} />}
+      <AiTokenList
+        tokens={data.tokens}
+        onToast={onToast}
+        onRevoke={async (id) => {
+          await api.revokeMyAiAccess(id);
+          setData({ ...data, tokens: data.tokens.filter((x) => x.id !== id) });
+        }}
+      />
+    </section>
   );
 }
 

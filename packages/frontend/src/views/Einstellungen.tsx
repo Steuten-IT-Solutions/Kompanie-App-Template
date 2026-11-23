@@ -41,6 +41,7 @@ import { navigate } from '../router';
 import { formatBytes, formatUntil } from '../format';
 import { menuSources, prefetchOnTap, sources, usePrefetchMenu } from '../viewData';
 import { confirmAsk } from '../ask';
+import { AiTokenList, McpUrl } from '../aiAccess';
 import { IconButton } from '../icons';
 import { TileArrange, TileGrid } from '../tiles';
 
@@ -91,6 +92,7 @@ const PAGES = [
   { id: 'rechtliches', group: 'App', title: t('Impressum und Datenschutz') },
   { id: 'sprachen', group: 'App', title: t('Sprachen') },
   { id: 'rollen', group: 'Mitglieder und Zugang', title: t('Rollen') },
+  { id: 'ki-zugang', group: 'Mitglieder und Zugang', title: t('KI-Assistenten') },
   { id: 'benachrichtigungen', group: 'Benachrichtigungen', title: t('Benachrichtigungen') },
   { id: 'email', group: 'Verbindungen', title: t('E-Mail') },
   { id: 'google', group: 'Verbindungen', title: t('Google-Zugang') },
@@ -138,6 +140,7 @@ export default function Einstellungen({ path, onToast }: { path: string[]; onToa
           <RegistrationSection onToast={onToast} />
         </>
       )}
+      {page.id === 'ki-zugang' && <AiAccessSection onToast={onToast} />}
       {page.id === 'benachrichtigungen' && <PushSettings onToast={onToast} />}
       {page.id === 'email' && <MailSection onToast={onToast} />}
       {page.id === 'nutzung' && <Nutzung onToast={onToast} />}
@@ -360,6 +363,68 @@ const UPCOMING_DAYS_MAX = 30;
  * Zugang beantragen (Issue #314): ein- und ausschalten, Rolle, die beim Freigeben vorgeschlagen ist, Link zum Weitergeben.
  * Ohne Mailversand geht es auch; dann bestätigt niemand seine Adresse, und das Ergebnis sieht die Person beim Anmelden.
  */
+/**
+ * Zugang für KI-Assistenten (Plan „MCP-Server“): Schalter (Vorgabe aus), Adresse zum Eintragen und alle Zugänge zum
+ * Entfernen. Aus heißt: Kein Zugang gilt, und es wird keiner ausgestellt; die Zugänge bleiben.
+ */
+function AiAccessSection({ onToast }: { onToast: (msg: string) => void }) {
+  const { data, error, loading, reload, setData } = useAsync(() => api.adminAiAccess(), [], 'admin/ai-access');
+  const [busy, setBusy] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  if (loading && !data) return <Loading shape="form" />;
+  if (error) return <ErrorBox message={error} onRetry={reload} />;
+  const s = data!;
+
+  async function toggle(enabled: boolean) {
+    setBusy(true);
+    setSaveError(null);
+    try {
+      await api.setAiAccess(enabled);
+      // Neu laden: Ob die Anmeldung per OAuth geht, hängt am Schalter
+      setData(await api.adminAiAccess());
+      onToast(enabled ? t('Zugang für KI-Assistenten: an') : t('Zugang für KI-Assistenten: aus'));
+    } catch (err) {
+      setSaveError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <section className="card settings-section stack" id="einstellungen-ki-zugang">
+        <h3>{t('KI-Assistenten')}</h3>
+        <label className="toggle">
+          <input type="checkbox" checked={s.enabled} disabled={busy} onChange={(e) => void toggle(e.target.checked)} />
+          <span>{t('Angemeldete können einen KI-Assistenten (z. B. Claude) mit der App verbinden')}</span>
+        </label>
+        <p className="small muted">
+          {t(
+            'Der KI-Assistent handelt mit den Rechten der Person, die ihn verbindet, und darf nur lesen oder auch ändern, wie sie es beim Verbinden wählt. Änderungen stehen im Änderungsprotokoll mit dem Namen des Programms.',
+          )}
+        </p>
+        {s.enabled && <McpUrl access={s} onToast={onToast} />}
+        {saveError && (
+          <p className="form-error" role="alert">
+            {saveError}
+          </p>
+        )}
+      </section>
+      <section className="settings-section stack">
+        <h3>{t('Verbundene KI-Assistenten')}</h3>
+        <AiTokenList
+          tokens={s.tokens}
+          onToast={onToast}
+          onRevoke={async (id) => {
+            await api.revokeAiAccess(id);
+            setData({ ...s, tokens: s.tokens.filter((x) => x.id !== id) });
+          }}
+        />
+      </section>
+    </>
+  );
+}
+
 function RegistrationSection({ onToast }: { onToast: (msg: string) => void }) {
   const { data, error, loading, reload, setData } = useAsync(() => api.registrationSettings(), [], 'admin/registration');
   const [busy, setBusy] = useState(false);

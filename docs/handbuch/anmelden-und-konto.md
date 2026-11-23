@@ -80,5 +80,6 @@ Das neue Passwort muss mindestens 8 Zeichen lang sein, sich vom bisherigen unter
 
 ## Siehe auch
 - [Anmelden](seite:anmelden)
+- [Einen KI-Assistenten verbinden](seite:ki-assistent-verbinden)
 - [Benachrichtigungen](seite:benachrichtigungen)
 - [Die App aufs Handy holen](seite:app-installieren)

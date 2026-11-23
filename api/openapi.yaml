@@ -9576,6 +9576,8 @@ components:
       description: Zugang für KI-Assistenten (Plan „MCP-Server“); Zeiten als Unix-Zeit (Sekunden, UTC).
       properties:
         enabled: { type: boolean, description: 'Zugang in der App eingeschaltet (Vorgabe aus)' }
+        mcp_url: { type: string, description: Adresse des MCP-Endpunkts zum Eintragen im KI-Assistenten }
+        oauth: { type: boolean, description: 'Anmeldung per OAuth möglich (eingeschaltet und API-Adresse ohne `?`)' }
         tokens:
           type: array
           items:

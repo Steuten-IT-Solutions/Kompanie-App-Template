@@ -2925,6 +2925,38 @@ async function requestRepeatable<T>(method: string, path: string, body?: unknown
   return (await requestFull<T>(method, path, body, undefined, true, false, background > 0, WRITE_TIMEOUT_MS)).data;
 }
 
+/** Ein Zugang für KI-Assistenten (Plan „MCP-Server“); Zeiten als Unix-Zeit (Sekunden). */
+export interface AiToken {
+  id: number;
+  client: string;
+  scope: 'read' | 'write';
+  created_at: number;
+  last_used_at: number | null;
+  valid_until: number;
+  expired: boolean;
+  /** Nur in der Liste aller Zugänge (Einstellungen) */
+  user_id?: number;
+  user_name?: string;
+}
+
+export interface AiAccess {
+  enabled: boolean;
+  /** Adresse des MCP-Endpunkts zum Eintragen im KI-Assistenten (ältere Server: fehlt) */
+  mcp_url?: string;
+  /** Anmeldung per OAuth möglich (ältere Server: fehlt) */
+  oauth?: boolean;
+  tokens: AiToken[];
+}
+
+/** Anfrage eines KI-Assistenten, die die angemeldete Person annimmt oder ablehnt (#/ki-zugang/<Schlüssel>). */
+export interface OAuthRequest {
+  client: string;
+  client_host: string;
+  redirect_host: string;
+  scope: 'read' | 'write';
+  installation: string;
+}
+
 export const api = {
   me: () => request<Me>('GET', '/me'),
   myPoints: () => request<PointEntry[]>('GET', '/me/points'),
@@ -3565,6 +3597,17 @@ export const api = {
   // Fehlermeldungen an die Betreuer der App (Issue #64), auch ohne Anmeldung
   reportForm: () => request<ReportForm>('GET', '/reports/form'),
   // Zugang beantragen (Issue #314)
+  /** Eigene Zugänge für KI-Assistenten */
+  myAiAccess: () => request<AiAccess>('GET', '/me/ai-access'),
+  revokeMyAiAccess: (id: number) => request<{ deleted: boolean }>('DELETE', `/me/ai-access/${id}`),
+  /** Alle Zugänge und der Schalter (manage_settings) */
+  adminAiAccess: () => request<AiAccess>('GET', '/admin/ai-access'),
+  setAiAccess: (enabled: boolean) => request<{ enabled: boolean }>('PUT', '/admin/ai-access', { enabled }),
+  revokeAiAccess: (id: number) => request<{ deleted: boolean }>('DELETE', `/admin/ai-access/${id}`),
+  /** Anmeldung eines KI-Assistenten: Anfrage zeigen und zustimmen bzw. ablehnen; Antwort ist die Rücksprung-Adresse. */
+  oauthRequest: (key: string) => request<OAuthRequest>('GET', `/oauth/requests/${encodeURIComponent(key)}`),
+  decideOAuthRequest: (key: string, approve: boolean, scope?: 'read' | 'write') =>
+    request<{ redirect: string }>('POST', `/oauth/requests/${encodeURIComponent(key)}`, approve ? { approve, scope } : { approve }),
   registrationForm: () => request<RegistrationForm>('GET', '/registration/form'),
   register: (data: RegistrationInput) => request<{ status: 'confirm_email' | 'pending' }>('POST', '/registration', data),
   confirmRegistration: (token: string) => request<{ status: 'pending' }>('POST', '/registration/confirm', { token }),

@@ -780,6 +780,23 @@ final class Api
         ];
     }
 
+    /**
+     * Zugang für KI-Assistenten: Schalter, Adresse des MCP-Endpunkts (zum Eintragen im KI-Assistenten), ob die Anmeldung
+     * per OAuth möglich ist, und die Zugänge (einer Person bzw. aller bei null).
+     *
+     * @return array<string, mixed>
+     */
+    private function aiAccess(?int $userId): array
+    {
+        $a = $this->app;
+        return [
+            'enabled' => $a->accessTokens()->enabled(),
+            'mcp_url' => $a->oauth()->resource(),
+            'oauth' => $a->oauth()->available(),
+            'tokens' => $a->accessTokens()->list($userId),
+        ];
+    }
+
     private function user(): User
     {
         return $this->app->authContext->currentUser() ?? throw ApiError::notLoggedIn();
@@ -1058,7 +1075,7 @@ final class Api
                 return ['changed' => true];
             }),
             // Zugänge für KI-Assistenten (Plan „MCP-Server“): eigene ansehen und widerrufen
-            new Route('GET', '/me/ai-access', $L, fn () => ['enabled' => $a->accessTokens()->enabled(), 'tokens' => $a->accessTokens()->list($this->user()->id)]),
+            new Route('GET', '/me/ai-access', $L, fn () => $this->aiAccess($this->user()->id)),
             new Route('DELETE', '/me/ai-access/{id}', $L, function (Request $r) use ($a) {
                 $a->accessTokens()->revoke($r->id(), $this->user()->id);
                 return ['deleted' => true];
@@ -1987,7 +2004,7 @@ final class Api
             new Route('POST', '/admin/backup/encryption/verify', Cap::ManageSettings, fn (Request $r) => ['ok' => $a->backupEncryption()->verify($r->input('passphrase'))], null, $denySettings),
             // Aufbewahrungsfrist für Ehemalige (Standard aus): Stand mit Vorschau, einstellen
             // Zugang für KI-Assistenten (Plan „MCP-Server“): Schalter (Vorgabe aus), alle Zugänge mit Person, widerrufen
-            new Route('GET', '/admin/ai-access', Cap::ManageSettings, fn () => ['enabled' => $a->accessTokens()->enabled(), 'tokens' => $a->accessTokens()->list(null)], null, $denySettings),
+            new Route('GET', '/admin/ai-access', Cap::ManageSettings, fn () => $this->aiAccess(null), null, $denySettings),
             new Route('PUT', '/admin/ai-access', Cap::ManageSettings, fn (Request $r) => ['enabled' => $a->accessTokens()->setEnabled($r->input('enabled'))], null, $denySettings),
             new Route('DELETE', '/admin/ai-access/{id}', Cap::ManageSettings, function (Request $r) use ($a) {
                 $a->accessTokens()->revoke($r->id());
