@@ -24,7 +24,7 @@ The colours: **green** means everything is fine. **Yellow** means something shou
 
 ### Updates
 - **Installed: …** with the time of the last check and the **What’s new** link.
-- **Maintenance until …** or **Maintenance: unlimited**: how long your app receives new versions, if the app’s maintainers specify this. If maintenance has expired, this is shown here in red.
+- **Maintenance contract end: …** (a date) or **Maintenance contract end: unlimited**: how long your app receives new versions, if the app’s maintainers specify this. If the maintenance contract has expired, “(expired)” follows the date and the line is red.
 - **✓ The app is up to date.** or **New version: …** with the **Update to … now** button.
 - **The automatic update to … was postponed**: only if the backup in Google Drive didn’t work before an automatic update, with the buttons **Update anyway** and **Cancel**.
 - **Check for updates** and **Reload status**.
