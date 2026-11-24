@@ -245,6 +245,32 @@ final class GalleryTest extends TestCase
         $this->assertSame(1, $this->drive->tokens, 'Zugriffstoken wird zwischengespeichert');
     }
 
+    /** „Abgleichen“ (POST /admin/gallery/sync): Aufbereiten nur im Rest des Zeitbudgets, Übriges als geplante Aufgabe. */
+    public function testManualSyncLeavesTheRestToTheTask(): void
+    {
+        $gallery = $this->app->gallery();
+        $this->app->drive()->saveServiceAccount($this->drive->serviceAccountJson());
+        $gallery->setRoot('ROOT');
+        $scheduler = $this->app->scheduler;
+        $this->assertInstanceOf(Support\NullScheduler::class, $scheduler);
+        $scheduler->schedule(GalleryService::PROCESS_TASK, 3600);
+
+        // Läuft die Aufbereitung gerade anderswo (Cron), bereitet diese Anfrage nichts auf: Die Aufgabe macht weiter.
+        $lock = fopen($this->app->files->path('.aufbereitung.lock', false), 'c');
+        $this->assertNotFalse($lock);
+        flock($lock, LOCK_EX);
+        $r = $this->app->settingsService()->syncGallery(false);
+        flock($lock, LOCK_UN);
+        fclose($lock);
+        $this->assertSame([5, 0, 5], [$r['photos'], $r['processed'], $r['pending']]);
+        $this->assertSame([GalleryService::PROCESS_TASK], $scheduler->soon, 'Rest als geplante Aufgabe vorgezogen');
+
+        $scheduler->soon = [];
+        $r = $this->app->settingsService()->syncGallery(true);
+        $this->assertSame([5, 0], [$r['processed'], $r['pending']]);
+        $this->assertSame([], $scheduler->soon, 'Nichts mehr übrig: keine Aufgabe vorgezogen');
+    }
+
     public function testSyncErrorIsStoredAndTaskSchedules(): void
     {
         $gallery = $this->app->gallery();

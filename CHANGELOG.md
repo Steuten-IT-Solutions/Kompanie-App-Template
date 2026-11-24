@@ -64,6 +64,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   PHP-FPM oder LiteSpeed, das haben die meisten Hoster). Ein Cronjob beim Hoster alle 15 Minuten zusammen mit
   `define('DISABLE_WP_CRON', true);` in der `wp-config.php` reicht damit; ein Cronjob jede Minute belastet den Webspace
   nur unnötig.
+- Der Knopf **Abgleichen** in den Einstellungen der Galerie hält jede Anfrage an den Server kurz (höchstens etwa 20
+  Sekunden für Abgleich und Aufbereiten zusammen) und fragt dafür öfter nach. Bisher konnte die erste Anfrage auf
+  kleinen Webspaces in das Zeitlimit des Hosters laufen. Was danach noch aufzubereiten ist, erledigt die App im
+  Hintergrund, auch wenn man die Seite schließt.
 - Das Fenster **+ Block einfügen** ordnet die Blöcke in Gruppen: *Text und Medien* (Text, Bild, Album, Dokument),
   *Termine und Ablauf*, *Personen und Zahlen*, *Mitmachen und Links* und *Gestaltung*.
 

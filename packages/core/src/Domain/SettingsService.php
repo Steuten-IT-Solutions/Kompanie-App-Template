@@ -22,6 +22,8 @@ final class SettingsService
 {
     /** Links auf Impressum und Datenschutzerklärung (z. B. auf der Webseite der Kompanie), in der App für alle sichtbar. */
     public const IMPRINT_SETTING = 'legal_imprint_url';
+    /** Höchstens so viele Sekunden je Anfrage „Abgleichen“ (Drive-Abgleich und Aufbereiten zusammen), syncGallery */
+    public const SYNC_BUDGET = 20;
     public const PRIVACY_SETTING = 'legal_privacy_url';
 
     public function __construct(private readonly App $app)
@@ -350,13 +352,21 @@ final class SettingsService
         if (function_exists('set_time_limit')) {
             @set_time_limit(120);
         }
+        $start = microtime(true);
         try {
             // Ohne Drive (eigener Server) nur aufbereiten
             $stats = $onlyProcess || !$g->driveConfigured() ? $g->status() : $g->sync();
         } catch (\RuntimeException $e) {
             throw ApiError::upstream($e->getMessage());
         }
-        $done = $g->processPending(20);
+        // Eine Anfrage soll nicht länger als etwa SYNC_BUDGET Sekunden dauern: Hoster brechen lange Anfragen ab, und
+        // solange sie läuft, belegt sie einen PHP-Prozess. Hat der Abgleich mit Drive schon gedauert, bleibt für das
+        // Aufbereiten nur der Rest (mindestens ein Bild); die App fragt dann in weiteren Runden nach (only_process).
+        $done = $g->processPending(max(1, self::SYNC_BUDGET - (int) ceil(microtime(true) - $start)));
+        // Was übrig bleibt, bereitet die geplante Aufgabe weiter auf, auch wenn die App vorher geschlossen wird.
+        if ($g->countPending() > 0) {
+            $this->app->scheduler->runSoon(GalleryService::PROCESS_TASK);
+        }
         return [
             'albums' => (int) ($stats['albums'] ?? 0),
             'photos' => (int) ($stats['photos'] ?? 0),
