@@ -10,7 +10,7 @@ import { translatableFields } from './blockTranslation';
 const RichTextEditor = lazyView(() => import('../richtext/RichTextEditor'));
 
 /** Grenzen wie auf dem Server (Domain/Blocks/*Block.php). */
-const MAX: Record<string, number> = { title: 100, running_text: 200, after_text: 200, label: 60, text: 1000 };
+const MAX: Record<string, number> = { title: 100, running_text: 200, after_text: 200, label: 60, text: 1000, alt: 200, caption: 200 };
 const ITEM_MAX: Record<string, number> = { time: 20, text: 200, value: 20, label: 60 };
 
 const FIELD_LABEL = (field: string): string =>
@@ -20,6 +20,8 @@ const FIELD_LABEL = (field: string): string =>
     after_text: t('Text nach dem Ende'),
     label: t('Beschriftung'),
     text: t('Text'),
+    alt: t('Beschreibung für Screenreader'),
+    caption: t('Bildunterschrift'),
   })[field] ?? field;
 
 const ITEM_LABEL = (field: string): string =>

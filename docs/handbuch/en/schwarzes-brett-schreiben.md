@@ -64,6 +64,7 @@ With the bar above the text you format the message as in an email program. First
 - **Album**: under **Album**, choose one from the {bereich.gallery} and **How many photos** (1 to 12). Everyone only sees the pictures they may also see in the {bereich.gallery}.
 - **Document**: under **Document**, choose a file from the {bereich.documents}. The block shows it with **Open** (PDF and images) and **Download**, but only for those who may see it in the {bereich.documents}.
 - **{bereich.sponsors}**: shows all {bereich.sponsors} with logo and link, optionally with a **Heading**.
+- **Image**: tap **Choose image** and pick your own image (JPG, PNG or WebP); it does not have to be in the {bereich.gallery}. Optionally add a **Caption** and a **Description for screen readers**; under **Size** choose **Full width**, **Medium** or **Small**.
 - **Map for directions**: enter a **Place or address**. The block shows the place with the **Map** button, which opens it in the device’s maps app, as for an event’s location.
 
 ### Insert a countdown

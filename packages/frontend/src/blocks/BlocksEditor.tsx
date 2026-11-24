@@ -1,5 +1,15 @@
 import { Suspense, useEffect, useState, type ReactNode } from 'react';
-import { api, type BlockAudience, type DocumentInfo, type GalleryAlbumSummary, type Office, type Poll, type PublicEvent } from '../api';
+import {
+  api,
+  type BlockAudience,
+  type DocumentInfo,
+  type GalleryAlbumSummary,
+  type Office,
+  type Poll,
+  type PublicEvent,
+  type RichImageLimits,
+} from '../api';
+import { formatBytes } from '../format';
 import { Loading, Sheet, lazyView } from '../ui';
 import {
   BLOCK_KINDS,
@@ -20,6 +30,7 @@ import {
   type DocumentDraft,
   type SponsorsDraft,
   type MapDraft,
+  type ImageDraft,
 } from './blockDrafts';
 import { BlockIcon } from './blockIcons';
 import Countdown from './Countdown';
@@ -333,6 +344,117 @@ function SponsorsFields({ block, onChange }: { block: SponsorsDraft; onChange: (
       />
       <span className="muted small">{t('Zeigt alle Einträge in ihrer Reihenfolge, mit Logo und Link.')}</span>
     </label>
+  );
+}
+
+const IMAGE_ALT_MAX = 200;
+const IMAGE_CAPTION_MAX = 200;
+const IMAGE_ACCEPT = ['image/png', 'image/jpeg', 'image/webp'];
+
+let imageLimits: Promise<RichImageLimits> | null = null;
+/** Grenzen des Servers für Bilder, einmal je Sitzung geladen. */
+function serverImageLimits(): Promise<RichImageLimits> {
+  imageLimits ??= api.richImageLimits().catch((err) => {
+    imageLimits = null;
+    throw err;
+  });
+  return imageLimits;
+}
+
+/** Eigenes Bild: hochladen (Bildspeicher der App wie Bilder im Text), Beschreibung, Bildunterschrift, Größe. */
+function ImageFields({ block, onChange }: { block: ImageDraft; onChange: (b: ImageDraft) => void }) {
+  const set = (patch: Partial<ImageDraft>) => onChange({ ...block, ...patch });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function upload(file: File | null) {
+    if (!file) return;
+    setError(null);
+    if (!IMAGE_ACCEPT.includes(file.type)) {
+      setError(t('Erlaubt sind Bilder als JPG, PNG oder WebP.'));
+      return;
+    }
+    setBusy(true);
+    try {
+      const max = (await serverImageLimits().catch(() => null))?.max_image_bytes ?? null;
+      if (max !== null && file.size > max) {
+        setError(
+          t('„{name}“ ist {size} groß; der Server nimmt Bilder bis {max} an. Bitte ein kleineres Bild wählen.', {
+            name: file.name,
+            size: formatBytes(file.size),
+            max: formatBytes(max),
+          }),
+        );
+        return;
+      }
+      const img = await api.uploadRichImage(file);
+      set({ image: img.uid, url: img.url, width: img.width, height: img.height });
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="block-image-fields">
+      {block.url ? (
+        <img
+          className="block-image-preview"
+          src={block.url}
+          alt={block.alt}
+          width={block.width || undefined}
+          height={block.height || undefined}
+        />
+      ) : (
+        block.image !== '' && <p className="muted small">{t('Das Bild fehlt. Bitte ein neues hochladen.')}</p>
+      )}
+      <div className="button-row">
+        <label className="btn btn-small btn-secondary">
+          {busy ? t('Lädt …') : block.url ? t('Bild ersetzen') : t('Bild wählen')}
+          <input
+            type="file"
+            accept=".jpg,.jpeg,.png,.webp"
+            hidden
+            aria-label={t('Bild')}
+            disabled={busy}
+            onChange={(e) => {
+              void upload(e.target.files?.[0] ?? null);
+              e.target.value = '';
+            }}
+          />
+        </label>
+      </div>
+      {error && (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      )}
+      <label className="field">
+        <span>{t('Bildunterschrift (optional)')}</span>
+        <input type="text" maxLength={IMAGE_CAPTION_MAX} value={block.caption} onChange={(e) => set({ caption: e.target.value })} />
+      </label>
+      <label className="field">
+        <span>{t('Beschreibung für Screenreader (optional)')}</span>
+        <input
+          type="text"
+          maxLength={IMAGE_ALT_MAX}
+          value={block.alt}
+          placeholder={t('z. B. Gruppenfoto vor dem Rathaus')}
+          onChange={(e) => set({ alt: e.target.value })}
+        />
+        <span className="muted small">{t('Wird vorgelesen, wenn jemand das Bild nicht sehen kann.')}</span>
+      </label>
+      <label className="field">
+        <span>{t('Größe')}</span>
+        <select value={block.size} onChange={(e) => set({ size: e.target.value as ImageDraft['size'] })}>
+          <option value="full">{t('Volle Breite')}</option>
+          <option value="medium">{t('Mittel')}</option>
+          <option value="small">{t('Klein')}</option>
+        </select>
+        <span className="muted small">{t('Ein Bild wird nie größer gezeigt, als es ist.')}</span>
+      </label>
+    </div>
   );
 }
 
@@ -797,6 +919,8 @@ export default function BlocksEditor({
               <SponsorsFields block={b} onChange={(c) => update(i, c)} />
             ) : b.type === 'map' ? (
               <MapFields block={b} onChange={(c) => update(i, c)} />
+            ) : b.type === 'image' ? (
+              <ImageFields block={b} onChange={(c) => update(i, c)} />
             ) : (
               <CountdownFields block={b} onChange={(c) => update(i, c)} idPrefix={id} />
             )}

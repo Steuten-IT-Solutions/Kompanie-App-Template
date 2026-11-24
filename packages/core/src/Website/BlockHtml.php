@@ -47,6 +47,7 @@ final class BlockHtml
             'document' => $this->document($b),
             'sponsors' => $this->sponsors($b),
             'map' => $this->map($b),
+            'image' => $this->image($b),
             'divider' => ($b['style'] ?? '') === 'space' ? '<div class="block-space" aria-hidden="true"></div>' : '<hr>',
             // Polls are for members; a guest never gets one (PollBlock). Unknown types: data of a newer version.
             default => '',
@@ -239,6 +240,24 @@ final class BlockHtml
         }
         return self::heading($b) . '<p>' . self::e($place) . '</p><p><a class="site-btn site-btn-secondary" href="'
             . self::e('https://www.openstreetmap.org/search?query=' . rawurlencode($place)) . '" target="_blank" rel="noopener noreferrer">' . self::e(I18n::t('Karte')) . '</a></p>';
+    }
+
+    /**
+     * Own image with caption; small and medium are narrower and centred, never wider than the image itself.
+     *
+     * @param array<string, mixed> $b
+     */
+    private function image(array $b): string
+    {
+        $url = $b['url'] ?? null;
+        if (!is_string($url) || $url === '') {
+            return '';
+        }
+        $size = in_array($b['size'] ?? null, ['small', 'medium'], true) ? (string) $b['size'] : 'full';
+        $dims = (int) ($b['width'] ?? 0) > 0 && (int) ($b['height'] ?? 0) > 0 ? ' width="' . (int) $b['width'] . '" height="' . (int) $b['height'] . '"' : '';
+        $caption = (string) ($b['caption'] ?? '');
+        return '<figure class="block-image block-image-' . $size . '"><img src="' . self::e($url) . '" alt="' . self::e((string) ($b['alt'] ?? '')) . '" loading="lazy"' . $dims . '>'
+            . ($caption !== '' ? '<figcaption>' . self::e($caption) . '</figcaption>' : '') . '</figure>';
     }
 
     /** Pages of the App (#/…) at the App's address; other links as they are. */

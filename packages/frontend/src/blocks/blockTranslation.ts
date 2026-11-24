@@ -14,6 +14,7 @@ export const TRANSLATABLE: Readonly<Partial<Record<BlockDraft['type'], readonly 
   facts: ['title', 'items'],
   sponsors: ['title'],
   map: ['title'],
+  image: ['alt', 'caption'],
 };
 
 const isEmpty = (v: unknown): boolean => v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0);

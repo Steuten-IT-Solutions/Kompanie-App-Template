@@ -354,19 +354,14 @@ final class NewsService
         return $claimed[0] ?? throw ApiError::invalid(I18n::t('Das Titelbild wurde nicht gefunden. Bitte noch einmal hochladen.'));
     }
 
-    /** Bilder des Beitrags löschen, die weder in einem Textblock noch als Titelbild stehen. */
+    /** Bilder des Beitrags löschen, die weder in einem Block (Text oder Bild) noch als Titelbild stehen. */
     private function pruneImages(int $id): void
     {
         $row = $this->appSource()->row($id);
         if ($row === null) {
             return;
         }
-        $keep = [];
-        foreach (Blocks::decode($row['blocks'] ?? null, (string) ($row['body'] ?? '')) as $b) {
-            if (is_string($b['html'] ?? null)) {
-                array_push($keep, ...RichText::imageUids($b['html']));
-            }
-        }
+        $keep = Blocks::imageUids(Blocks::decode($row['blocks'] ?? null, (string) ($row['body'] ?? '')));
         $cover = AppNewsSource::cover($row);
         if ($cover !== null) {
             $keep[] = $cover;

@@ -6699,7 +6699,7 @@ test('Block einfügen: Fenster mit allen Blockarten, Zurück und Esc schließen 
   const open = form.getByRole('button', { name: '+ Block einfügen', exact: true });
   const dialog = page.getByRole('dialog', { name: 'Block einfügen' });
   await open.click();
-  await expect(dialog.locator('.block-kind')).toHaveCount(14);
+  await expect(dialog.locator('.block-kind')).toHaveCount(15);
   await expect(dialog.locator('.block-kind[data-kind="countdown"]')).toContainText('Zählt bis zu einem Datum');
   await shot(page, 'seiten-block-einfuegen');
   // „Zurück“ schließt nur das Fenster, die Seite bleibt
@@ -6905,6 +6905,39 @@ test('Eigene Seiten: Karte zur Anfahrt öffnet den Ort in der Karten-App', async
       /^https:\/\/(maps\.apple\.com\/\?q=|www\.google\.com\/maps\/search\/\?api=1&query=)Am%20Markt%201%2C%2012345%20Musterstadt$/,
     );
     await expect(link).toHaveAttribute('target', '_blank');
+  } finally {
+    await adminMenu(page, 'Seiten');
+    await row.getByRole('button', { name: 'Löschen' }).click();
+    await askOk(page);
+    await expect(page.locator('.toast')).toHaveText('Gelöscht');
+  }
+});
+
+test('Eigene Seiten: Block Bild lädt ein eigenes Bild hoch und zeigt es mit Bildunterschrift', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Seiten');
+  const form = page.locator('form', { has: page.getByRole('heading', { name: 'Neue Seite' }) });
+  const title = `Bild ${Date.now().toString(36)}`;
+  await form.getByLabel('Titel').fill(title);
+  await form.getByRole('textbox', { name: 'Text', exact: true }).fill('Oben.');
+  await insertBlock(form, '+ Block darunter einfügen', 'image');
+  const fields = form.locator('.block-image-fields');
+  await fields.getByLabel('Bild', { exact: true }).setInputFiles(PNG);
+  await expect(fields.locator('.block-image-preview')).toBeVisible();
+  await fields.getByLabel('Bildunterschrift (optional)').fill('Unser Plakat');
+  await fields.getByLabel('Beschreibung für Screenreader (optional)').fill('Plakat zum Fest');
+  await fields.getByLabel('Größe').selectOption('small');
+  await form.getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Seite angelegt');
+  const row = page.locator('.page-admin-list .row', { hasText: title });
+  try {
+    await page.goto('/app/#/seiten');
+    await page.getByRole('button', { name: title }).first().click();
+    const figure = page.locator('.page-article figure.block-image-small');
+    await expect(figure.locator('figcaption')).toHaveText('Unser Plakat');
+    const img = figure.getByRole('img', { name: 'Plakat zum Fest' });
+    await expect(img).toBeVisible();
+    await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0)).toBe(true);
   } finally {
     await adminMenu(page, 'Seiten');
     await row.getByRole('button', { name: 'Löschen' }).click();
