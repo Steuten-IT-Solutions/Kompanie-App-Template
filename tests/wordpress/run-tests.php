@@ -569,8 +569,12 @@ $singleRuns = static function (string $t) use ($hook): int {
 };
 // Was das API-Szenario davor ausgelöst hat, zählt hier nicht.
 \KompanieApp\WordPress\WpScheduler::runAfterResponse(static fn (): bool => false);
-// Einmaliger Lauf weit weg vom stündlichen: WordPress legt innerhalb von zehn Minuten um einen Lauf keinen zweiten an.
-wp_schedule_single_event(time() - 1200, $hook, [$sendTask]);
+// Einmaliger Lauf direkt in den Plan: wp_schedule_single_event legt keinen an, solange der stündliche Lauf in den
+// nächsten zehn Minuten kommt.
+$crons = _get_cron_array() ?: [];
+$crons[time() - 5][$hook][md5(serialize([$sendTask]))] = ['schedule' => false, 'args' => [$sendTask]];
+ksort($crons);
+_set_cron_array($crons);
 $sched->runSoon($sendTask);
 $c->ok(\KompanieApp\WordPress\WpScheduler::runAfterResponse(static fn (): bool => false) === [] && $singleRuns($sendTask) >= 1, 'Ohne abgeschlossene Antwort (kein PHP-FPM) bleibt es beim Lauf über WP-Cron');
 $sched->runSoon($sendTask);
