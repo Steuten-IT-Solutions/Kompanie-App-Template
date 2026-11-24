@@ -46,7 +46,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   nach dem Löschen der Browserdaten). Dazu stehen dort der Push-Dienst (z. B. Google für Chrome und Android), seit wann
   die Benachrichtigungen an waren und wann zuletzt eine ankam. So lässt sich klären, warum jemand plötzlich keine
   Benachrichtigungen mehr bekommt. Auch das Einschalten und Ändern auf einem Gerät steht dort, mit altem und neuem
-  Wert: welche Arten an sind und ob Betrag und Grund in der Nachricht stehen. Neue Arten, die die App von selbst
+  Wert: je Art „an“ oder „aus“ (beim Ändern nur die geänderten Arten, z. B. „Geburtstage: am Tag selbst: an → aus“)
+  und ob Betrag und Grund in der Nachricht stehen. Neue Arten, die die App von selbst
   einschaltet, stehen mit „System (automatisch)“ da. Benachrichtigungen von Gästen ohne Konto werden nicht aufgezeichnet.
 - **Neuer Block: Bild** für [eigene Seiten](app:verwaltung/seiten), News in der App und das Schwarze Brett: ein eigenes
   Bild hochladen, das nicht in der Galerie liegen muss, mit Bildunterschrift, Beschreibung für Screenreader und Größe
