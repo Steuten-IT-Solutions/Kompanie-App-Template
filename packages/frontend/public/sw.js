@@ -26,6 +26,9 @@
  *   hinweg). Schlechtes Netz: Antwortet das Netz nicht binnen API_TIMEOUT_MS (oder gar nicht), kommt die gespeicherte
  *   Version derselben Person, gekennzeichnet mit X-Kompanie-Stale: 1 (die App zeigt dann „Schlechte Verbindung“); kommt
  *   die Antwort aus dem Netz später doch noch, wird sie gespeichert und den Fenstern gemeldet wie oben.
+ *   Mit X-Kompanie-Prefetch dazu (Vorabladen im Leerlauf beim Start): Ist eine solche Version gespeichert, kommt nur
+ *   sie, ohne Anfrage im Hintergrund; sonst wie oben aus dem Netz. So geht beim Start nur an den Server, was auf dem
+ *   Gerät noch fehlt.
  * - Dokumente (<App>/dokument/<id>?v=<Fassung>, Issue #2) → zuerst aus dem Speicher: Die Adresse wechselt mit
  *   jeder neuen Fassung. Was einmal geöffnet wurde, ist so offline verfügbar; gespeichert wird je Dokument nur die
  *   aktuelle Fassung. Direkt aufgerufen (nicht über fetch) nie als App-Seite speichern.
@@ -622,6 +625,9 @@ async function staleWhileRevalidate(request, event) {
   // Nur das Fenster, das die Meldung bekommen hat, lädt danach aus dem Speicher, und nur einmal. Eine neu geladene Seite
   // (anderes Fenster) fragt wie sonst im Hintergrund: Sonst bekäme sie bis FRESH_MS den Stand von vor einer Änderung,
   // die erst nach der Meldung kam, falls die alte Seite die Meldung nicht mehr verarbeitet hat.
+  // Vorabladen im Leerlauf (X-Kompanie-Prefetch): Gespeichertes reicht, keine Anfrage an den Server. Die Ansicht fragt
+  // beim Öffnen selbst nach.
+  if (stored && request.headers.get('X-Kompanie-Prefetch') === '1') return stored;
   const last = announced.get(key);
   const client = event.clientId || '';
   const recent = last && Date.now() - last.at < FRESH_MS && last.clients.has(client);

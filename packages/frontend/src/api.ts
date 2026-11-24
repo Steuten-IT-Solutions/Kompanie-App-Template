@@ -2825,6 +2825,28 @@ export const WRITE_TIMEOUT_MS = 20000;
 
 /** Header für den Service Worker (public/sw.js): Antwort darf zuerst aus seinem Speicher kommen. */
 const STALE_OK_HEADER = 'X-Kompanie-Stale-Ok';
+/**
+ * Header für den Service Worker: Vorabladen im Leerlauf. Hat er eine gültige gespeicherte Antwort, gibt er nur sie zurück
+ * und fragt nicht im Hintergrund nach; zum Server geht nur, was auf dem Gerät noch fehlt. Das spart beim Start der App
+ * die meisten Anfragen; die Ansicht fragt beim Öffnen ohnehin selbst nach.
+ */
+const PREFETCH_HEADER = 'X-Kompanie-Prefetch';
+
+/** Zähler für storedFirst: Anfragen, die beginnen, solange er über 0 steht, tragen PREFETCH_HEADER. */
+let storedFirstCount = 0;
+
+/**
+ * Vorabladen im Leerlauf: Die Anfragen, die `start` sofort beginnt (vor dem ersten await), nimmt der Service Worker aus
+ * seinem Speicher, wenn er eine gültige Antwort hat, und fragt dann nicht beim Server nach.
+ */
+export function storedFirst<T>(start: () => Promise<T>): Promise<T> {
+  storedFirstCount++;
+  try {
+    return start();
+  } finally {
+    storedFirstCount--;
+  }
+}
 const USER_HEADER = 'X-Kompanie-User';
 
 async function requestFull<T>(
@@ -2863,6 +2885,7 @@ async function requestFull<T>(
         ...(method === 'GET' ? { [USER_HEADER]: String(config.user?.id ?? 0) + (locale() === SOURCE_LOCALE ? '' : `:${locale()}`) } : {}),
         [LOCALE_HEADER]: locale(),
         ...(staleOk ? { [STALE_OK_HEADER]: '1' } : {}),
+        ...(staleOk && storedFirstCount > 0 ? { [PREFETCH_HEADER]: '1' } : {}),
         ...(csrfToken ? { [config.csrf.header]: csrfToken } : {}),
         ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
         // Vorschau (Issue #63): bei jeder Anfrage, der Server wendet dann die Rechte der Rolle an.
