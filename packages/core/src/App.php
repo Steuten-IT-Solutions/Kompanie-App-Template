@@ -48,6 +48,7 @@ use KompanieApp\Core\Domain\MemberService;
 use KompanieApp\Core\Domain\PollService;
 use KompanieApp\Core\Domain\RankService;
 use KompanieApp\Core\Domain\RegistrationService;
+use KompanieApp\Core\Domain\RequestLogService;
 use KompanieApp\Core\Domain\RoleService;
 use KompanieApp\Core\Domain\ScoreService;
 use KompanieApp\Core\Domain\SettingsService;
@@ -477,6 +478,8 @@ final class App
                 }
             } elseif ($task === ActivityService::TASK) {
                 $this->activity()->prune();
+                // Anfragen-Protokoll: Dateien nach der Frist löschen
+                $this->requestLog()->prune();
             } elseif ($task === ChangeLogService::TASK) {
                 $this->changeLog()->prune();
             } elseif ($task === FormerMemberService::RETENTION_TASK) {
@@ -850,6 +853,11 @@ final class App
     public function activity(): ActivityService
     {
         return $this->service(ActivityService::class, fn () => new ActivityService($this));
+    }
+
+    public function requestLog(): RequestLogService
+    {
+        return $this->service(RequestLogService::class, fn () => new RequestLogService($this));
     }
 
     /** Änderungsprotokoll: wer wann was angelegt, geändert oder gelöscht hat */

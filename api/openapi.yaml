@@ -8632,6 +8632,54 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
 
+  /admin/request-log:
+    get:
+      tags: [Wartung]
+      summary: Anfragen-Protokoll (nur WordPress zeichnet auf) - Stand und Übersicht
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RequestLogSummary' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Wartung]
+      summary: Anfragen-Protokoll ein- (für 7 Tage ab jetzt) oder ausschalten
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: ['on']
+              properties:
+                'on': { type: boolean }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RequestLogState' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Wartung]
+      summary: Alle aufgezeichneten Anfragen sofort löschen
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RequestLogSummary' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
   /admin/update/check:
     post:
       tags: [Wartung]
@@ -11275,6 +11323,75 @@ components:
               ]
           description: 'Wirksame Rechte aller Rollen zusammen (Grundrolle und Zusatzrollen); member bringt calendar mit.'
 
+    RequestLogState:
+      type: object
+      required: ['on', until, on_days, keep_days]
+      properties:
+        'on': { type: boolean }
+        until: { type: [integer, 'null'], description: Läuft bis (Unix-Zeit), null wenn aus }
+        on_days: { type: integer, description: So viele Tage läuft es nach dem Einschalten }
+        keep_days: { type: integer, description: Nach so vielen Tagen werden Einträge gelöscht }
+    RequestLogRow:
+      type: object
+      required: [name, count, ms, avg]
+      properties:
+        name: { type: string, description: Methode und Adresse ohne Werte der Parameter bzw. Name des User-Agents }
+        count: { type: integer }
+        ms: { type: integer, description: Dauer gesamt in Millisekunden }
+        avg: { type: integer, description: Dauer im Schnitt in Millisekunden }
+        kind: { $ref: '#/components/schemas/RequestKind' }
+        max: { type: integer, description: Längste Dauer (nur Adressen) }
+        bots: { type: integer, description: Aufrufe ohne Browser (nur Adressen) }
+    RequestKind:
+      type: string
+      enum: [app-api, app, cron, admin, login, rest, page, other]
+    RequestLogSummary:
+      description: |
+        Übersicht über alle gespeicherten Tage (höchstens 14). Gespeichert sind je Anfrage Zeit, Art, Methode, Adresse
+        ohne Werte der Parameter, Dauer, Statuscode, angemeldet ja/nein, User-Agent und die gekürzte IP-Adresse.
+      allOf:
+        - { $ref: '#/components/schemas/RequestLogState' }
+        - type: object
+          required: [total, from, to, kinds, days, hours, paths, slowest, agents, cron]
+          properties:
+            total: { type: integer }
+            from: { type: [integer, 'null'] }
+            to: { type: [integer, 'null'] }
+            kinds:
+              type: object
+              additionalProperties:
+                type: object
+                required: [count, ms, avg]
+                properties:
+                  count: { type: integer }
+                  ms: { type: integer }
+                  avg: { type: integer }
+            days:
+              type: array
+              description: Anfragen je Tag (Ortszeit der Kompanie) und Art
+              items:
+                type: object
+                required: [date]
+                properties:
+                  date: { type: string, format: date }
+                additionalProperties: { type: integer }
+            hours:
+              type: array
+              description: Anfragen je Stunde 0-23 (Ortszeit der Kompanie)
+              items: { type: integer }
+            paths: { type: array, items: { $ref: '#/components/schemas/RequestLogRow' } }
+            slowest: { type: array, description: 'Nur Adressen mit mindestens 3 Aufrufen', items: { $ref: '#/components/schemas/RequestLogRow' } }
+            agents: { type: array, items: { $ref: '#/components/schemas/RequestLogRow' } }
+            cron:
+              type: array
+              description: Herkunft der Aufrufe von wp-cron.php
+              items:
+                type: object
+                required: [agent, ip, count]
+                properties:
+                  agent: { type: string }
+                  ip: { type: string, description: Gekürzte IP-Adresse, leer wenn unbekannt }
+                  count: { type: integer }
     ErrorLog:
       type: array
       description: |

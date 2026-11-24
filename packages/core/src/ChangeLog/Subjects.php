@@ -283,6 +283,8 @@ final class Subjects
             'POST /admin/google/connect' => $general,
             'POST /admin/google/disconnect' => $general,
             'DELETE /admin/error-log' => $this->event('Einstellungen', 'Fehlerprotokoll', 'delete'),
+            'PUT /admin/request-log' => $this->value('Anfragen-Protokoll', 'Anfragen aufzeichnen', fn (): bool => $this->app->requestLog()->active()),
+            'DELETE /admin/request-log' => $this->event('Einstellungen', 'Anfragen-Protokoll', 'delete'),
             'DELETE /admin/update/held' => $this->event('Einstellungen', 'Zurückgestelltes Update', 'delete'),
             'POST /admin/backup/server/delete' => $this->event('Sicherung', fn (Request $r): string => 'Sicherung ' . (is_string($r->input('id')) ? $r->input('id') : ''), 'delete'),
             // Updates und Sicherungen (ohne vergleichbaren Stand)

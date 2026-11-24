@@ -1,7 +1,7 @@
 ---
 titel: Status and updates
 ---
-Here you see at a glance whether the app is running smoothly, which version is installed and whether there are updates. You also find the error log and the status reports to the app’s maintainers here.
+Here you see at a glance whether the app is running smoothly, which version is installed and whether there are updates. You also find the error log, the status reports to the app’s maintainers and (with WordPress) the request log here.
 
 ![The Status and updates page with the traffic light](bild:admin-zustand)
 
@@ -37,6 +37,9 @@ The colours: **green** means everything is fine. **Yellow** means something shou
 The errors of the last 14 days (at most 50) with time, type of error and full error text, with the **Copy** and **Clear** buttons. If there were none, it says **No errors in the last 14 days.**
 
 ![The error log with two entries](bild:admin-zustand-fehlerprotokoll)
+
+### Request log
+WordPress only. With the switch **Record requests (7 days)** the app writes down for one week which requests reach your web space and run PHP: from the app, the website, WordPress itself, crawlers and cron jobs. Then it switches itself off. The overview below has the sections **By type**, **Per day**, **Per hour**, **Most frequent addresses**, **Slowest addresses (3 calls or more)**, **Who is asking (user agent)** and **Where do the calls to wp-cron.php come from?** (the server itself, a cron job of your hosting provider or another service, with shortened IP address). **Delete recording** removes everything straight away.
 
 ## Step by step
 ### Get the current status
@@ -81,6 +84,11 @@ This is how you install a particular version without the server downloading it i
 
 After that it continues as with a normal update: first back up, then install, then the app reloads. The app only installs an unchanged package that is in your app’s checked update list. It rejects a changed file, a package of another app or a withdrawn version.
 
+### Talk to your hosting provider about response times
+1. Turn on **Record requests (7 days)**.
+2. After a few days, look at the overview: how many requests come from crawlers instead of browsers? Which addresses are slow? Who calls wp-cron.php?
+3. Pass the figures on to your hosting provider when they ask about the cause of the load.
+
 ### Send the error log to the maintainers
 1. Look through the log briefly: error texts may contain names or content.
 2. Tap **Copy** and paste the text into a message to the maintainers. If copying doesn’t work, the app shows the text for selecting.
@@ -95,6 +103,7 @@ After that it continues as with a normal update: first back up, then install, th
 - **Status reports:** if you agree, the app sends the maintainers a short sign of life every hour (among other things version, colour of the traffic light per row, error codes with cause, e.g. “Calendar: HTTP 404”, and usage figures without names: how many accounts there are, how many of them were active in the last 24 hours, 7 and 30 days and how many people used which section) and reports serious errors immediately. Names, content and error texts are never sent. What exactly is sent is shown under **What exactly is sent (example: sign of life)**; above it is when the last report went. If you withdraw consent, the counted errors are deleted too.
 - **Error log:** it stays on your server and isn’t sent, even without consent to the status reports. Identical errors directly after each other are only listed once, with number and period. Addresses are shortened to the server; this way, e.g., a secret calendar address stays secret.
 - If your installation doesn’t get updates via the app, the **Updates** section only shows the installed version.
+- **Request log:** it stays on your server and is not sent. For each request it stores the time, the address without parameter values (`?s=search` becomes `?s`), duration, status code, whether someone was signed in, the user agent and the shortened IP address (e.g. `203.0.113.x`): this way networks of crawlers can be recognised, individual visitors cannot. Names, accounts and content are not stored. Each day is deleted after 14 days. What the web server delivers without PHP (images, app files, pages from a page cache) does not appear in the log; only your hosting provider’s access log shows that. Mention the log in your privacy policy while it is running.
 
 > **For advanced users:** A *cron job* is a job in your hosting provider’s customer menu that calls an address regularly. Without it, the app does its background tasks (syncing the {bereich.gallery} and calendar, updates) after page visits. A cron job that calls the address shown under **Background tasks** every 15 minutes is more reliable. With WordPress this row doesn’t exist; there the cron job replaces WP-Cron, as described in the guide to installing with WordPress.
 

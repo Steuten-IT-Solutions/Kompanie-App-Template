@@ -1875,6 +1875,13 @@ final class Api
                 // Fehlerprotokoll: bleibt auf dem Server, auch ohne Zustimmung zu den Statusmeldungen
                 'errorLog' => $a->telemetry()->log(),
             ], null, $denySettings),
+            // Anfragen-Protokoll: welche PHP-Anfragen beim Webspace ankommen (RequestLogService)
+            new Route('GET', '/admin/request-log', Cap::ManageSettings, fn () => $a->requestLog()->summary(), null, $denySettings),
+            new Route('PUT', '/admin/request-log', Cap::ManageSettings, fn (Request $r) => $a->requestLog()->set(Input::bool($r->input('on'))), null, $denySettings),
+            new Route('DELETE', '/admin/request-log', Cap::ManageSettings, function () use ($a) {
+                $a->requestLog()->clear();
+                return $a->requestLog()->summary();
+            }, null, $denySettings),
             new Route('DELETE', '/admin/error-log', Cap::ManageSettings, function () use ($a) {
                 $a->telemetry()->clearLog();
                 return ['errorLog' => []];

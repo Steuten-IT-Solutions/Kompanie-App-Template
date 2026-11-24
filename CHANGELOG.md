@@ -26,6 +26,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- Mit WordPress lässt sich unter [Einstellungen → Zustand und Updates](app:einstellungen/zustand) ein
+  Anfragen-Protokoll einschalten (Vorgabe aus). Es zeichnet eine Woche lang auf, welche Anfragen mit PHP beim Webspace
+  ankommen, auch von Crawlern, Cronjobs und WordPress selbst, und schaltet sich dann von selbst aus. Die Übersicht zeigt
+  die Anfragen nach Art, je Tag und Stunde, die häufigsten und langsamsten Adressen, die User-Agents und woher die
+  Aufrufe von wp-cron.php kommen. Gespeichert werden Adressen ohne Werte der Parameter und gekürzte IP-Adressen, auf dem
+  eigenen Server; nach 14 Tagen wird alles gelöscht.
 - Alle Benachrichtigungen kommen jetzt auch per E-Mail, nicht nur aufs Gerät: Termine, Erinnerungen, Umfragen,
   Geburtstage, Punkte, Strafen, Dienstgrad, Galerie, Anfragen und Fehlermeldungen. Die Mail enthält Titel und Text der
   Benachrichtigung und einen Link in die App. Voraussetzung ist der Mailversand unter
