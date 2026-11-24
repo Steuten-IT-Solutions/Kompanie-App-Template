@@ -8,10 +8,10 @@
  * fehlende oder nicht mehr genutzte Einträge; deshalb sind das erste Argument von t() und die ersten beiden von tn()
  * immer einfache Zeichenketten.
  *
- * Die Kataloge sind mitgebündelt (nicht nachgeladen): So sieht auch Code auf Modulebene die richtige Sprache, solange
- * sie vor dem Start der App feststeht. Ein Wechsel der Sprache lädt die Seite neu.
+ * Die Kataloge sind nicht im Startpaket: Der Einstieg (boot.ts) legt beim Laden dieses Moduls die Sprache fest, lädt nur
+ * ihren Katalog ({@link setCatalog}; Deutsch braucht keinen) und startet erst danach die App. So sieht auch Code auf
+ * Modulebene die richtige Sprache. Ein Wechsel der Sprache lädt die Seite neu.
  */
-import en from '../../core/src/I18n/en.json' with { type: 'json' };
 
 export const LOCALES = ['de', 'en'] as const;
 export type Locale = (typeof LOCALES)[number];
@@ -23,7 +23,12 @@ export type Entry = string | { one: string; other: string };
 export type Catalog = Readonly<Record<string, Entry>>;
 export type Params = Readonly<Record<string, string | number>>;
 
-const CATALOGS: Readonly<Record<Locale, Catalog>> = { de: {}, en: en as Catalog };
+const CATALOGS: Record<Locale, Catalog> = { de: {}, en: {} };
+
+/** Katalog einer Sprache übernehmen (boot.ts vor dem Start der App; Tests). */
+export function setCatalog(l: Locale, catalog: Catalog): void {
+  if (l !== SOURCE_LOCALE) CATALOGS[l] = catalog;
+}
 
 /** Sprachkennung für Intl (Datum, Zahlen): Englisch in britischer Schreibweise und Form. */
 const TAGS: Readonly<Record<Locale, string>> = { de: 'de-DE', en: 'en-GB' };

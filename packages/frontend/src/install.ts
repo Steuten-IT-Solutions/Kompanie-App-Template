@@ -12,6 +12,7 @@
 
 import { useEffect, useState } from 'react';
 import { config } from './api';
+import { takeEarlyInstallPrompt } from './earlyInstall';
 
 /** Adresse der Installationsanleitung – zum Weiterschicken per WhatsApp, E-Mail und in den Zugangsdaten. */
 export function installUrl(): string {
@@ -27,7 +28,9 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
-let deferred: BeforeInstallPromptEvent | null = null;
+// Was vor dem Start der App kam (boot.ts, earlyInstall.ts), sonst ab jetzt selbst abfangen.
+const early = takeEarlyInstallPrompt();
+let deferred: BeforeInstallPromptEvent | null = early && !isSamsungInternet() ? (early as BeforeInstallPromptEvent) : null;
 const listeners = new Set<() => void>();
 const notify = () => listeners.forEach((l) => l());
 
