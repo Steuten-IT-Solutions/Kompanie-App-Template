@@ -1150,7 +1150,7 @@ final class PushService
 
     /**
      * Hält Einschalten (ohne Stand davor) und Ändern der Benachrichtigungen eines Kontos auf einem Gerät mit altem und
-     * neuem Wert im Änderungsprotokoll fest: welche Arten an sind und ob Betrag und Grund in der Nachricht stehen.
+     * neuem Wert im Änderungsprotokoll fest: je Art „an“ oder „aus“ und ob Betrag und Grund in der Nachricht stehen.
      * Gäste nicht. Ohne Unterschied entsteht kein Eintrag (ChangeLogService::recordMany).
      *
      * @param list<array{0: Subscription|null, 1: Subscription}> $changes Stand davor (null = neu eingeschaltet) und danach
@@ -1172,10 +1172,18 @@ final class PushService
         foreach ($changes as [$before, $after]) {
             $name = isset($users[$after['user_id']]) ? $users[$after['user_id']]->name : '';
             $label = mb_substr(($name === '' ? '' : $name . ', ') . self::serviceLabel($after['endpoint']), 0, 191);
-            $item = fn (array $sub): Item => new Item('Benachrichtigungen', (string) $sub['id'], $label, [
-                'Arten' => $this->typeLabels($sub['types']),
-                'Betrag und Grund zeigen' => $sub['details'],
-            ], [], [], $sub['user_id']);
+            // Je Art ein eigenes Feld „an“/„aus“ (über dieselben Arten vorher und nachher): Die Ansicht zeigt so nur die Arten,
+            // die sich geändert haben, statt zweier langer Listen.
+            $keys = $this->sorted([...$after['types'], ...($after['offered'] ?? []), ...($before['types'] ?? []), ...($before['offered'] ?? [])]);
+            $labels = $this->types();
+            $item = static function (array $sub) use ($label, $keys, $labels): Item {
+                $fields = [];
+                foreach ($keys as $k) {
+                    $fields[$labels[$k]['label'] ?? $k] = in_array($k, $sub['types'], true) ? 'an' : 'aus';
+                }
+                $fields['Betrag und Grund zeigen'] = $sub['details'] ? 'an' : 'aus';
+                return new Item('Benachrichtigungen', (string) $sub['id'], $label, $fields, [], [], $sub['user_id']);
+            };
             $rows[] = [$before === null ? 'create' : 'update', $before === null ? null : $item($before), $item($after), false];
         }
         $this->app->changeLog()->recordMany($actor, 'app', $rows);

@@ -179,7 +179,10 @@ final class PushServiceTest extends TestCase
         $this->assertSame(1, $p->addNewTypes());
         $row = $app->db->selectOne('SELECT actor_id, action, changes FROM {change_log}');
         $this->assertSame([0, 'update'], [(int) ($row['actor_id'] ?? -1), (string) ($row['action'] ?? '')], 'neue Arten von selbst an: System, alt → neu');
-        $this->assertStringContainsString('"f":"Arten"', (string) ($row['changes'] ?? ''));
+        $changes = (array) json_decode((string) ($row['changes'] ?? ''), true);
+        $this->assertNotSame([], $changes);
+        $this->assertSame(['aus', 'an'], [$changes[0]['o'] ?? null, $changes[0]['n'] ?? null], 'nur die neu eingeschalteten Arten');
+        $this->assertNotContains($p->types()['news']['label'], array_column($changes, 'f'), 'selbst abgeschaltete News bleibt aus');
         $sub = $p->repository()->byEndpoint($d['endpoint']);
         $this->assertNotNull($sub);
         $this->assertSame(['board', 'board_public', 'polls', 'birthdays', 'penalties', 'points', 'ranks', 'titles', 'events', 'reminder'], $sub['types'], 'neue Arten der Rolle an, News bleibt aus');
@@ -351,7 +354,9 @@ final class PushServiceTest extends TestCase
         $log = $entries();
         $this->assertCount(1, $log);
         $this->assertSame(['actor' => $anna->id, 'subject' => $anna->id, 'type' => 'Benachrichtigungen', 'label' => $anna->name . ', Google (Chrome, Edge oder Android)', 'action' => 'create'], array_diff_key($log[0], ['fields' => 1]));
-        $this->assertSame([null, $labels['penalties']['label'] . ', ' . $labels['points']['label']], $log[0]['fields']['Arten']);
+        $this->assertSame([null, 'an'], $log[0]['fields'][$labels['penalties']['label']], 'neu: jede Art mit an oder aus');
+        $this->assertSame([null, 'an'], $log[0]['fields'][$labels['points']['label']]);
+        $this->assertSame([null, 'aus'], $log[0]['fields'][$labels['events']['label']]);
 
         // Arten und Betrag/Grund ändern: alt → neu; dasselbe noch einmal: kein Eintrag.
         $p->update($anna, $a['endpoint'], null, ['points'], true);
@@ -360,8 +365,7 @@ final class PushServiceTest extends TestCase
         $log = $entries();
         $this->assertCount(1, $log);
         $this->assertSame('update', $log[0]['action']);
-        $this->assertSame([$labels['penalties']['label'] . ', ' . $labels['points']['label'], $labels['points']['label']], $log[0]['fields']['Arten']);
-        $this->assertSame(['nein', 'ja'], $log[0]['fields']['Betrag und Grund zeigen']);
+        $this->assertSame([$labels['penalties']['label'] => ['an', 'aus'], 'Betrag und Grund zeigen' => ['aus', 'an']], $log[0]['fields'], 'nur was sich geändert hat');
 
         // Gäste: kein Eintrag.
         $g = self::device('g');
