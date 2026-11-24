@@ -15,6 +15,7 @@ import type { AdminOrder, NavigationSetting, NavNames, NavStart } from './naviga
 import type { TileLayouts, TilePlace } from './tileGrid';
 import { nameIn, setNameTranslations, type NameKind, type NameTranslations } from './names';
 import { presetRoleLabel } from './brandLocale';
+import { CsrfToken, type FetchResult } from './csrfToken';
 
 /** Schlüssel einer Rolle: guest, member, admin, früher fest (organizer, manager, candidate) oder vom Admin angelegt (r1, r2, …). */
 export type Level = string;
@@ -147,7 +148,8 @@ export interface AppConfig {
   base_language?: Locale;
   variant: 'wordpress' | 'standalone';
   version: string;
-  csrf: { header: string; token: string; refreshUrl: string };
+  /** expiresAt: bis wann das Token sicher gilt (Unix-Zeit, Sekunden), null ohne Ablauf; fehlt bei älteren Servern */
+  csrf: { header: string; token: string; expiresAt?: number | null; refreshUrl: string };
   auth: { mode: 'form' | 'redirect'; loginUrl: string | null; logoutUrl: string | null };
   features: Record<Feature, boolean>;
   /** Handbuch auf der Webseite der Kompanie (GitHub Pages); null ohne Update-Adresse */
@@ -2737,7 +2739,26 @@ export class ApiError extends Error {
   }
 }
 
-let csrfToken = config?.csrf.token ?? '';
+/** CSRF-Token und sein Erneuern (csrfToken.ts): vorab, wenn es abgelaufen ist; nach einer Ablehnung gemeinsam. */
+const csrfState = new CsrfToken({
+  initial: { token: config?.csrf.token ?? '', expiresAt: config?.csrf.expiresAt ?? null },
+  fetchToken: fetchCsrfToken,
+  // Gesteuert vom Service Worker: Er holt beim Start die aktuelle App-Seite und meldet ihre Tokens (pageUpdate.ts).
+  pageExpected: () => typeof navigator !== 'undefined' && !!navigator.serviceWorker?.controller,
+  online: () => typeof navigator === 'undefined' || navigator.onLine !== false,
+});
+
+async function fetchCsrfToken(): Promise<FetchResult> {
+  let res: Response;
+  try {
+    res = await fetch(config!.csrf.refreshUrl, { credentials: 'same-origin', headers: { Accept: 'application/json' } });
+  } catch {
+    return { ok: false, offline: true };
+  }
+  const data = await res.json().catch(() => null);
+  if (!res.ok || typeof data?.token !== 'string' || data.token === '') return { ok: false, offline: false };
+  return { ok: true, state: { token: data.token, expiresAt: typeof data.expiresAt === 'number' ? data.expiresAt : null } };
+}
 
 /**
  * Tokens aus der aktuellen App-Seite übernehmen (pageUpdate.ts): Der Service Worker zeigt beim Start die gespeicherte
@@ -2747,7 +2768,7 @@ export function takeTokens(csrf: AppConfig['csrf'], auth: AppConfig['auth']): vo
   if (!config || !csrf?.token) return;
   config.csrf = csrf;
   config.auth = auth;
-  csrfToken = csrf.token;
+  csrfState.take({ token: csrf.token, expiresAt: csrf.expiresAt ?? null });
 }
 
 /** Zur Anmeldung: Weiterleitung (WordPress) oder Anmeldeformular in der App. */
@@ -2768,18 +2789,11 @@ function sessionExpired(): never {
 
 /** Holt ein neues CSRF-Token (nur mit dem Sitzungs-Cookie). quiet: ohne Weiterleitung zur Anmeldung. */
 export async function refreshCsrf(quiet = false): Promise<void> {
-  let res: Response;
-  try {
-    res = await fetch(config!.csrf.refreshUrl, { credentials: 'same-origin', headers: { Accept: 'application/json' } });
-  } catch {
-    throw new ApiError(t('Keine Verbindung. Bitte später erneut versuchen.'), 0);
-  }
-  const data = await res.json().catch(() => null);
-  if (!res.ok || !data?.token) {
-    if (quiet) throw new ApiError(t('Sitzung abgelaufen.'), 401, 'not_logged_in');
-    sessionExpired();
-  }
-  csrfToken = data.token;
+  const res = await csrfState.refresh();
+  if (res.ok) return;
+  if (res.offline) throw new ApiError(t('Keine Verbindung. Bitte später erneut versuchen.'), 0);
+  if (quiet) throw new ApiError(t('Sitzung abgelaufen.'), 401, 'not_logged_in');
+  sessionExpired();
 }
 
 function url(path: string, query?: Record<string, string>): string {
@@ -2871,6 +2885,11 @@ async function requestFull<T>(
   // letzten eigenen Änderung gespeichert wurde, holt er zuerst aus dem Netz (public/sw.js). Nicht /config: Damit prüft
   // die App den aktuellen Stand (z. B. „Erneut versuchen“ auf der Wartungsseite).
   const staleOk = method === 'GET' && !previewRole() && path !== '/config';
+  // Vor dem ersten await festhalten: storedFirst zählt nur Anfragen, die sofort beginnen.
+  const prefetch = staleOk && storedFirstCount > 0;
+  // Abgelaufenes Token (gespeicherte App-Seite): kurz auf ein neues warten, statt abgelehnt zu werden (csrfToken.ts).
+  await csrfState.ready();
+  const sentToken = csrfState.token();
   const abort = timeoutMs > 0 && typeof AbortController !== 'undefined' ? new AbortController() : null;
   const timer = abort ? setTimeout(() => abort.abort(), timeoutMs) : null;
   try {
@@ -2885,8 +2904,8 @@ async function requestFull<T>(
         ...(method === 'GET' ? { [USER_HEADER]: String(config.user?.id ?? 0) + (locale() === SOURCE_LOCALE ? '' : `:${locale()}`) } : {}),
         [LOCALE_HEADER]: locale(),
         ...(staleOk ? { [STALE_OK_HEADER]: '1' } : {}),
-        ...(staleOk && storedFirstCount > 0 ? { [PREFETCH_HEADER]: '1' } : {}),
-        ...(csrfToken ? { [config.csrf.header]: csrfToken } : {}),
+        ...(prefetch ? { [PREFETCH_HEADER]: '1' } : {}),
+        ...(sentToken ? { [config.csrf.header]: sentToken } : {}),
         ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
         // Vorschau (Issue #63): bei jeder Anfrage, der Server wendet dann die Rechte der Rolle an.
         ...(previewRole() ? { [PREVIEW_HEADER]: previewRole()! } : {}),
@@ -2915,7 +2934,8 @@ async function requestFull<T>(
   const data = await res.json().catch(() => null);
 
   if (res.status === 403 && retry && CSRF_ERRORS.includes(data?.code)) {
-    await refreshCsrf(quiet);
+    // Hat eine andere Anfrage das Token inzwischen erneuert, gleich damit noch einmal; sonst gemeinsam ein neues holen.
+    if (csrfState.token() === sentToken) await refreshCsrf(quiet);
     return requestFull<T>(method, path, body, query, false, quiet, silent, timeoutMs);
   }
   if (res.status === 401 && config.user && !quiet) {

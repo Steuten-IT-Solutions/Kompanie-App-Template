@@ -524,10 +524,10 @@ test('Nach einer eigenen Änderung: vorher Gespeichertes erst aus dem Netz, auch
 });
 
 /** App-Seite wie von den Adaptern: Konfiguration im Kopf, Programmdatei mit Hash. */
-function appPage({ user = 1, token = 't1', logout = 'n1', entry = 'index-a.js', features = { news: true } } = {}) {
+function appPage({ user = 1, token = 't1', expiresAt = 1000, logout = 'n1', entry = 'index-a.js', features = { news: true } } = {}) {
   const config = {
     version: '1.0.0',
-    csrf: { header: 'X-WP-Nonce', token, refreshUrl: '/app/csrf' },
+    csrf: { header: 'X-WP-Nonce', token, expiresAt, refreshUrl: '/app/csrf' },
     auth: { mode: 'redirect', loginUrl: '/wp-login.php', logoutUrl: `/wp-login.php?action=logout&_wpnonce=${logout}` },
     features,
     user: user === null ? null : { id: user, name: 'A</script>'.replace('<', '\\u003C') },
@@ -544,7 +544,7 @@ test('App-Seite sofort aus dem Speicher, die aktuelle im Hintergrund; neue Token
   const net = { [SCOPE]: () => appPage() };
   const sw = load({ net, clientIds: ['neu'] });
   await sw.request(SCOPE, 'navigate'); // gespeichert
-  net[SCOPE] = () => new Promise((resolve) => (release = () => resolve(appPage({ token: 't2', logout: 'n2' }))));
+  net[SCOPE] = () => new Promise((resolve) => (release = () => resolve(appPage({ token: 't2', expiresAt: 2000, logout: 'n2' }))));
   const { answer, done } = sw.requestSplit(SCOPE, 'navigate', {}, 'GET', { resultingClientId: 'neu' });
   // Die Antwort wartet nicht auf den Server.
   const res = await answer;
@@ -558,7 +558,7 @@ test('App-Seite sofort aus dem Speicher, die aktuelle im Hintergrund; neue Token
       to: 'neu',
       type: 'kompanie-page',
       reload: false,
-      csrf: { header: 'X-WP-Nonce', token: 't2', refreshUrl: '/app/csrf' },
+      csrf: { header: 'X-WP-Nonce', token: 't2', expiresAt: 2000, refreshUrl: '/app/csrf' },
       auth: { mode: 'redirect', loginUrl: '/wp-login.php', logoutUrl: '/wp-login.php?action=logout&_wpnonce=n2' },
     },
   ]);

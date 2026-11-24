@@ -121,6 +121,7 @@ try {
     $r = $login('anna', 'anna-passwort');
     $token = $cookieOf($r);
     $c->ok($r[0] === 200 && $r[1]['user']['login'] === 'anna' && $r[1]['csrf']['token'] !== '', 'Anmelden liefert Konfiguration mit Benutzer und CSRF-Token');
+    $c->ok(array_key_exists('expiresAt', $r[1]['csrf']) && $r[1]['csrf']['expiresAt'] === null, 'Token der Sitzung ohne eigenen Ablauf');
     $c->ok($token !== null && stripos($r[2]['set-cookie'], 'HttpOnly') !== false && stripos($r[2]['set-cookie'], 'SameSite=Lax') !== false && stripos($r[2]['set-cookie'], 'path=/') !== false, 'Cookie HttpOnly, SameSite=Lax, Pfad der Installation');
     $c->ok(substr_count($r[2]['set-cookie'], Sessions::COOKIE . '=') === 1, 'Nur ein Sitzungs-Cookie (kein überflüssiges Löschen)');
     $c->ok((bool) preg_match('/expires=([^;]+)/i', $lastCookie($r), $m) && abs(strtotime($m[1]) - (time() + Sessions::LIFETIME)) < 120, 'Angemeldet bleiben: rund 400 Tage');

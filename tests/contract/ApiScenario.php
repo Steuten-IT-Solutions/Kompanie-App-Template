@@ -2248,6 +2248,8 @@ final class ApiScenario
         [, $d] = $this->req('GET', '/config');
         $c->ok(($d['user']['id'] ?? 0) === $this->m1 && in_array('member', $d['user']['capabilities'], true) && $d['csrf']['token'] !== '', '/config mit Benutzer, Rechten und Token');
         $c->ok(str_starts_with((string) ($d['csrf']['refreshUrl'] ?? ''), 'http'), '/config nennt die Adresse zum Erneuern des Tokens');
+        $exp = array_key_exists('expiresAt', $d['csrf']) ? $d['csrf']['expiresAt'] : 'fehlt';
+        $c->ok($exp === null || (is_int($exp) && $exp > time()), '/config nennt den Ablauf des Tokens (Zukunft oder keiner)');
         $c->ok($this->req('GET', '/auth/csrf')[0] === 200, 'Neues CSRF-Token für Angemeldete');
         $this->d->actAs(null);
         $c->ok($this->req('GET', '/auth/csrf')[0] === 401, 'Kein CSRF-Token ohne Anmeldung');

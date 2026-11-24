@@ -823,6 +823,7 @@ final class Api
             'csrf' => [
                 'header' => $a->authenticator->csrfHeader(),
                 'token' => $a->authenticator->csrfToken(),
+                'expiresAt' => $a->authenticator->csrfExpiresAt(),
                 'refreshUrl' => $a->authenticator->csrfRefreshUrl(),
             ],
             'auth' => [
@@ -995,7 +996,7 @@ final class Api
         return [
             // App und Anmeldung
             new Route('GET', '/config', $P, fn () => $this->config()),
-            new Route('GET', '/auth/csrf', $L, fn () => ['token' => $a->authenticator->csrfToken()]),
+            new Route('GET', '/auth/csrf', $L, fn () => ['token' => $a->authenticator->csrfToken(), 'expiresAt' => $a->authenticator->csrfExpiresAt()]),
             new Route('POST', '/auth/login', $P, function (Request $r) use ($a) {
                 $username = is_string($r->input('username')) ? trim($r->input('username')) : '';
                 $password = is_string($r->input('password')) ? $r->input('password') : '';

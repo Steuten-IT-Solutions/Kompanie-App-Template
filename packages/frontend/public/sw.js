@@ -583,7 +583,8 @@ function pageChange(before, after) {
   const b = parse(after);
   if (!b.config) return null;
   const tokens = { csrf: b.config.csrf, auth: b.config.auth };
-  const rest = (c) => JSON.stringify({ ...c, csrf: { ...c.csrf, token: '' }, auth: { ...c.auth, logoutUrl: '' } });
+  // Token samt Ablauf (csrf.expiresAt) übernimmt die App still; ein neues Token ist kein Grund zum Neuladen.
+  const rest = (c) => JSON.stringify({ ...c, csrf: { ...c.csrf, token: '', expiresAt: null }, auth: { ...c.auth, logoutUrl: '' } });
   const reload = !a.config || a.entry !== b.entry || rest(a.config) !== rest(b.config);
   if (
     !reload &&
