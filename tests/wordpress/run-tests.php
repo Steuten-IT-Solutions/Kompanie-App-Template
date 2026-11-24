@@ -555,6 +555,52 @@ $c->ok(!wp_next_scheduled($hook, $task), 'Normaler Seitenaufruf plant keine Aufg
 delete_option('kompanie_app_' . \KompanieApp\Core\App::PLAN_SETTING);
 Plugin::upgrade(); // nach einem Update passt die vermerkte Version nicht mehr
 $c->ok((bool) wp_next_scheduled($hook, $task), 'Nach einem Update werden die Aufgaben neu eingeplant');
+// Benachrichtigungen und Mails nach der Antwort der auslösenden Anfrage, nicht erst mit dem nächsten Cron-Lauf.
+$sched = new \KompanieApp\WordPress\WpScheduler();
+$sendTask = \KompanieApp\Core\Push\PushService::TASK_SEND;
+$sched->schedule($sendTask, 3600);
+$singleRuns = static function (string $t) use ($hook): int {
+    $n = 0;
+    foreach (_get_cron_array() ?: [] as $cron) {
+        $e = $cron[$hook][md5(serialize([$t]))] ?? null;
+        $n += is_array($e) && empty($e['schedule']) ? 1 : 0;
+    }
+    return $n;
+};
+// Was das API-Szenario davor ausgelöst hat, zählt hier nicht.
+\KompanieApp\WordPress\WpScheduler::runAfterResponse(static fn (): bool => false);
+// Einmaliger Lauf direkt in den Plan: wp_schedule_single_event legt keinen an, solange der stündliche Lauf in den
+// nächsten zehn Minuten kommt.
+$crons = _get_cron_array() ?: [];
+$crons[time() - 5][$hook][md5(serialize([$sendTask]))] = ['schedule' => false, 'args' => [$sendTask]];
+ksort($crons);
+_set_cron_array($crons);
+$sched->runSoon($sendTask);
+$c->ok(\KompanieApp\WordPress\WpScheduler::runAfterResponse(static fn (): bool => false) === [] && $singleRuns($sendTask) >= 1, 'Ohne abgeschlossene Antwort (kein PHP-FPM) bleibt es beim Lauf über WP-Cron');
+$sched->runSoon($sendTask);
+$c->ok(\KompanieApp\WordPress\WpScheduler::runAfterResponse(static fn (): bool => true) === [$sendTask], 'Nach der Antwort: Benachrichtigungen gleich verschickt');
+$c->ok($singleRuns($sendTask) === 0 && wp_get_schedule($hook, [$sendTask]) === 'hourly', 'Einmaliger Lauf übernommen, der stündliche bleibt');
+$c->ok(\KompanieApp\WordPress\WpScheduler::runAfterResponse(static fn (): bool => true) === [], 'Ohne neuen Anlass nichts nach der Antwort');
+$doingCron = static fn (): bool => true;
+add_filter('wp_doing_cron', $doingCron);
+$sched->runSoon($sendTask);
+remove_filter('wp_doing_cron', $doingCron);
+$c->ok(\KompanieApp\WordPress\WpScheduler::runAfterResponse(static fn (): bool => true) === [], 'Im Cron-Lauf selbst: nichts zusätzlich nach der Antwort');
+$mailTask = \KompanieApp\Core\Domain\BoardMailService::TASK;
+$c->ok(\KompanieApp\WordPress\WpScheduler::lock($mailTask) && !\KompanieApp\WordPress\WpScheduler::lock($mailTask), 'Sperre je Aufgabe: zweiter Versuch scheitert');
+$ranLocked = false;
+$c->ok(!\KompanieApp\WordPress\WpScheduler::exclusive($mailTask, static function () use (&$ranLocked): void {
+    $ranLocked = true;
+}) && !$ranLocked, 'Läuft die Aufgabe gerade, startet sie nicht noch einmal');
+\KompanieApp\WordPress\WpScheduler::unlock($mailTask);
+$c->ok(\KompanieApp\WordPress\WpScheduler::exclusive($mailTask, static function () use (&$ranLocked): void {
+    $ranLocked = true;
+}) && $ranLocked && \KompanieApp\WordPress\WpScheduler::lock($mailTask), 'Nach dem Freigeben läuft sie, danach ist die Sperre wieder frei');
+\KompanieApp\WordPress\WpScheduler::unlock($mailTask);
+global $wpdb;
+$wpdb->query($wpdb->prepare("INSERT INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %s, 'no')", 'kompanie_app_lock_' . $mailTask, (string) (time() - 600)));
+$c->ok(\KompanieApp\WordPress\WpScheduler::lock($mailTask), 'Verwaiste Sperre (älter als fünf Minuten) gilt nicht mehr');
+\KompanieApp\WordPress\WpScheduler::unlock($mailTask);
 // Schwarzes Brett (Issue #5, #172): stündlich über WP-Cron; der Hook löscht Nachrichten 30 Tage nach ihrem Ende.
 $boardTask = \KompanieApp\Core\Domain\BoardService::TASK;
 $c->ok(wp_get_schedule($hook, [$boardTask]) === 'hourly', 'Schwarzes Brett: Aufräumen stündlich über WP-Cron');

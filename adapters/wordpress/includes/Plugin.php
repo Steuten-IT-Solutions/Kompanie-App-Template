@@ -130,7 +130,14 @@ final class Plugin
             $user = get_current_user_id();
             wp_set_current_user(0);
             try {
-                self::app()->runTask($task);
+                $run = static fn () => self::app()->runTask($task);
+                // Benachrichtigungen und Mails laufen auch nach der Antwort einer Anfrage (WpScheduler::runAfterResponse):
+                // nie zweimal gleichzeitig. Läuft die Aufgabe gerade, kommt sie mit dem nächsten Cron-Lauf.
+                if (!in_array($task, WpScheduler::AFTER_RESPONSE, true)) {
+                    $run();
+                } elseif (!WpScheduler::exclusive($task, $run)) {
+                    (new WpScheduler())->runSoon($task);
+                }
             } finally {
                 wp_set_current_user($user);
             }
