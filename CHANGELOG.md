@@ -51,6 +51,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   (volle Breite, mittel, klein). Es sieht, wer den Block sehen darf; Bildunterschrift und Beschreibung lassen sich
   übersetzen. Entfernt man den Block, wird das Bild gelöscht.
 
+### Geändert
+
+- Das Fenster **+ Block einfügen** ordnet die Blöcke in Gruppen: *Text und Medien* (Text, Bild, Album, Dokument),
+  *Termine und Ablauf*, *Personen und Zahlen*, *Mitmachen und Links* und *Gestaltung*.
+
 ## [0.13.0] – 2026-11-22
 
 ### Neu

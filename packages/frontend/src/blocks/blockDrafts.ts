@@ -54,23 +54,38 @@ export type BlockDraft =
   | ImageDraft;
 export type BlockKind = BlockDraft['type'];
 
-/** Blöcke, die man einfügen kann, mit Bezeichnung und Erklärung (Reihenfolge der Auswahl). */
-export const BLOCK_KINDS: { type: BlockKind; label: string; hint: string }[] = [
-  { type: 'text', label: t('Text'), hint: t('Formatierter Text mit Bildern') },
-  { type: 'image', label: t('Bild'), hint: t('Eigenes Bild hochladen, mit Bildunterschrift') },
-  { type: 'countdown', label: t('Countdown'), hint: t('Zählt bis zu einem Datum oder Termin herunter') },
-  { type: 'button', label: t('Knopf mit Link'), hint: t('Führt zu einer Webseite, Mail, Telefonnummer oder Seite der App') },
-  { type: 'events', label: t('Nächste Termine'), hint: t('Was als Nächstes ansteht, immer aktuell') },
-  { type: 'contacts', label: t('Ansprechpartner'), hint: t('Wer ein Amt gerade innehat, mit Foto') },
-  { type: 'notice', label: t('Hinweis-Kasten'), hint: t('Kurzer Text, farbig hervorgehoben') },
-  { type: 'divider', label: t('Trennlinie'), hint: t('Linie oder Abstand zwischen Blöcken') },
-  { type: 'schedule', label: t('Ablauf'), hint: t('Uhrzeit und Programmpunkt untereinander') },
-  { type: 'facts', label: t('Zahlen und Fakten'), hint: t('Kurze Kennzahlen nebeneinander') },
-  { type: 'poll', label: t('Umfrage'), hint: t('Eine Umfrage zum Mitmachen einbinden') },
-  { type: 'album', label: t('Album'), hint: t('Einige Bilder aus einem Album') },
-  { type: 'document', label: t('Dokument'), hint: t('Eine Datei aus den Dokumenten zum Herunterladen') },
-  { type: 'sponsors', label: t('Sponsoren'), hint: t('Alle Logos mit Link, in ihrer Reihenfolge') },
-  { type: 'map', label: t('Karte zur Anfahrt'), hint: t('Ort mit Knopf zur Karten-App') },
+/** Gruppen im Fenster „Block einfügen“ (Reihenfolge der Anzeige). */
+export const BLOCK_GROUPS = [
+  { id: 'media', label: t('Text und Medien') },
+  { id: 'dates', label: t('Termine und Ablauf') },
+  { id: 'club', label: t('Personen und Zahlen') },
+  { id: 'action', label: t('Mitmachen und Links') },
+  { id: 'layout', label: t('Gestaltung') },
+] as const;
+export type BlockGroup = (typeof BLOCK_GROUPS)[number]['id'];
+
+/** Blöcke, die man einfügen kann, mit Gruppe, Bezeichnung und Erklärung (Reihenfolge der Auswahl, nach Gruppen). */
+export const BLOCK_KINDS: { type: BlockKind; group: BlockGroup; label: string; hint: string }[] = [
+  { type: 'text', group: 'media', label: t('Text'), hint: t('Formatierter Text mit Bildern') },
+  { type: 'image', group: 'media', label: t('Bild'), hint: t('Eigenes Bild hochladen, mit Bildunterschrift') },
+  { type: 'album', group: 'media', label: t('Album'), hint: t('Einige Bilder aus einem Album') },
+  { type: 'document', group: 'media', label: t('Dokument'), hint: t('Eine Datei aus den Dokumenten zum Herunterladen') },
+  { type: 'countdown', group: 'dates', label: t('Countdown'), hint: t('Zählt bis zu einem Datum oder Termin herunter') },
+  { type: 'events', group: 'dates', label: t('Nächste Termine'), hint: t('Was als Nächstes ansteht, immer aktuell') },
+  { type: 'schedule', group: 'dates', label: t('Ablauf'), hint: t('Uhrzeit und Programmpunkt untereinander') },
+  { type: 'contacts', group: 'club', label: t('Ansprechpartner'), hint: t('Wer ein Amt gerade innehat, mit Foto') },
+  { type: 'facts', group: 'club', label: t('Zahlen und Fakten'), hint: t('Kurze Kennzahlen nebeneinander') },
+  { type: 'sponsors', group: 'club', label: t('Sponsoren'), hint: t('Alle Logos mit Link, in ihrer Reihenfolge') },
+  { type: 'poll', group: 'action', label: t('Umfrage'), hint: t('Eine Umfrage zum Mitmachen einbinden') },
+  {
+    type: 'button',
+    group: 'action',
+    label: t('Knopf mit Link'),
+    hint: t('Führt zu einer Webseite, Mail, Telefonnummer oder Seite der App'),
+  },
+  { type: 'map', group: 'action', label: t('Karte zur Anfahrt'), hint: t('Ort mit Knopf zur Karten-App') },
+  { type: 'notice', group: 'layout', label: t('Hinweis-Kasten'), hint: t('Kurzer Text, farbig hervorgehoben') },
+  { type: 'divider', group: 'layout', label: t('Trennlinie'), hint: t('Linie oder Abstand zwischen Blöcken') },
 ];
 
 let counter = 0;

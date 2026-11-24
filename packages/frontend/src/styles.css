@@ -7519,7 +7519,22 @@ fieldset.block-source legend {
 .block-insert-btn {
   width: 100%;
 }
-/* Fenster „Block einfügen“: jede Blockart als Kachel mit Symbol, Name und Erklärung; ab 560 px zwei Spalten */
+/* Fenster „Block einfügen“: Blockarten in Gruppen mit Überschrift, je Art eine Kachel mit Symbol, Name und Erklärung;
+   ab 560 px zwei Spalten */
+.block-kind-groups {
+  display: grid;
+  gap: var(--space-4);
+}
+.block-kind-group {
+  display: grid;
+  gap: var(--space-2);
+}
+.block-kind-group-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--muted);
+}
 .block-kinds {
   display: grid;
   gap: var(--space-2);
