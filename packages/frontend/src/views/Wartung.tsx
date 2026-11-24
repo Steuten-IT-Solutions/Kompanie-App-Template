@@ -25,6 +25,7 @@ import { IconButton } from '../icons';
 import { serverBackupLabel, serverBackupUrl } from '../serverBackup';
 import { localeTag, t } from '../i18n';
 import { maintenanceText } from '../wartungsabo';
+import AnfragenProtokoll from './AnfragenProtokoll';
 
 /**
  * Wartung für Admins: Ampel (Status), Updates mit Zurückrollen, Statusmeldungen (nur mit
@@ -43,6 +44,8 @@ export default function Wartung({ part, onToast }: { part: 'zustand' | 'datensic
       {/* key: nach dem Neuladen mit dem neuen Stand neu aufbauen */}
       <Updates key={JSON.stringify([s.updates, s.statusReports.enabled])} status={s} onChanged={reload} onToast={onToast} />
       <Fehlerprotokoll key={JSON.stringify(s.errorLog)} status={s} onToast={onToast} />
+      {/* Nur WordPress zeichnet Anfragen auf (am Ende jeder PHP-Anfrage); die eigenständige Version hat ihr Server-Log */}
+      {config?.variant === 'wordpress' && <AnfragenProtokoll />}
     </>
   );
 }

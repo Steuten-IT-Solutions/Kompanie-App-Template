@@ -3,7 +3,7 @@ titel: Zustand und Updates
 reihenfolge: 130
 rechte: [manage_settings]
 ---
-Hier siehst du auf einen Blick, ob die App rund läuft, welche Version installiert ist und ob es Updates gibt. Außerdem findest du hier das Fehlerprotokoll und die Statusmeldungen an die Betreuer der App.
+Hier siehst du auf einen Blick, ob die App rund läuft, welche Version installiert ist und ob es Updates gibt. Außerdem findest du hier das Fehlerprotokoll, die Statusmeldungen an die Betreuer der App und (mit WordPress) das Anfragen-Protokoll.
 
 ![Die Seite Zustand und Updates mit der Ampel](bild:admin-zustand)
 
@@ -39,6 +39,9 @@ Die Farben: **Grün** heißt alles in Ordnung. **Gelb** heißt, etwas sollte erl
 Die Fehler der letzten 14 Tage (höchstens 50) mit Zeitpunkt, Art des Fehlers und vollständigem Fehlertext, mit den Knöpfen **Kopieren** und **Leeren**. Gab es keine, steht dort **Keine Fehler in den letzten 14 Tagen.**
 
 ![Das Fehlerprotokoll mit zwei Einträgen](bild:admin-zustand-fehlerprotokoll)
+
+### Anfragen-Protokoll
+Nur mit WordPress. Mit dem Schalter **Anfragen aufzeichnen (7 Tage)** schreibt die App eine Woche lang auf, welche Anfragen bei eurem Webspace ankommen, bei denen PHP läuft: von der App, von der Webseite, von WordPress selbst, von Crawlern und Cronjobs. Danach schaltet sie sich selbst aus. Die Übersicht darunter hat die Abschnitte **Nach Art**, **Je Tag**, **Je Stunde**, **Häufigste Adressen**, **Langsamste Adressen (ab 3 Aufrufen)**, **Wer fragt an (User-Agent)** und **Woher kommen die Aufrufe von wp-cron.php?** (der Server selbst, ein Cronjob des Hosters oder ein fremder Dienst, mit gekürzter IP-Adresse). Mit **Aufzeichnung löschen** ist alles sofort weg.
 
 ## So gehst du vor
 ### Den aktuellen Stand holen
@@ -83,6 +86,11 @@ So spielst du eine bestimmte Version ein, ohne dass der Server sie selbst lädt,
 
 Danach geht es weiter wie beim normalen Update: erst sichern, dann einspielen, dann lädt die App neu. Die App spielt nur ein unverändertes Paket ein, das in der geprüften Update-Liste eurer App steht. Eine veränderte Datei, ein Paket einer anderen App oder eine zurückgezogene Version lehnt sie ab.
 
+### Mit dem Hoster über Antwortzeiten sprechen
+1. Schalte **Anfragen aufzeichnen (7 Tage)** ein.
+2. Sieh nach ein paar Tagen in die Übersicht: Wie viele Anfragen kommen von Crawlern statt von Browsern? Welche Adressen sind langsam? Von wem kommen die Aufrufe von wp-cron.php?
+3. Gib die Zahlen an den Hoster weiter, wenn er nach der Ursache für die Last fragt.
+
 ### Das Fehlerprotokoll an die Betreuer schicken
 1. Sieh das Protokoll kurz durch: Fehlertexte können Namen oder Inhalte enthalten.
 2. Tippe auf **Kopieren** und füge den Text in eine Nachricht an die Betreuer ein. Klappt das Kopieren nicht, zeigt die App den Text zum Markieren.
@@ -96,6 +104,7 @@ Danach geht es weiter wie beim normalen Update: erst sichern, dann einspielen, d
 - **Vorabversionen:** Mit **Vorabversionen erhalten (zum Testen)** bekommt diese Installation jede neue Version, sobald sie gebaut ist, noch bevor sie für alle freigegeben wird. Das ist für eine Testseite gedacht. Schaltest du es aus, bleibt die jetzige Version installiert, bis eine neuere für alle freigegeben ist.
 - **Statusmeldungen:** Wenn du zustimmst, schickt die App den Betreuern stündlich ein kurzes Lebenszeichen (u. a. Version, Farbe der Ampel je Zeile, Fehlercodes mit Ursache, z. B. „Kalender: HTTP 404“, und Nutzungszahlen ohne Namen: wie viele Konten es gibt, wie viele davon in den letzten 24 Stunden, 7 und 30 Tagen aktiv waren und wie viele Personen welchen Bereich genutzt haben) und meldet schwere Fehler sofort. Namen, Inhalte und Fehlertexte werden nie gesendet. Was genau gesendet wird, zeigt **Was genau gesendet wird (Beispiel: Lebenszeichen)**; darüber steht, wann die letzte Meldung ging. Nimmst du die Zustimmung zurück, werden auch die gezählten Fehler gelöscht.
 - **Fehlerprotokoll:** Es bleibt auf eurem Server und wird nicht gesendet, auch ohne Zustimmung zu den Statusmeldungen. Gleiche Fehler direkt hintereinander stehen nur einmal da, mit Anzahl und Zeitraum. Adressen sind auf den Server gekürzt; so bleibt z. B. eine geheime Kalender-Adresse geheim.
+- **Anfragen-Protokoll:** Es bleibt auf eurem Server und wird nicht gesendet. Gespeichert werden je Anfrage Zeit, Adresse ohne Werte der Parameter (aus `?s=Suchwort` wird `?s`), Dauer, Statuscode, ob jemand angemeldet war, der User-Agent und die gekürzte IP-Adresse (z. B. `203.0.113.x`): Netze von Crawlern lassen sich so erkennen, einzelne Besucher nicht. Namen, Konten und Inhalte werden nicht gespeichert. Nach 14 Tagen wird jeder Tag gelöscht. Was der Webserver ohne PHP ausliefert (Bilder, Dateien der App, Seiten aus einem Seitencache), kommt im Protokoll nicht vor; das zeigt nur das Zugriffsprotokoll des Hosters. Erwähnt das Protokoll in eurer Datenschutzerklärung, solange es läuft.
 - Bekommt eure Installation keine Updates über die App, steht im Abschnitt **Updates** nur die installierte Version.
 
 > **Für Fortgeschrittene:** Ein *Cronjob* ist ein Auftrag im Kundenmenü eures Hosters, der eine Adresse regelmäßig aufruft. Ohne ihn erledigt die App ihre Hintergrundaufgaben (Abgleich von {bereich.gallery} und Kalender, Updates) nach Seitenaufrufen. Zuverlässiger ist ein Cronjob, der alle 15 Minuten die Adresse aufruft, die bei **Hintergrundaufgaben** steht. Mit WordPress gibt es diese Zeile nicht; dort ersetzt der Cronjob WP-Cron, wie in der Anleitung zur Installation mit WordPress beschrieben.

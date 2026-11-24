@@ -3605,6 +3605,9 @@ export const api = {
   restoreBackupServer: (id: string) => request<{ restored: boolean }>('POST', '/admin/backup/server/restore', { id, confirm: true }),
   deleteBackupServer: (id: string) => request<BackupServerStatus>('POST', '/admin/backup/server/delete', { id }),
   clearErrorLog: () => request<{ errorLog: ErrorLogEntry[] }>('DELETE', '/admin/error-log'),
+  requestLog: () => request<RequestLogSummary>('GET', '/admin/request-log'),
+  setRequestLog: (on: boolean) => request<RequestLogState>('PUT', '/admin/request-log', { on }),
+  clearRequestLog: () => request<RequestLogSummary>('DELETE', '/admin/request-log'),
   setupDone: () => request<{ done: boolean }>('POST', '/admin/setup/done', {}),
 
   // Benachrichtigungen (Web Push): Konten über /me/push, Gäste über /push mit dem auth-Geheimnis des Geräts.
@@ -4043,6 +4046,45 @@ export interface AdminStatus {
   setupDone: boolean;
   /** Fehlerprotokoll dieser Installation, neueste zuerst (bleibt auf dem Server) */
   errorLog: ErrorLogEntry[];
+}
+
+/** Anfragen-Protokoll (nur WordPress zeichnet auf): an für wenige Tage, danach von selbst aus. */
+export interface RequestLogState {
+  on: boolean;
+  /** läuft bis (Unix-Zeit), null wenn aus */
+  until: number | null;
+  on_days: number;
+  keep_days: number;
+}
+
+export type RequestKind = 'app-api' | 'app' | 'cron' | 'admin' | 'login' | 'rest' | 'page' | 'other';
+
+export interface RequestLogRow {
+  /** Adresse (Methode und Pfad ohne Parameterwerte) bzw. Name des Crawlers oder Dienstes */
+  name: string;
+  count: number;
+  /** Dauer gesamt und im Schnitt in Millisekunden */
+  ms: number;
+  avg: number;
+  /** nur bei Adressen: Art, längste Dauer, Aufrufe ohne Browser */
+  kind?: RequestKind;
+  max?: number;
+  bots?: number;
+}
+
+export interface RequestLogSummary extends RequestLogState {
+  total: number;
+  from: number | null;
+  to: number | null;
+  kinds: Record<RequestKind, { count: number; ms: number; avg: number }>;
+  days: ({ date: string } & Record<RequestKind, number>)[];
+  /** Anfragen je Stunde (0–23, Ortszeit der Kompanie) */
+  hours: number[];
+  paths: RequestLogRow[];
+  slowest: RequestLogRow[];
+  agents: RequestLogRow[];
+  /** Herkunft der Aufrufe von wp-cron.php: User-Agent und gekürzte IP */
+  cron: { agent: string; ip: string; count: number }[];
 }
 
 export interface ErrorLogEntry {

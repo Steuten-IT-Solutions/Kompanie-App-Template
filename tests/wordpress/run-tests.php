@@ -597,6 +597,17 @@ $c->ok(\KompanieApp\WordPress\WpScheduler::exclusive($mailTask, static function 
     $ranLocked = true;
 }) && $ranLocked && \KompanieApp\WordPress\WpScheduler::lock($mailTask), 'Nach dem Freigeben läuft sie, danach ist die Sperre wieder frei');
 \KompanieApp\WordPress\WpScheduler::unlock($mailTask);
+$kind = static fn (string $uri, bool $cron = false, bool $admin = false): string => \KompanieApp\WordPress\WpRequestLog::kind($uri, '/blog/', 'wp-json', $cron, $admin);
+$c->ok(
+    $kind('/blog/wp-json/kompanie-app/v1/config') === 'app-api'
+    && $kind('/blog/index.php?rest_route=/kompanie-app/v1/news') === 'app-api'
+    && $kind('/blog/app/termine') === 'app' && $kind('/blog/?kompanie_app=sw.js') === 'app'
+    && $kind('/blog/wp-cron.php?doing_wp_cron=1') === 'cron' && $kind('/blog/', true) === 'cron'
+    && $kind('/blog/wp-login.php') === 'login' && $kind('/blog/wp-admin/admin-ajax.php', false, false) === 'admin'
+    && $kind('/blog/wp-json/wp/v2/posts') === 'rest' && $kind('/blog/xmlrpc.php') === 'other'
+    && $kind('/blog/2026/11/fest/') === 'page' && $kind('/blog/apple/') === 'page',
+    'Anfragen-Protokoll: Art der Anfrage aus der Adresse'
+);
 global $wpdb;
 $wpdb->query($wpdb->prepare("INSERT INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %s, 'no')", 'kompanie_app_lock_' . $mailTask, (string) (time() - 600)));
 $c->ok(\KompanieApp\WordPress\WpScheduler::lock($mailTask), 'Verwaiste Sperre (älter als fünf Minuten) gilt nicht mehr');
