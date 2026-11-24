@@ -213,6 +213,14 @@ final class FakeUsers implements UserDirectory, AuthContext, Authenticator
         return $this->current ? $this->session . '-' . $this->current : '';
     }
 
+    /** Ablauf des Tokens; ein Test kann ihn setzen (sonst wie bei der eigenständigen Version: keiner). */
+    public ?int $csrfExpiresAt = null;
+
+    public function csrfExpiresAt(): ?int
+    {
+        return $this->current ? $this->csrfExpiresAt : null;
+    }
+
     public function csrfRefreshUrl(): string
     {
         return 'https://example.org/api/v1/auth/csrf';

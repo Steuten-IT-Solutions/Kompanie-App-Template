@@ -66,6 +66,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   die Daten aller anderen Bereiche neu; jetzt nur noch, was auf dem Gerät noch nicht gespeichert ist. Öffnet man einen
   Bereich, erscheint er wie bisher sofort mit dem gespeicherten Stand und wird dabei aktualisiert. Das entlastet vor
   allem kleine Webspaces, auf denen viele gleichzeitige Anfragen warten müssen.
+- WordPress: War die App länger als etwa einen halben Tag nicht offen, lehnte der Server die ersten Anfragen ab
+  (abgelaufenes Sicherheitstoken), und jede holte sich ein eigenes neues Token und fragte noch einmal. Aus drei Anfragen
+  an den Server wurden so neun. Jetzt holt die App einmal ein neues Token, bevor sie fragt, meist sogar ohne eigene
+  Anfrage aus der ohnehin aktualisierten App-Seite.
 - WordPress: Benachrichtigungen und Mails (vom Brett, aus dem Bereich E-Mail und Benachrichtigungen per E-Mail) gehen
   direkt nach der Anfrage raus, die sie auslöst, statt auf den nächsten Lauf von WP-Cron zu warten (auf Servern mit
   PHP-FPM oder LiteSpeed, das haben die meisten Hoster). Ein Cronjob beim Hoster alle 15 Minuten zusammen mit

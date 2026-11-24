@@ -26,6 +26,12 @@ interface Authenticator
     public function csrfToken(): string;
 
     /**
+     * Bis wann (Unix-Zeit, Sekunden) das Token von csrfToken() sicher gilt; null, wenn es mit der Sitzung gilt (oder für
+     * Gäste). Die App holt danach vorab ein neues, statt mit dem alten abgelehnt zu werden (WordPress: Nonce).
+     */
+    public function csrfExpiresAt(): ?int;
+
+    /**
      * Kennung der aktuellen Anmeldung (Sitzung), die sich während der Sitzung nicht ändert; leer für Gäste.
      * Bindet z. B. die Anmeldung bei Google („Mit Google verbinden“) an die Sitzung, in der sie begonnen wurde.
      * Nur zum Vergleichen: Sie darf kein Geheimnis preisgeben (z. B. ein Hash des Sitzungsschlüssels).

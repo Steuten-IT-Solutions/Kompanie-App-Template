@@ -229,7 +229,7 @@ final class AppPage
             echo wp_json_encode(['code' => 'not_logged_in', 'message' => I18n::t('Bitte melde dich an.')]);
             return;
         }
-        echo wp_json_encode(['token' => $app->authenticator->csrfToken()]);
+        echo wp_json_encode(['token' => $app->authenticator->csrfToken(), 'expiresAt' => $app->authenticator->csrfExpiresAt()]);
     }
 
     private static function sendPhoto(App $app, int $id, string $size): void

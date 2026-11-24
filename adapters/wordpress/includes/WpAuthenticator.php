@@ -46,6 +46,19 @@ final class WpAuthenticator implements Authenticator
         return is_user_logged_in() ? wp_create_nonce('wp_rest') : '';
     }
 
+    /**
+     * Ein Nonce gilt im Zeitabschnitt, in dem es entstand, und im nächsten (je die halbe nonce_life, sonst 12 Stunden):
+     * also bis zum Ende des nächsten Abschnitts (wie wp_verify_nonce mit wp_nonce_tick rechnet).
+     */
+    public function csrfExpiresAt(): ?int
+    {
+        if (!is_user_logged_in()) {
+            return null;
+        }
+        $life = (int) apply_filters('nonce_life', DAY_IN_SECONDS, 'wp_rest');
+        return (int) floor(((int) wp_nonce_tick('wp_rest') + 1) * ($life / 2));
+    }
+
     /** Hash des Sitzungs-Tokens von WordPress (Anmelde-Cookie); ohne Cookie (z. B. WP-CLI) nur die Benutzer-ID. */
     public function sessionKey(): string
     {

@@ -106,6 +106,9 @@ paths:
                 required: [token]
                 properties:
                   token: { type: string }
+                  expiresAt:
+                    type: [integer, 'null']
+                    description: Wie `csrf.expiresAt` in `/config`
         '401': { $ref: '#/components/responses/Error' }
 
   /auth/login:
@@ -11629,6 +11632,12 @@ components:
           properties:
             header: { type: string, description: 'Name des Headers, z. B. X-CSRF-Token oder X-WP-Nonce' }
             token: { type: string, description: Leer für Gäste ohne Anmeldung }
+            expiresAt:
+              type: [integer, 'null']
+              description: |
+                Bis wann (Unix-Zeit, Sekunden) das Token sicher gilt; null, wenn es mit der Sitzung gilt
+                (eigenständige Version, Gäste). Danach holt die App vor der nächsten Anfrage ein neues
+                (WordPress: Nonce, gilt 12 bis 24 Stunden).
             refreshUrl:
               type: string
               description: |

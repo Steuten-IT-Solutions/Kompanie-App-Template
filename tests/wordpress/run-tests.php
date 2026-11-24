@@ -679,6 +679,9 @@ $c->section('Laufzeit-Konfiguration und App-Seite');
 wp_set_current_user($member);
 $config = $app->api()->config();
 $c->ok($config['csrf']['header'] === 'X-WP-Nonce' && wp_verify_nonce($config['csrf']['token'], 'wp_rest') !== false, 'CSRF-Token ist ein gültiger REST-Nonce');
+// Ablauf: mindestens die halbe nonce_life (12 h) ab jetzt, höchstens die ganze (wp_verify_nonce: dieser und der nächste Abschnitt).
+$exp = $config['csrf']['expiresAt'] ?? null;
+$c->ok(is_int($exp) && $exp >= time() + DAY_IN_SECONDS / 2 - 1 && $exp <= time() + DAY_IN_SECONDS, 'Ablauf des REST-Nonce zwischen 12 und 24 Stunden');
 $c->ok($config['auth']['mode'] === 'redirect' && str_contains((string) $config['auth']['loginUrl'], 'wp-login.php'), 'Anmeldung über wp-login.php');
 $c->ok($config['features']['calendar'] === true && $config['features']['gallery'] === true && $config['features']['news'] === true, 'Eingerichtete Bereiche sind eingeschaltet');
 $c->ok($config['apiBase'] === rest_url('kompanie-app/v1/'), 'API-Adresse der WordPress-REST-API');

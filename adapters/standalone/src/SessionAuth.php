@@ -78,6 +78,12 @@ final class SessionAuth implements Authenticator, AuthContext
         return $hash === null ? '' : hash_hmac('sha256', 'session|' . $hash, $this->secret);
     }
 
+    /** Das Token hängt an der Sitzung und läuft nicht vorher ab. */
+    public function csrfExpiresAt(): ?int
+    {
+        return null;
+    }
+
     public function csrfRefreshUrl(): string
     {
         return $this->env->apiUrl('auth/csrf');
