@@ -23,6 +23,7 @@ import { setLeaveGuard } from './router';
 import { confirmAsk } from './ask';
 import { t } from './i18n';
 import { initTileLayouts } from './tileStore';
+import { afterLoad } from './afterLoad';
 // Gewählte Schrift aus kompanie.json, lokal gebündelt (kein Abruf bei Google).
 import './generated/fonts';
 import './generated/theme.css';
@@ -96,7 +97,7 @@ if ('serviceWorker' in navigator && cfg) {
     // Aktuelle App-Seite aus dem Hintergrund (Seite kam sofort aus dem Speicher)
     else if (e.data?.type === 'kompanie-page') handlePageMessage(e.data);
   });
-  window.addEventListener('load', () => {
+  afterLoad(() => {
     // Der Service Worker erfährt so, wo API und Programmdateien liegen.
     const src = document.querySelector<HTMLScriptElement>('script[type="module"][src]')?.src ?? location.href;
     const assets = src.includes('/assets/') ? src.slice(0, src.lastIndexOf('/assets/') + 1) : new URL('.', src).href;

@@ -3,6 +3,8 @@
 // der Bildschirm. Dann wird die Seite so vergrößert, dass sie wieder genau Handybreite hat. Als Modul statt Inline-Skript,
 // weil die Content-Security-Policy der eigenständigen Version keine Inline-Skripte erlaubt.
 
+import { afterLoad } from './afterLoad';
+
 function fit(): void {
   const root = document.documentElement;
   root.style.removeProperty('zoom');
@@ -32,7 +34,7 @@ function refit(): void {
 }
 
 refit();
-window.addEventListener('load', () => {
+afterLoad(() => {
   last = '';
   refit();
 });
