@@ -26,7 +26,7 @@ Die Farben: **Grün** heißt alles in Ordnung. **Gelb** heißt, etwas sollte erl
 
 ### Updates
 - **Installiert: …** mit dem Zeitpunkt der letzten Prüfung und dem Verweis **Was ist neu**.
-- **Wartung bis …** oder **Wartung: unbefristet**: wie lange eure App neue Versionen bekommt, wenn die Betreuer der App das angeben. Ist die Wartung abgelaufen, steht das hier rot.
+- **Ablauf Wartungsvertrag: …** (ein Datum) oder **Ablauf Wartungsvertrag: unbefristet**: wie lange eure App neue Versionen bekommt, wenn die Betreuer der App das angeben. Ist der Wartungsvertrag abgelaufen, steht hinter dem Datum „(abgelaufen)“, und die Zeile ist rot.
 - **✓ Die App ist auf dem neuesten Stand.** oder **Neue Version: …** mit dem Knopf **Jetzt auf … aktualisieren**.
 - **Das automatische Update auf … wurde zurückgestellt**: nur, wenn vor einem automatischen Update die Sicherung in Google Drive nicht geklappt hat, mit den Knöpfen **Trotzdem aktualisieren** und **Abbrechen**.
 - **Nach Updates suchen** und **Zustand neu laden**.

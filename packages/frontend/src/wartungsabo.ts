@@ -13,12 +13,12 @@ export function dayText(iso: string): string {
 /** null = keine Angabe (nichts anzeigen) */
 export function maintenanceText(maintenance: string | null | undefined, ended: boolean | undefined): string | null {
   if (!maintenance) return null;
-  if (maintenance === 'unbefristet') return t('Wartung: unbefristet.');
+  if (maintenance === 'unbefristet') return t('Ablauf Wartungsvertrag: unbefristet.');
   if (ended) {
     return t(
-      'Das Wartungsabo ist am {date} abgelaufen. Die App läuft mit dieser Version weiter; neue Versionen, auch Sicherheitsupdates, gibt es erst nach einer Verlängerung.',
+      'Ablauf Wartungsvertrag: {date} (abgelaufen). Die App läuft mit dieser Version weiter; neue Versionen, auch Sicherheitsupdates, gibt es erst nach einer Verlängerung.',
       { date: dayText(maintenance) },
     );
   }
-  return t('Wartung bis {date}. Bis dahin bekommt die App neue Versionen.', { date: dayText(maintenance) });
+  return t('Ablauf Wartungsvertrag: {date}. Bis dahin bekommt die App neue Versionen.', { date: dayText(maintenance) });
 }

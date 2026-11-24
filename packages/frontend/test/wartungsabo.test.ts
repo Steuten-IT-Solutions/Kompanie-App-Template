@@ -9,16 +9,16 @@ test('ohne Angabe nichts anzeigen', () => {
 });
 
 test('laufende Wartung nennt das Datum', () => {
-  assert.equal(maintenanceText('2027-06-30', false), 'Wartung bis 30.06.2027. Bis dahin bekommt die App neue Versionen.');
+  assert.equal(maintenanceText('2027-06-30', false), 'Ablauf Wartungsvertrag: 30.06.2027. Bis dahin bekommt die App neue Versionen.');
 });
 
 test('nach dem Ende: weiterlaufen, keine Sicherheitsupdates', () => {
   const t = maintenanceText('2026-11-20', true) ?? '';
-  assert.match(t, /am 20\.11\.2026 abgelaufen/);
+  assert.match(t, /^Ablauf Wartungsvertrag: 20\.11\.2026 \(abgelaufen\)\./);
   assert.match(t, /auch Sicherheitsupdates/);
 });
 
 test('unbefristet und unbekannte Angaben', () => {
-  assert.equal(maintenanceText('unbefristet', false), 'Wartung: unbefristet.');
+  assert.equal(maintenanceText('unbefristet', false), 'Ablauf Wartungsvertrag: unbefristet.');
   assert.equal(dayText('morgen'), 'morgen');
 });

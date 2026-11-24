@@ -62,6 +62,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- Die Zeile zum Wartungsvertrag unter [Einstellungen → Zustand und Updates](app:einstellungen/zustand) heißt jetzt
+  „Ablauf Wartungsvertrag: …“ (ein Datum oder „unbefristet“) statt „Wartung bis …“ bzw. „Wartung: unbefristet“.
 - Die App schickt beim Start viel weniger Anfragen an den Server (gemessen: 4 statt 18). Bisher lud sie im Hintergrund
   die Daten aller anderen Bereiche neu; jetzt nur noch, was auf dem Gerät noch nicht gespeichert ist. Öffnet man einen
   Bereich, erscheint er wie bisher sofort mit dem gespeicherten Stand und wird dabei aktualisiert. Das entlastet vor
