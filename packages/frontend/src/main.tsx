@@ -24,6 +24,7 @@ import { confirmAsk } from './ask';
 import { t } from './i18n';
 import { initTileLayouts } from './tileStore';
 import { afterLoad } from './afterLoad';
+import { onServiceWorkerMessage } from './earlyMessages';
 // Gewählte Schrift aus kompanie.json, lokal gebündelt (kein Abruf bei Google).
 import './generated/fonts';
 import './generated/theme.css';
@@ -92,7 +93,7 @@ void Promise.all([preparePreview(), restoreSkeletons()]).then(([notice]) => {
 const cfg = config;
 if ('serviceWorker' in navigator && cfg) {
   // Neue Daten aus dem Hintergrund (public/sw.js, Issue #108): offene Ansichten neu laden.
-  navigator.serviceWorker.addEventListener('message', (e: MessageEvent) => {
+  onServiceWorkerMessage((e: MessageEvent) => {
     if (e.data?.type === 'kompanie-data') dataUpdated();
     // Aktuelle App-Seite aus dem Hintergrund (Seite kam sofort aus dem Speicher)
     else if (e.data?.type === 'kompanie-page') handlePageMessage(e.data);

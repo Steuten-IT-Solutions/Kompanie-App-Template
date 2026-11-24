@@ -5605,7 +5605,9 @@ test('Service Worker: nach einem Update alte Speicher gelöscht, alle Programmte
   });
   await page.evaluate(async (assets) => {
     // Stand vor einem Update: Speicher früherer Versionen (alter Name und voriger Build), kein Service Worker,
-    // keine gespeicherte App-Seite.
+    // keine gespeicherte App-Seite. Erst warten, bis die App ihren Service Worker angemeldet hat (nach dem Laden der
+    // Seite): Sonst installiert er sich erst danach und speichert die App-Seite vor dem Neuladen.
+    await navigator.serviceWorker.ready;
     for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
     await (await caches.open('kompanie-static-v2')).put('/alt.js', new Response('alt'));
     await (await caches.open('kompanie-static-000000000000')).put(assets + 'assets/Alt-0000.js', new Response('alt'));

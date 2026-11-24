@@ -6,6 +6,8 @@
 // deshalb startet die App erst danach. Fehlt der Katalog (z. B. ohne Netz vor dem ersten Speichern), erscheint die App
 // auf Deutsch wie bei einem fehlenden Eintrag.
 import { takeEarlyInstallPrompt } from './earlyInstall';
+// Früh laden: nimmt Nachrichten des Service Workers an, bis die App da ist.
+import './earlyMessages';
 import { locale, setCatalog, SOURCE_LOCALE, type Catalog, type Locale } from './i18n';
 
 void takeEarlyInstallPrompt; // früh laden: fängt das Installationsangebot ab, bevor die App da ist
