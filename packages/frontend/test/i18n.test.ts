@@ -9,6 +9,7 @@ import {
   locale,
   localeTag,
   saveDeviceLocale,
+  setCatalog,
   setLocale,
   t,
   tc,
@@ -113,4 +114,17 @@ test('Wahl am Gerät merken und lesen, ohne Speicher kein Fehler', () => {
   };
   assert.equal(deviceLocale(broken), null);
   saveDeviceLocale('en', broken);
+});
+
+test('setCatalog: Katalog einer Sprache gilt danach für t(), Deutsch braucht keinen', () => {
+  setCatalog('en', { Speichern: 'Save' });
+  setCatalog('de', { Speichern: 'Falsch' });
+  setLocale('en', { documentElement: { lang: 'de' } });
+  try {
+    assert.equal(t('Speichern'), 'Save');
+  } finally {
+    setLocale('de', { documentElement: { lang: 'de' } });
+    setCatalog('en', {});
+  }
+  assert.equal(t('Speichern'), 'Speichern');
 });

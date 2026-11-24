@@ -70,6 +70,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   (abgelaufenes Sicherheitstoken), und jede holte sich ein eigenes neues Token und fragte noch einmal. Aus drei Anfragen
   an den Server wurden so neun. Jetzt holt die App einmal ein neues Token, bevor sie fragt, meist sogar ohne eigene
   Anfrage aus der ohnehin aktualisierten App-Seite.
+- Die App startet auf Handys schneller: Die Übersetzungen einer weiteren Sprache (z. B. Englisch) lädt sie nur noch,
+  wenn beim Start diese Sprache gilt. Auf Deutsch ist das Startpaket damit etwa halb so groß.
 - WordPress: Benachrichtigungen und Mails (vom Brett, aus dem Bereich E-Mail und Benachrichtigungen per E-Mail) gehen
   direkt nach der Anfrage raus, die sie auslöst, statt auf den nächsten Lauf von WP-Cron zu warten (auf Servern mit
   PHP-FPM oder LiteSpeed, das haben die meisten Hoster). Ein Cronjob beim Hoster alle 15 Minuten zusammen mit

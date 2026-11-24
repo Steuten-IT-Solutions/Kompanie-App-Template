@@ -2,7 +2,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { localizeBrand, type LocalizableBrand } from '../src/brandLocale.ts';
-import { setLocale } from '../src/i18n.ts';
+import { setCatalog, setLocale, type Catalog } from '../src/i18n.ts';
+import en from '../../core/src/I18n/en.json' with { type: 'json' };
+
+// In der App lädt boot.ts den Katalog der Sprache; hier gleich den englischen.
+setCatalog('en', en as Catalog);
 
 const doc = { documentElement: { lang: 'de' } };
 

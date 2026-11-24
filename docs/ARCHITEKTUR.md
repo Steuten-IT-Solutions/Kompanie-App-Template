@@ -644,7 +644,10 @@ Deutsch ist die Ausgangssprache; weitere Sprachen (zuerst Englisch) kommen schri
 Deutsch im Code und laufen durch `t('Speichern')` bzw. `tn('{count} Termin', '{count} Termine', n)` (App,
 `packages/frontend/src/i18n.ts`) oder `I18n::t()`/`I18n::tn()` (Kern, `packages/core/src/I18n/I18n.php`). Der deutsche
 Text ist der Schlüssel; je weitere Sprache gibt es einen Katalog `packages/core/src/I18n/<sprache>.json` für App und
-Kern zugleich. Fehlt ein Eintrag, erscheint Deutsch.
+Kern zugleich. Fehlt ein Eintrag, erscheint Deutsch. In der App ist der Einstieg `boot.ts`: Er legt die Sprache fest
+(Konto, Gerät, Browser, Basissprache; nur eingeschaltete), lädt nur ihren Katalog als eigene Datei (Deutsch braucht
+keinen) und startet erst danach `main.tsx`, weil Module schon beim Laden `t()` aufrufen. Das Startpaket enthält so keinen
+Katalog; App und CSS holt der Browser trotzdem gleich mit der Seite (`modulepreload`, Vite-Plugin `preloadApp`).
 
 **Regel:** Neue oder geänderte Texte bekommen im selben Pull Request ihren Eintrag in jedem Katalog.
 `php scripts/check-i18n.php` (CI-Job `checks`) meldet fehlende und nicht mehr genutzte Einträge und abweichende

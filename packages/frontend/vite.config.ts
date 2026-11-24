@@ -69,6 +69,41 @@ function precacheList(): Plugin {
   };
 }
 
+// Einstieg ist src/boot.ts (Sprache und ihr Katalog), die App selbst (src/main.tsx) lädt er nach. Damit der Browser die
+// App und ihr CSS trotzdem gleich mit der Seite holt (wie vorher als Einstieg), stehen sie als modulepreload und
+// stylesheet in index.html; ausgeführt wird die App erst, wenn boot.ts sie importiert.
+function preloadApp(): Plugin {
+  return {
+    name: 'kompanie-preload-app',
+    apply: 'build',
+    transformIndexHtml: {
+      order: 'post',
+      handler(_html, ctx) {
+        const bundle = ctx.bundle;
+        if (!bundle) return [];
+        // Die App ist der nachgeladene Teil, der src/main.tsx enthält (facadeModuleId fehlt, wenn Rollup Module zusammenlegt).
+        const main = Object.values(bundle).find(
+          (c) => c.type === 'chunk' && c.isDynamicEntry && c.moduleIds.some((id) => id.endsWith('/src/main.tsx')),
+        );
+        if (!main || main.type !== 'chunk') throw new Error('index.html: Teil der App (src/main.tsx) nicht gefunden.');
+        const css = [...(main.viteMetadata?.importedCss ?? [])];
+        return [
+          ...css.map((href) => ({
+            tag: 'link',
+            attrs: { rel: 'stylesheet', crossorigin: true, href: './' + href },
+            injectTo: 'head' as const,
+          })),
+          ...[main.fileName, ...main.imports.filter((f) => !(bundle[f]?.type === 'chunk' && bundle[f].isEntry))].map((href) => ({
+            tag: 'link',
+            attrs: { rel: 'modulepreload', crossorigin: true, href: './' + href },
+            injectTo: 'head' as const,
+          })),
+        ];
+      },
+    },
+  };
+}
+
 // pdf.js (Issue #2): Bilder in gescannten PDFs (JBIG2, JPEG 2000) dekodiert pdf.js mit eigenen Modulen, die es zur
 // Laufzeit unter festem Namen nachlädt. Hier die reinen JavaScript-Fassungen (keine .wasm-Dateien: manche Webserver
 // kennen den Typ nicht, und die Veröffentlichung nimmt nur bekannte Dateitypen an). Ordner mit der Version im Namen,
@@ -128,6 +163,7 @@ export default defineConfig({
     brandHtml(),
     pdfjsDecoders(),
     precacheList(),
+    preloadApp(),
     thirdPartyLicenses({ root: fileURLToPath(new URL('../..', import.meta.url)) }),
   ],
   css: { postcss: { plugins: [themeOverride()] } },
