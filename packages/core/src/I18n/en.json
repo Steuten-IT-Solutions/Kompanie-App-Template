@@ -830,7 +830,6 @@
   "Block ausblenden": "Hide block",
   "Block einfügen": "Insert block",
   "Block „{name}“ entfernen?": "Remove block “{name}”?",
-  "Blockarten": "Block types",
   "Blocksatz": "Justify",
   "board muss true oder false sein.": "board must be true or false.",
   "Braucht {areas}.": "Needs {areas}.",
@@ -4928,5 +4927,10 @@
   "Per E-Mail: an": "By email: on",
   "Per E-Mail: aus": "By email: off",
   "Zusätzlich eine E-Mail an deine Adresse. Gilt für dein Konto, egal auf welchem Gerät du die App nutzt.": "An additional email to your address. Applies to your account, whichever device you use the app on.",
-  "types muss eine Liste von Arten sein.": "types must be a list of notification types."
+  "types muss eine Liste von Arten sein.": "types must be a list of notification types.",
+  "Text und Medien": "Text and media",
+  "Termine und Ablauf": "Events and schedule",
+  "Personen und Zahlen": "People and figures",
+  "Mitmachen und Links": "Take part and links",
+  "Gestaltung": "Layout"
 }

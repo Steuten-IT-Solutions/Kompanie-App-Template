@@ -6700,6 +6700,21 @@ test('Block einfügen: Fenster mit allen Blockarten, Zurück und Esc schließen 
   const dialog = page.getByRole('dialog', { name: 'Block einfügen' });
   await open.click();
   await expect(dialog.locator('.block-kind')).toHaveCount(15);
+  // Nach Gruppen: eigene Bilder stehen neben Album und Dokument
+  await expect(dialog.locator('.block-kind-group-title')).toHaveText([
+    'Text und Medien',
+    'Termine und Ablauf',
+    'Personen und Zahlen',
+    'Mitmachen und Links',
+    'Gestaltung',
+  ]);
+  expect(
+    await dialog
+      .locator('.block-kind-group')
+      .first()
+      .locator('.block-kind')
+      .evaluateAll((els) => els.map((e) => e.getAttribute('data-kind'))),
+  ).toEqual(['text', 'image', 'album', 'document']);
   await expect(dialog.locator('.block-kind[data-kind="countdown"]')).toContainText('Zählt bis zu einem Datum');
   await shot(page, 'seiten-block-einfuegen');
   // „Zurück“ schließt nur das Fenster, die Seite bleibt

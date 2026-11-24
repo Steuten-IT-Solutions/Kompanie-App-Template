@@ -12,6 +12,7 @@ import {
 import { formatBytes } from '../format';
 import { Loading, Sheet, lazyView } from '../ui';
 import {
+  BLOCK_GROUPS,
   BLOCK_KINDS,
   moveBlock,
   newBlock,
@@ -642,29 +643,38 @@ function InsertBlock({ onInsert, label = t('+ Block einfügen') }: { onInsert: (
       </button>
       {open && (
         <Sheet title={t('Block einfügen')} onClose={() => setOpen(false)}>
-          <ul className="block-kinds" aria-label={t('Blockarten')}>
-            {BLOCK_KINDS.map((k) => (
-              <li key={k.type}>
-                <button
-                  type="button"
-                  className="block-kind"
-                  data-kind={k.type}
-                  onClick={() => {
-                    setOpen(false);
-                    onInsert(k.type);
-                  }}
-                >
-                  <span className="block-kind-icon">
-                    <BlockIcon type={k.type} />
-                  </span>
-                  <span className="block-kind-text">
-                    <strong>{kindLabel(k)}</strong>
-                    <span className="muted small">{k.hint}</span>
-                  </span>
-                </button>
-              </li>
+          <div className="block-kind-groups">
+            {BLOCK_GROUPS.map((g) => (
+              <section key={g.id} className="block-kind-group" aria-labelledby={`block-group-${g.id}`}>
+                <h3 id={`block-group-${g.id}`} className="block-kind-group-title">
+                  {g.label}
+                </h3>
+                <ul className="block-kinds">
+                  {BLOCK_KINDS.filter((k) => k.group === g.id).map((k) => (
+                    <li key={k.type}>
+                      <button
+                        type="button"
+                        className="block-kind"
+                        data-kind={k.type}
+                        onClick={() => {
+                          setOpen(false);
+                          onInsert(k.type);
+                        }}
+                      >
+                        <span className="block-kind-icon">
+                          <BlockIcon type={k.type} />
+                        </span>
+                        <span className="block-kind-text">
+                          <strong>{kindLabel(k)}</strong>
+                          <span className="muted small">{k.hint}</span>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
             ))}
-          </ul>
+          </div>
         </Sheet>
       )}
     </div>
