@@ -94,7 +94,7 @@ final class WpScheduler implements Scheduler
         // Im Cron-Lauf selbst erledigt das WP-Cron; sonst nach der Antwort (der eingeplante Lauf bleibt der Rückfall).
         if (in_array($task, self::AFTER_RESPONSE, true) && !wp_doing_cron() && !self::$draining) {
             if (self::$afterResponse === []) {
-                add_action('shutdown', [self::class, 'runAfterResponse'], PHP_INT_MAX);
+                add_action('shutdown', static fn () => self::runAfterResponse(), PHP_INT_MAX, 0);
             }
             self::$afterResponse[$task] = true;
         }
