@@ -172,3 +172,39 @@ test('Frisch nur bis FRESH_MS nach dem Vorabladen', async () => {
   await p.tap([{ key: 'galerie', deps: [], load: () => Promise.resolve({ years: [] }) }]);
   assert.equal(takeFresh(cacheKey('galerie', []), Date.now() + 60_000), false);
 });
+
+test('Im Leerlauf zuerst aus dem Speicher des Service Workers (storedFirst), beim Antippen nicht', async () => {
+  dataCache.clear();
+  let stored = 0;
+  const marks: [string, boolean][] = [];
+  const storedFirst = <T>(start: () => Promise<T>): Promise<T> => {
+    stored++;
+    try {
+      return start();
+    } finally {
+      stored--;
+    }
+  };
+  const p = create({
+    blocked: () => false,
+    idleOk: () => true,
+    whenIdle: () => Promise.resolve(),
+    prefetch,
+    inBackground,
+    storedFirst,
+  });
+  const src = (key: string): PrefetchSource => ({
+    key,
+    deps: [],
+    load: () => {
+      marks.push([key, stored > 0]);
+      return Promise.resolve(key);
+    },
+  });
+  await p.idle([src('leer')]);
+  await p.tap([src('tipp')]);
+  assert.deepEqual(marks, [
+    ['leer', true],
+    ['tipp', false],
+  ]);
+});

@@ -55,6 +55,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- Die App schickt beim Start viel weniger Anfragen an den Server (gemessen: 4 statt 18). Bisher lud sie im Hintergrund
+  die Daten aller anderen Bereiche neu; jetzt nur noch, was auf dem Gerät noch nicht gespeichert ist. Öffnet man einen
+  Bereich, erscheint er wie bisher sofort mit dem gespeicherten Stand und wird dabei aktualisiert. Das entlastet vor
+  allem kleine Webspaces, auf denen viele gleichzeitige Anfragen warten müssen.
 - WordPress: Benachrichtigungen und Mails (vom Brett, aus dem Bereich E-Mail und Benachrichtigungen per E-Mail) gehen
   direkt nach der Anfrage raus, die sie auslöst, statt auf den nächsten Lauf von WP-Cron zu warten (auf Servern mit
   PHP-FPM oder LiteSpeed, das haben die meisten Hoster). Ein Cronjob beim Hoster alle 15 Minuten zusammen mit

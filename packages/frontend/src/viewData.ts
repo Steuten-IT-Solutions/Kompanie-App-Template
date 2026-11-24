@@ -5,6 +5,7 @@ import {
   config,
   inBackground,
   isMember,
+  storedFirst,
   type AttendanceEvent,
   type AttendanceSummary,
   type CalendarEvent,
@@ -277,6 +278,7 @@ export const prefetcher = createPrefetcher({
   idleOk: () => idleNetworkOk(navigator as NetworkInfo),
   prefetch,
   inBackground,
+  storedFirst,
 });
 
 /** Beim Antippen eines Albums so viele Vorschaubilder vorladen (die erste Bildschirmseite und etwas mehr). */

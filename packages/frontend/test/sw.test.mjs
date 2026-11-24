@@ -371,6 +371,34 @@ test('Mit X-Kompanie-Stale-Ok (Issue #108): gespeicherte Antwort sofort, aus dem
   assert.equal(sw.messages.length, 1);
 });
 
+test('Mit X-Kompanie-Prefetch: Gespeichertes ohne Anfrage an den Server, Fehlendes aus dem Netz', async () => {
+  let t = 0;
+  const net = { [`${API}gallery`]: json('["a"]'), [`${API}offices`]: json('["o"]') };
+  const sw = load({ net, now: () => t });
+  const PREFETCH = { ...STALE_OK, 'X-Kompanie-Prefetch': '1' };
+  // Noch nichts gespeichert: aus dem Netz (und gespeichert).
+  assert.equal(await (await sw.request(`${API}gallery`, 'cors', PREFETCH)).text(), '["a"]');
+  assert.equal(sw.fetched.length, 1);
+  // Gespeichert: nur aus dem Speicher, auch nach FRESH_MS keine Anfrage im Hintergrund.
+  net[`${API}gallery`] = json('["a","b"]');
+  t = 20_000;
+  assert.equal(await (await sw.request(`${API}gallery`, 'cors', PREFETCH)).text(), '["a"]');
+  assert.equal(sw.fetched.length, 1, 'keine Anfrage an den Server');
+  assert.equal(sw.messages.length, 0);
+  // Andere Adresse, noch nicht gespeichert: aus dem Netz.
+  assert.equal(await (await sw.request(`${API}offices`, 'cors', PREFETCH)).text(), '["o"]');
+  assert.equal(sw.fetched.length, 2);
+  // Öffnet die Person die Ansicht (ohne X-Kompanie-Prefetch): gespeichert sofort, aus dem Netz im Hintergrund.
+  assert.equal(await (await sw.request(`${API}gallery`, 'cors', STALE_OK)).text(), '["a"]');
+  assert.equal(sw.fetched.length, 3);
+  // Nach einer eigenen Änderung gilt das Gespeicherte nicht mehr: auch beim Vorabladen aus dem Netz.
+  t = 40_000;
+  await sw.request(`${API}board`, 'cors', {}, 'POST');
+  t = 60_000;
+  assert.equal(await (await sw.request(`${API}gallery`, 'cors', PREFETCH)).text(), '["a","b"]');
+  assert.equal(sw.fetched.length, 4);
+});
+
 test('Mit X-Kompanie-Stale-Ok: Läuft die Abfrage im Hintergrund schon, fragt er danach noch einmal (Issue #68)', async () => {
   let t = 0;
   const net = { [`${API}board`]: json('["alt"]') };

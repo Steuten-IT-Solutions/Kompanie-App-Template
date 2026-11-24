@@ -3,7 +3,8 @@
  * erscheint. Zwei Wege:
  * - tap: beim Antippen (pointerdown, etwa 100–300 ms vor dem click) bzw. Fokus per Tastatur, vor allem anderen;
  * - idle: nach dem Start, wenn der Browser untätig ist, eins nach dem anderen (nicht im Datensparmodus, nicht in einem
- *   langsamen Netz, nicht offline).
+ *   langsamen Netz, nicht offline). Hat der Service Worker die Daten schon gespeichert, kommen sie aus seinem Speicher,
+ *   ohne Anfrage an den Server (storedFirst); zum Server geht nur, was auf dem Gerät noch fehlt.
  * Höchstens eine Vorab-Anfrage gleichzeitig. Abgelegt wird über dataCache.prefetch: unter dem Schlüssel der Ansicht,
  * nur wenn seit dem Start nichts geändert wurde, nichts doppelt. Fehler bleiben still (api.inBackground: keine
  * Weiterleitung zur Anmeldung, nichts unter „Fehler melden“): Die Ansicht lädt dann beim Öffnen selbst.
@@ -48,14 +49,27 @@ export interface PrefetcherOptions {
   prefetch: (key: string, deps: unknown[], load: () => Promise<unknown>, markFresh: boolean) => Promise<void>;
   /** api.inBackground: ohne Weiterleitung zur Anmeldung und ohne Eintrag unter „Fehler melden“ */
   inBackground: <T>(start: () => Promise<T>) => Promise<T>;
+  /**
+   * api.storedFirst, nur im Leerlauf: Was der Service Worker schon gespeichert hat, kommt aus seinem Speicher, ohne
+   * Anfrage an den Server (beim Start sonst eine Anfrage je Bereich). Beim Antippen nicht: Dann öffnet die Ansicht gleich.
+   */
+  storedFirst?: <T>(start: () => Promise<T>) => Promise<T>;
 }
 
-export function createPrefetcher({ blocked, idleOk, whenIdle: idle = whenIdle, prefetch, inBackground }: PrefetcherOptions) {
+export function createPrefetcher({
+  blocked,
+  idleOk,
+  whenIdle: idle = whenIdle,
+  prefetch,
+  inBackground,
+  storedFirst = (start) => start(),
+}: PrefetcherOptions) {
   const queue: { source: PrefetchSource; idle: boolean }[] = [];
   let running = false;
 
   // Beim Antippen öffnet die Ansicht gleich: Sie fragt dann nicht noch einmal (dataCache.takeFresh).
-  const run = (s: PrefetchSource, tapped: boolean) => prefetch(s.key, s.deps, () => inBackground(s.load), tapped);
+  const run = (s: PrefetchSource, tapped: boolean) =>
+    prefetch(s.key, s.deps, () => inBackground(tapped ? s.load : () => storedFirst(s.load)), tapped);
 
   async function pump(): Promise<void> {
     if (running) return;
